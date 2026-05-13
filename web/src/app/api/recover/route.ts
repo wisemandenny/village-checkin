@@ -14,33 +14,33 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient();
 
   // Case-insensitive lookup
-  const { data: attendee, error: lookupErr } = await supabase
-    .from("attendees")
+  const { data: villager, error: lookupErr } = await supabase
+    .from("villagers")
     .select("*")
     .ilike("display_name", display_name.trim())
     .single();
 
-  if (lookupErr || !attendee) {
+  if (lookupErr || !villager) {
     return NextResponse.json(
       { error: "No account found with that name. Check your spelling or register as new." },
       { status: 404 }
     );
   }
 
-  // Upsert the new device_id onto the existing attendee
+  // Upsert the new device_id onto the existing villager
   const { error: updateErr } = await supabase
-    .from("attendees")
+    .from("villagers")
     .update({
       device_id: new_device_id,
       last_visited_at: new Date().toISOString(),
     })
-    .eq("id", attendee.id);
+    .eq("id", villager.id);
 
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
   return NextResponse.json({
-    attendee: { ...attendee, device_id: new_device_id },
+    villager: { ...villager, device_id: new_device_id },
   });
 }

@@ -14,28 +14,28 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient();
 
-  // Look up attendee
-  const { data: attendee, error: lookupErr } = await supabase
-    .from("attendees")
+  // Look up villager
+  const { data: villager, error: lookupErr } = await supabase
+    .from("villagers")
     .select("id")
     .eq("device_id", device_id)
     .single();
 
-  if (lookupErr || !attendee) {
-    return NextResponse.json({ error: "Attendee not found" }, { status: 404 });
+  if (lookupErr || !villager) {
+    return NextResponse.json({ error: "Villager not found" }, { status: 404 });
   }
 
   // Update last_visited_at
   await supabase
-    .from("attendees")
+    .from("villagers")
     .update({ last_visited_at: new Date().toISOString() })
-    .eq("id", attendee.id);
+    .eq("id", villager.id);
 
   // Create check-in record
   const { data: checkIn, error: insertErr } = await supabase
     .from("check_ins")
     .insert({
-      attendee_id: attendee.id,
+      villager_id: villager.id,
       intent_amount,
       payment_method,
       status: payment_method === "skipped" ? "paid" : "pending",

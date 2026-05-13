@@ -1,4 +1,4 @@
-export interface Attendee {
+export interface Villager {
   id: string;
   device_id: string;
   display_name: string;
@@ -11,7 +11,7 @@ export interface Attendee {
 
 export interface CheckIn {
   id: string;
-  attendee_id: string;
+  villager_id: string;
   intent_amount: number;
   payment_method: PaymentMethod;
   status: CheckInStatus;

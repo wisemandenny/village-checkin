@@ -22,11 +22,11 @@ export default function Home() {
     }
 
     // Returning user — check if they exist in the DB
-    fetch(`/api/attendee?device_id=${encodeURIComponent(id)}`)
+    fetch(`/api/villager?device_id=${encodeURIComponent(id)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.attendee) {
-          setDisplayName(data.attendee.display_name);
+        if (data?.villager) {
+          setDisplayName(data.villager.display_name);
           setScreen("checkin");
         } else {
           setScreen("onboarding");

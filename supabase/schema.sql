@@ -3,8 +3,8 @@
 -- Enable UUID generation
 create extension if not exists "pgcrypto";
 
--- Attendees table: one row per unique device
-create table attendees (
+-- Villagers table: one row per unique device
+create table villagers (
   id          uuid primary key default gen_random_uuid(),
   device_id   text unique not null,
   display_name text not null,
@@ -18,7 +18,7 @@ create table attendees (
 -- Check-ins table: one row per studio visit
 create table check_ins (
   id                   uuid primary key default gen_random_uuid(),
-  attendee_id          uuid not null references attendees(id) on delete cascade,
+  villager_id          uuid not null references villagers(id) on delete cascade,
   intent_amount        integer not null default 0,
   payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped')),
   status               text not null default 'pending' check (status in ('pending', 'paid')),
@@ -27,31 +27,31 @@ create table check_ins (
 );
 
 -- Case-insensitive unique constraint on display_name for identity recovery
-create unique index idx_attendees_display_name_unique
-  on attendees (lower(display_name));
+create unique index idx_villagers_display_name_unique
+  on villagers (lower(display_name));
 
 -- Index for fast lookups by device_id
-create index idx_attendees_device_id on attendees(device_id);
+create index idx_villagers_device_id on villagers(device_id);
 
--- Index for fast lookups by attendee
-create index idx_check_ins_attendee_id on check_ins(attendee_id);
+-- Index for fast lookups by villager
+create index idx_check_ins_villager_id on check_ins(villager_id);
 
 -- Row Level Security (RLS) policies
--- For now, keep it simple: service role has full access, anon can read/insert attendees
-alter table attendees enable row level security;
+-- For now, keep it simple: service role has full access, anon can read/insert villagers
+alter table villagers enable row level security;
 alter table check_ins enable row level security;
 
--- Allow anon key to look up attendees by device_id
-create policy "Attendees are viewable by anon"
-  on attendees for select
+-- Allow anon key to look up villagers by device_id
+create policy "Villagers are viewable by anon"
+  on villagers for select
   using (true);
 
-create policy "Attendees can be inserted by anon"
-  on attendees for insert
+create policy "Villagers can be inserted by anon"
+  on villagers for insert
   with check (true);
 
-create policy "Attendees can be updated by anon"
-  on attendees for update
+create policy "Villagers can be updated by anon"
+  on villagers for update
   using (true);
 
 -- Check-ins: anon can insert and read their own

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (primary_role) record.primary_role = primary_role;
 
   const { data, error } = await supabase
-    .from("attendees")
+    .from("villagers")
     .insert(record)
     .select()
     .single();
@@ -33,5 +33,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ attendee: data }, { status: 201 });
+  return NextResponse.json({ villager: data }, { status: 201 });
 }

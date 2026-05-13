@@ -11,14 +11,14 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient();
 
   const { data, error } = await supabase
-    .from("attendees")
+    .from("villagers")
     .select("*")
     .eq("device_id", deviceId)
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ attendee: null }, { status: 404 });
+    return NextResponse.json({ villager: null }, { status: 404 });
   }
 
-  return NextResponse.json({ attendee: data });
+  return NextResponse.json({ villager: data });
 }

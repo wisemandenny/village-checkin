@@ -73,7 +73,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
       // Overwrite localStorage with the (same) device ID now linked to the old account
       setDeviceId(deviceId);
-      onComplete(data.attendee.display_name);
+      onComplete(data.villager.display_name);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

@@ -8,7 +8,7 @@ interface RecoveryFlowProps {
   onCancel: () => void;
 }
 
-interface AttendeeMatch {
+interface VillagerMatch {
   id: string;
   display_name: string;
   primary_role: string | null;
@@ -17,7 +17,7 @@ interface AttendeeMatch {
 
 export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AttendeeMatch[]>([]);
+  const [results, setResults] = useState<VillagerMatch[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -31,10 +31,10 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
 
     try {
       const res = await fetch(
-        `/api/attendee/search?display_name=${encodeURIComponent(query.trim())}`
+        `/api/villager/search?display_name=${encodeURIComponent(query.trim())}`
       );
       const data = await res.json();
-      setResults(data.attendees ?? []);
+      setResults(data.villagers ?? []);
     } catch {
       setError("Search failed. Try again.");
     } finally {
@@ -42,7 +42,7 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
     }
   }, [query]);
 
-  async function handleClaim(attendee: AttendeeMatch) {
+  async function handleClaim(villager: VillagerMatch) {
     setClaiming(true);
     setError(null);
 
@@ -51,7 +51,7 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          attendee_id: attendee.id,
+          villager_id: villager.id,
           new_device_id: deviceId,
         }),
       });
@@ -61,7 +61,7 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
         throw new Error(data.error || "Recovery failed");
       }
 
-      onRecovered(attendee.display_name);
+      onRecovered(villager.display_name);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
