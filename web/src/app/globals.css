@@ -26,3 +26,64 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
 }
+
+.input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.form-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-foreground);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.form-input:focus {
+  border-color: var(--color-accent);
+}
+
+.btn-primary {
+  border-radius: 0.5rem;
+  background: var(--color-accent);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: white;
+  transition: background-color 0.15s;
+}
+.btn-primary:hover {
+  background: var(--color-accent-light);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.btn-secondary {
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  transition: all 0.15s;
+}
+.btn-secondary:hover {
+  border-color: var(--color-foreground);
+  color: var(--color-foreground);
+}

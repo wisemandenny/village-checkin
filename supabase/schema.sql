@@ -66,3 +66,6 @@ create policy "Check-ins can be inserted by anon"
 create policy "Check-ins can be updated by service role"
   on check_ins for update
   using (true);
+
+-- Deletes: only service role (admin) can delete; no anon delete policy needed
+-- since the admin panel uses the service role key which bypasses RLS.
