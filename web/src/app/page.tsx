@@ -11,6 +11,7 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [deviceId, setDeviceId] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("");
+  const [pendingCheckInId, setPendingCheckInId] = useState<string | undefined>();
 
   useEffect(() => {
     const { deviceId: id, isNew } = getOrCreateDeviceId();
@@ -21,12 +22,21 @@ export default function Home() {
       return;
     }
 
-    // Returning user — check if they exist in the DB
-    fetch(`/api/villager?device_id=${encodeURIComponent(id)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.villager) {
-          setDisplayName(data.villager.display_name);
+    // Returning user -- check if they exist, then check for pending check-in
+    Promise.all([
+      fetch(`/api/villager?device_id=${encodeURIComponent(id)}`).then((res) =>
+        res.ok ? res.json() : null
+      ),
+      fetch(
+        `/api/checkin/pending?device_id=${encodeURIComponent(id)}`
+      ).then((res) => (res.ok ? res.json() : null)),
+    ])
+      .then(([villagerData, pendingData]) => {
+        if (villagerData?.villager) {
+          setDisplayName(villagerData.villager.display_name);
+          if (pendingData?.check_in) {
+            setPendingCheckInId(pendingData.check_in.id);
+          }
           setScreen("checkin");
         } else {
           setScreen("onboarding");
@@ -57,7 +67,11 @@ export default function Home() {
       )}
 
       {screen === "checkin" && (
-        <CheckInFlow deviceId={deviceId} displayName={displayName} />
+        <CheckInFlow
+          deviceId={deviceId}
+          displayName={displayName}
+          pendingCheckInId={pendingCheckInId}
+        />
       )}
     </main>
   );

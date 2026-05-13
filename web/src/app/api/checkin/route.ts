@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, intent_amount, payment_method } = body;
+  const { device_id, intent_amount = 0, payment_method = "deferred" } = body;
 
-  if (!device_id || intent_amount === undefined || !payment_method) {
+  if (!device_id) {
     return NextResponse.json(
-      { error: "device_id, intent_amount, and payment_method are required" },
+      { error: "device_id is required" },
       { status: 400 }
     );
   }

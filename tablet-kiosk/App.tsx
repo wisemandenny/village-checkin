@@ -12,6 +12,7 @@ import { API_BASE_URL } from "./src/config";
 interface PaymentPayload {
   check_in_id: string;
   amount: number;
+  request_id: string;
 }
 
 type KioskState = "idle" | "collecting" | "processing" | "success" | "error";
@@ -42,13 +43,21 @@ function KioskScreen() {
     }, delay);
   }, []);
 
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const broadcastEvent = useCallback(
+    (event: string, payload: Record<string, unknown>) => {
+      channelRef.current?.send({ type: "broadcast", event, payload });
+    },
+    []
+  );
+
   const handlePayment = useCallback(
     async (p: PaymentPayload) => {
       setPayload(p);
       setState("collecting");
 
       try {
-        // Discover and connect to local mobile reader (tap-to-pay)
         const { discoveredReaders } = await discoverReaders({
           discoveryMethod: "localMobile",
           simulated: false,
@@ -60,7 +69,6 @@ function KioskScreen() {
           });
         }
 
-        // Create a PaymentIntent via the backend, then collect
         const piRes = await fetch(`${API_BASE_URL}/api/terminal-payment-intent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -79,6 +87,11 @@ function KioskScreen() {
         if (confirmedPI?.status === "succeeded" || confirmedPI?.status === "requires_capture") {
           await updateCheckInStatus(p.check_in_id, "paid", confirmedPI.id);
           setState("success");
+          broadcastEvent("payment_result", {
+            request_id: p.request_id,
+            check_in_id: p.check_in_id,
+            status: "success",
+          });
           resetToIdle();
         } else {
           throw new Error("Payment not confirmed");
@@ -87,27 +100,59 @@ function KioskScreen() {
         const msg = err instanceof Error ? err.message : "Payment failed";
         setErrorMsg(msg);
         setState("error");
+        broadcastEvent("payment_result", {
+          request_id: p.request_id,
+          check_in_id: p.check_in_id,
+          status: "failed",
+          reason: msg,
+        });
         resetToIdle(6000);
       }
     },
-    [discoverReaders, connectLocalMobileReader, collectPaymentMethod, confirmPaymentIntent, resetToIdle]
+    [discoverReaders, connectLocalMobileReader, collectPaymentMethod, confirmPaymentIntent, resetToIdle, broadcastEvent]
   );
 
-  // Subscribe to Supabase Realtime for payment requests
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   useEffect(() => {
     const channel = supabase
       .channel("terminal_room")
       .on("broadcast", { event: "payment_request" }, ({ payload: p }) => {
-        if (state === "idle" && p) {
-          handlePayment(p as PaymentPayload);
+        if (!p) return;
+        const paymentPayload = p as PaymentPayload;
+
+        if (stateRef.current !== "idle") {
+          channel.send({
+            type: "broadcast",
+            event: "payment_ack",
+            payload: {
+              request_id: paymentPayload.request_id,
+              status: "rejected",
+              reason: "busy",
+            },
+          });
+          return;
         }
+
+        channel.send({
+          type: "broadcast",
+          event: "payment_ack",
+          payload: {
+            request_id: paymentPayload.request_id,
+            status: "accepted",
+          },
+        });
+        handlePayment(paymentPayload);
       })
       .subscribe();
+
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [state, handlePayment]);
+  }, [handlePayment]);
 
   const formatDollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
