@@ -2,27 +2,29 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { display_name, new_device_id } = await req.json();
+  const { ig_handle, new_device_id } = await req.json();
 
-  if (!display_name || !new_device_id) {
+  if (!ig_handle || !new_device_id) {
     return NextResponse.json(
-      { error: "display_name and new_device_id are required" },
+      { error: "ig_handle and new_device_id are required" },
       { status: 400 }
     );
   }
 
   const supabase = createServerClient();
 
-  // Case-insensitive lookup
+  let normalized = ig_handle.trim();
+  if (!normalized.startsWith("@")) normalized = `@${normalized}`;
+
   const { data: villager, error: lookupErr } = await supabase
     .from("villagers")
     .select("*")
-    .ilike("display_name", display_name.trim())
+    .ilike("ig_handle", normalized)
     .single();
 
   if (lookupErr || !villager) {
     return NextResponse.json(
-      { error: "No account found with that name. Check your spelling or register as new." },
+      { error: "No account found with that IG handle. Check your spelling or register as new." },
       { status: 404 }
     );
   }

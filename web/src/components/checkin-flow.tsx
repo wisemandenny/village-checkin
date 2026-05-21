@@ -89,12 +89,7 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
           />
         </svg>
       </div>
-      <div>
-        <h2 className="text-2xl font-bold">You&apos;re checked in!</h2>
-        <p className="mt-2 text-[var(--color-muted)]">
-          Welcome to the village, {displayName}. Enjoy your session.
-        </p>
-      </div>
+      <h2 className="text-2xl font-bold">Welcome back to the Village, {displayName}!</h2>
     </div>
   );
 }

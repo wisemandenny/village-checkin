@@ -28,6 +28,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [roles, setRoles] = useState<Set<string>>(new Set());
   const [instruments, setInstruments] = useState<Set<string>>(new Set());
   const [otherInstrument, setOtherInstrument] = useState("");
+  const [recoverIg, setRecoverIg] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,7 +126,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
   async function handleRecover(e: React.FormEvent) {
     e.preventDefault();
-    if (!displayName.trim()) return;
+    if (!recoverIg.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -135,7 +136,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          display_name: displayName.trim(),
+          ig_handle: recoverIg.trim(),
           new_device_id: deviceId,
         }),
       });
@@ -159,15 +160,15 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     return (
       <form onSubmit={handleRecover} className="flex flex-col gap-8 w-full max-w-sm">
         <div className="flex flex-col gap-2">
-          <label htmlFor="recover-name" className="text-sm font-medium text-[var(--color-muted)]">
-            What name did you use last time?
+          <label htmlFor="recover-ig" className="text-sm font-medium text-[var(--color-muted)]">
+            What&apos;s your IG?
           </label>
           <input
-            id="recover-name"
+            id="recover-ig"
             type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Your IG handle or artist name..."
+            value={recoverIg}
+            onChange={(e) => setRecoverIg(e.target.value)}
+            placeholder="@champagnepapi"
             className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
             autoFocus
             required
@@ -180,7 +181,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
         <button
           type="submit"
-          disabled={!displayName.trim() || loading}
+          disabled={!recoverIg.trim() || loading}
           className="h-14 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? "Looking you up..." : "Reconnect"}
@@ -188,11 +189,18 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
         <button
           type="button"
-          onClick={() => { setMode("register"); setError(null); setDisplayName(""); }}
+          onClick={() => { setMode("register"); setError(null); setRecoverIg(""); }}
           className="text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
         >
           Never mind, I&apos;m new here
         </button>
+
+        <a
+          href="/admin"
+          className="text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
+        >
+          Admin
+        </a>
       </form>
     );
   }
@@ -201,14 +209,14 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     <form onSubmit={handleRegister} className="flex flex-col gap-6 w-full max-w-sm">
       <div className="flex flex-col gap-2">
         <label htmlFor="ig" className="text-sm font-medium text-[var(--color-muted)]">
-          IG Handle
+          What&apos;s your IG?
         </label>
         <input
           id="ig"
           type="text"
           value={igHandle}
           onChange={(e) => setIgHandle(e.target.value)}
-          placeholder="@yourhandle"
+          placeholder="@champagnepapi"
           className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
           autoFocus
         />
@@ -246,7 +254,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
       <div className="flex flex-col gap-3">
         <span className="text-sm font-medium text-[var(--color-muted)]">
-          What brings you in?
+          What brings you in? <span className="font-normal opacity-60">(pick as many as you want)</span>
         </span>
         <div className="grid grid-cols-2 gap-2">
           {ROLES.map((r) => (
@@ -269,7 +277,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
       {roles.has("Musician") && (
         <div className="flex flex-col gap-3">
           <span className="text-sm font-medium text-[var(--color-muted)]">
-            What do you play?
+            What do you play? <span className="font-normal opacity-60">(pick as many as you want)</span>
           </span>
           <div className="grid grid-cols-2 gap-2">
             {INSTRUMENTS.map((inst) => (
