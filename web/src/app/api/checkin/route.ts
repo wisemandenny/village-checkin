@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, intent_amount = 0, payment_method = "deferred" } = body;
+  const { device_id, intent_amount = 0, payment_method = "skipped" } = body;
 
   if (!device_id) {
     return NextResponse.json(
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       villager_id: villager.id,
       intent_amount,
       payment_method,
-      status: payment_method === "skipped" ? "paid" : "pending",
+      status: payment_method === "skipped" ? "skipped" : "pending",
     })
     .select()
     .single();

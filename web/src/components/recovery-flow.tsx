@@ -11,7 +11,7 @@ interface RecoveryFlowProps {
 interface VillagerMatch {
   id: string;
   display_name: string;
-  primary_role: string | null;
+  roles: string[];
   first_visited_at: string;
 }
 
@@ -132,9 +132,9 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
             >
               <div>
                 <span className="text-lg font-semibold">{a.display_name}</span>
-                {a.primary_role && (
+                {a.roles?.length > 0 && (
                   <span className="ml-2 text-sm text-[var(--color-muted)]">
-                    {a.primary_role}
+                    {a.roles.join(", ")}
                   </span>
                 )}
               </div>

@@ -2,22 +2,22 @@
 
 :root {
   --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
-  --color-accent: #6d28d9;
-  --color-accent-light: #8b5cf6;
+  --color-foreground: #1a1a1a;
+  --color-accent: #dc2626;
+  --color-accent-light: #ef4444;
   --color-muted: #6b7280;
-  --color-surface: #f9fafb;
+  --color-surface: #fafafa;
   --color-border: #e5e7eb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --color-background: #0a0a0a;
-    --color-foreground: #ededed;
-    --color-accent: #a78bfa;
-    --color-accent-light: #c4b5fd;
+    --color-foreground: #f0f0f0;
+    --color-accent: #ef4444;
+    --color-accent-light: #f87171;
     --color-muted: #9ca3af;
-    --color-surface: #171717;
+    --color-surface: #141414;
     --color-border: #262626;
   }
 }
@@ -25,6 +25,10 @@
 body {
   background: var(--color-background);
   color: var(--color-foreground);
+}
+
+.animate-pulse-slow {
+  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 .input {

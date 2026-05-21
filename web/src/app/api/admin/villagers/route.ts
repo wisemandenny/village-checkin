@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   if (search) {
     query = query.or(
-      `display_name.ilike.%${search}%,email.ilike.%${search}%,primary_role.ilike.%${search}%`
+      `display_name.ilike.%${search}%,email.ilike.%${search}%,ig_handle.ilike.%${search}%`
     );
   }
 
@@ -41,7 +41,9 @@ export async function POST(req: NextRequest) {
     .insert({
       device_id: body.device_id,
       display_name: body.display_name,
-      primary_role: body.primary_role || null,
+      ig_handle: body.ig_handle || null,
+      roles: body.roles ?? [],
+      instruments: body.instruments ?? [],
       email: body.email || null,
       marketing_opt_in: body.marketing_opt_in ?? false,
       first_visited_at: body.first_visited_at || new Date().toISOString(),

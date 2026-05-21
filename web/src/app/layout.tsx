@@ -5,8 +5,8 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
 export const metadata: Metadata = {
-  title: "Village Studio — Check In",
-  description: "Check in to the open recording studio and pay what you can.",
+  title: "Potluck Sessions — Takes a Village",
+  description: "Check in to the Potluck Sessions open recording studio.",
 };
 
 export const viewport: Viewport = {

@@ -3,19 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, display_name, primary_role } = body;
+  const { device_id, display_name, email, ig_handle, roles, instruments } = body;
 
-  if (!device_id || !display_name) {
+  if (!device_id || !display_name || !email) {
     return NextResponse.json(
-      { error: "device_id and display_name are required" },
+      { error: "device_id, display_name, and email are required" },
       { status: 400 }
     );
   }
 
   const supabase = createServerClient();
 
-  const record: Record<string, unknown> = { device_id, display_name };
-  if (primary_role) record.primary_role = primary_role;
+  const record: Record<string, unknown> = { device_id, display_name, email };
+  if (ig_handle) record.ig_handle = ig_handle;
+  if (roles?.length) record.roles = roles;
+  if (instruments?.length) record.instruments = instruments;
 
   const { data, error } = await supabase
     .from("villagers")

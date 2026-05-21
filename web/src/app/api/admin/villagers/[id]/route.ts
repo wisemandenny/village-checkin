@@ -40,7 +40,9 @@ export async function PUT(
   const allowedFields = [
     "device_id",
     "display_name",
-    "primary_role",
+    "ig_handle",
+    "roles",
+    "instruments",
     "email",
     "marketing_opt_in",
     "first_visited_at",

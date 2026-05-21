@@ -8,7 +8,9 @@ create table villagers (
   id          uuid primary key default gen_random_uuid(),
   device_id   text unique not null,
   display_name text not null,
-  primary_role text,
+  ig_handle    text,
+  roles        text[] not null default '{}',
+  instruments  text[] not null default '{}',
   email       text,
   marketing_opt_in boolean not null default false,
   first_visited_at timestamptz not null default now(),
@@ -21,7 +23,7 @@ create table check_ins (
   villager_id          uuid not null references villagers(id) on delete cascade,
   intent_amount        integer not null default 0,
   payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred')),
-  status               text not null default 'pending' check (status in ('pending', 'paid')),
+  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped')),
   created_at           timestamptz not null default now(),
   stripe_transaction_id text
 );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { getOrCreateDeviceId } from "@/lib/device-id";
 import { OnboardingForm } from "@/components/onboarding-form";
 import { CheckInFlow } from "@/components/checkin-flow";
@@ -11,7 +12,6 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [deviceId, setDeviceId] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("");
-  const [pendingCheckInId, setPendingCheckInId] = useState<string | undefined>();
 
   useEffect(() => {
     const { deviceId: id, isNew } = getOrCreateDeviceId();
@@ -22,21 +22,11 @@ export default function Home() {
       return;
     }
 
-    // Returning user -- check if they exist, then check for pending check-in
-    Promise.all([
-      fetch(`/api/villager?device_id=${encodeURIComponent(id)}`).then((res) =>
-        res.ok ? res.json() : null
-      ),
-      fetch(
-        `/api/checkin/pending?device_id=${encodeURIComponent(id)}`
-      ).then((res) => (res.ok ? res.json() : null)),
-    ])
-      .then(([villagerData, pendingData]) => {
-        if (villagerData?.villager) {
-          setDisplayName(villagerData.villager.display_name);
-          if (pendingData?.check_in) {
-            setPendingCheckInId(pendingData.check_in.id);
-          }
+    fetch(`/api/villager?device_id=${encodeURIComponent(id)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.villager) {
+          setDisplayName(data.villager.display_name);
           setScreen("checkin");
         } else {
           setScreen("onboarding");
@@ -46,14 +36,32 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Village Studio</h1>
-        <p className="mt-2 text-[var(--color-muted)]">Open recording session</p>
+    <main className="flex flex-1 flex-col items-center justify-center px-6 py-10">
+      <div className="mb-8 flex flex-col items-center gap-4">
+        <Image
+          src="/potluck-sessions.png"
+          alt="Potluck Sessions — Takes a Village"
+          width={260}
+          height={100}
+          priority
+          className="h-auto w-56 sm:w-64"
+        />
+        <p className="text-sm tracking-wide text-[var(--color-muted)]">
+          {new Date().toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
       </div>
 
       {screen === "loading" && (
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent" />
+        <img
+          src="/potluck-chinese.png"
+          alt="Loading…"
+          className="h-36 w-auto animate-pulse-slow"
+        />
       )}
 
       {screen === "onboarding" && (
@@ -67,11 +75,7 @@ export default function Home() {
       )}
 
       {screen === "checkin" && (
-        <CheckInFlow
-          deviceId={deviceId}
-          displayName={displayName}
-          pendingCheckInId={pendingCheckInId}
-        />
+        <CheckInFlow deviceId={deviceId} displayName={displayName} />
       )}
     </main>
   );

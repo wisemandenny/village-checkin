@@ -7,10 +7,24 @@ type SortField = keyof Villager;
 type SortDir = "asc" | "desc";
 type ModalMode = "create" | "edit" | null;
 
-const EMPTY_FORM: Omit<Villager, "id"> = {
+type VillagerForm = {
+  device_id: string;
+  display_name: string;
+  ig_handle: string;
+  roles_text: string;
+  instruments_text: string;
+  email: string;
+  marketing_opt_in: boolean;
+  first_visited_at: string;
+  last_visited_at: string;
+};
+
+const EMPTY_FORM: VillagerForm = {
   device_id: "",
   display_name: "",
-  primary_role: "",
+  ig_handle: "",
+  roles_text: "",
+  instruments_text: "",
   email: "",
   marketing_opt_in: false,
   first_visited_at: "",
@@ -118,7 +132,9 @@ export default function VillagersPanel({ token }: { token: string }) {
     setForm({
       device_id: v.device_id,
       display_name: v.display_name,
-      primary_role: v.primary_role || "",
+      ig_handle: v.ig_handle || "",
+      roles_text: (v.roles ?? []).join(", "),
+      instruments_text: (v.instruments ?? []).join(", "),
       email: v.email || "",
       marketing_opt_in: v.marketing_opt_in,
       first_visited_at: v.first_visited_at,
@@ -134,10 +150,15 @@ export default function VillagersPanel({ token }: { token: string }) {
     setSaving(true);
     setFormError("");
 
+    const parseList = (s: string) =>
+      s.split(",").map((x) => x.trim()).filter(Boolean);
+
     const payload = {
       device_id: form.device_id,
       display_name: form.display_name,
-      primary_role: form.primary_role || null,
+      ig_handle: form.ig_handle || null,
+      roles: parseList(form.roles_text),
+      instruments: parseList(form.instruments_text),
       email: form.email || null,
       marketing_opt_in: form.marketing_opt_in,
       first_visited_at: form.first_visited_at || new Date().toISOString(),
@@ -193,13 +214,14 @@ export default function VillagersPanel({ token }: { token: string }) {
     return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  const columns: { key: SortField; label: string; hideOnMobile?: boolean }[] = [
-    { key: "display_name", label: "Name" },
-    { key: "primary_role", label: "Role", hideOnMobile: true },
-    { key: "email", label: "Email", hideOnMobile: true },
-    { key: "marketing_opt_in", label: "Opt-in", hideOnMobile: true },
-    { key: "first_visited_at", label: "First Visit" },
-    { key: "last_visited_at", label: "Last Visit", hideOnMobile: true },
+  const columns: { key: string; label: string; sortable?: boolean; hideOnMobile?: boolean }[] = [
+    { key: "display_name", label: "Name", sortable: true },
+    { key: "ig_handle", label: "IG Handle", sortable: true },
+    { key: "roles", label: "Roles", hideOnMobile: true },
+    { key: "instruments", label: "Instruments", hideOnMobile: true },
+    { key: "email", label: "Email", sortable: true, hideOnMobile: true },
+    { key: "first_visited_at", label: "First Visit", sortable: true },
+    { key: "last_visited_at", label: "Last Visit", sortable: true, hideOnMobile: true },
   ];
 
   return (
@@ -252,11 +274,11 @@ export default function VillagersPanel({ token }: { token: string }) {
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className={`cursor-pointer px-4 py-3 font-semibold text-[var(--color-muted)] select-none transition hover:text-[var(--color-foreground)] ${col.hideOnMobile ? "hidden md:table-cell" : ""}`}
+                  onClick={col.sortable ? () => handleSort(col.key as SortField) : undefined}
+                  className={`px-4 py-3 font-semibold text-[var(--color-muted)] select-none transition ${col.sortable ? "cursor-pointer hover:text-[var(--color-foreground)]" : ""} ${col.hideOnMobile ? "hidden md:table-cell" : ""}`}
                 >
                   {col.label}
-                  <SortIcon field={col.key} />
+                  {col.sortable && <SortIcon field={col.key as SortField} />}
                 </th>
               ))}
               <th className="px-4 py-3 text-right font-semibold text-[var(--color-muted)]">
@@ -294,22 +316,17 @@ export default function VillagersPanel({ token }: { token: string }) {
                   className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
                 >
                   <td className="px-4 py-3 font-medium">{v.display_name}</td>
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
+                    {v.ig_handle || "—"}
+                  </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
-                    {v.primary_role || "—"}
+                    {v.roles?.length ? v.roles.join(", ") : "—"}
+                  </td>
+                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                    {v.instruments?.length ? v.instruments.join(", ") : "—"}
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                     {v.email || "—"}
-                  </td>
-                  <td className="hidden px-4 py-3 md:table-cell">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        v.marketing_opt_in
-                          ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                          : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      {v.marketing_opt_in ? "Yes" : "No"}
-                    </span>
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(v.first_visited_at)}
@@ -365,6 +382,18 @@ export default function VillagersPanel({ token }: { token: string }) {
                 />
               </Field>
 
+              <Field label="IG Handle">
+                <input
+                  type="text"
+                  value={form.ig_handle ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, ig_handle: e.target.value })
+                  }
+                  placeholder="@handle"
+                  className="input"
+                />
+              </Field>
+
               <Field label="Device ID" required>
                 <input
                   type="text"
@@ -383,29 +412,41 @@ export default function VillagersPanel({ token }: { token: string }) {
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Primary Role">
+                <Field label="Roles">
                   <input
                     type="text"
-                    value={form.primary_role ?? ""}
+                    value={form.roles_text}
                     onChange={(e) =>
-                      setForm({ ...form, primary_role: e.target.value })
+                      setForm({ ...form, roles_text: e.target.value })
                     }
-                    placeholder="e.g. Musician, Producer"
+                    placeholder="Producer, Vocalist, Musician, Founder"
                     className="input"
                   />
                 </Field>
 
-                <Field label="Email">
+                <Field label="Instruments">
                   <input
-                    type="email"
-                    value={form.email ?? ""}
+                    type="text"
+                    value={form.instruments_text}
                     onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
+                      setForm({ ...form, instruments_text: e.target.value })
                     }
+                    placeholder="Keys, Guitar, Bass"
                     className="input"
                   />
                 </Field>
               </div>
+
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={form.email ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, email: e.target.value })
+                  }
+                  className="input"
+                />
+              </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="First Visited">

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("villagers")
-    .select("id, display_name, primary_role, first_visited_at")
+    .select("id, display_name, roles, first_visited_at")
     .ilike("display_name", `%${name.trim()}%`)
     .order("first_visited_at", { ascending: false })
     .limit(10);

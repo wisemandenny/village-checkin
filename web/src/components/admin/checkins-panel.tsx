@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, FormEvent } from "react";
 import type { CheckIn, PaymentMethod, CheckInStatus, Villager } from "@/lib/types";
 
 type CheckInWithVillager = CheckIn & {
@@ -15,7 +15,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
   "cash",
   "skipped",
 ];
-const STATUSES: CheckInStatus[] = ["pending", "paid"];
+const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped"];
 
 interface CheckInForm {
   villager_id: string;
@@ -68,12 +68,15 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
   online_fallback: "Online",
   cash: "Cash",
   skipped: "Skipped",
+  deferred: "Deferred",
 };
 
 const STATUS_STYLES: Record<CheckInStatus, string> = {
   paid: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
   pending:
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+  skipped:
+    "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
 };
 
 export default function CheckInsPanel({ token }: { token: string }) {
@@ -89,6 +92,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
   const [form, setForm] = useState<CheckInForm>(EMPTY_FORM);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [allCheckins, setAllCheckins] = useState<CheckInWithVillager[]>([]);
 
   const [deleteTarget, setDeleteTarget] = useState<CheckInWithVillager | null>(
     null
@@ -129,6 +134,18 @@ export default function CheckInsPanel({ token }: { token: string }) {
     }
   }, [filterVillagerId, apiFetch]);
 
+  const loadAllCheckins = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/admin/checkins");
+      if (res.ok) {
+        const { checkins } = await res.json();
+        setAllCheckins(checkins);
+      }
+    } catch {
+      // Non-critical for stats
+    }
+  }, [apiFetch]);
+
   const loadVillagers = useCallback(async () => {
     try {
       const res = await apiFetch("/api/admin/villagers?sort_by=display_name&sort_dir=asc");
@@ -147,7 +164,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
   useEffect(() => {
     loadVillagers();
-  }, [loadVillagers]);
+    loadAllCheckins();
+  }, [loadVillagers, loadAllCheckins]);
 
   function openCreate() {
     setForm({ ...EMPTY_FORM, created_at: new Date().toISOString() });
@@ -210,6 +228,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       }
       setModalMode(null);
       loadCheckins();
+      loadAllCheckins();
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -230,6 +249,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       }
       setDeleteTarget(null);
       loadCheckins();
+      loadAllCheckins();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Delete failed");
       setDeleteTarget(null);
@@ -237,6 +257,91 @@ export default function CheckInsPanel({ token }: { token: string }) {
       setDeleting(false);
     }
   }
+
+  const villagerStats = useMemo(() => {
+    if (!filterVillagerId || checkins.length === 0) return null;
+
+    const paidCheckins = checkins.filter((c) => c.status === "paid");
+    const totalCheckins = checkins.length;
+    const totalContributed = paidCheckins.reduce((sum, c) => sum + c.intent_amount, 0);
+    const avgContribution = paidCheckins.length > 0 ? totalContributed / paidCheckins.length : 0;
+
+    // Average monthly contribution: total contributed / number of distinct months with paid check-ins
+    const monthKeys = new Set(
+      paidCheckins.map((c) => {
+        const d = new Date(c.created_at);
+        return `${d.getFullYear()}-${d.getMonth()}`;
+      })
+    );
+    const avgMonthly = monthKeys.size > 0 ? totalContributed / monthKeys.size : 0;
+
+    // Monday streak: count consecutive Mondays (Mon 12am–Tue 4am) going backwards
+    // Normalize each check-in to the Monday it belongs to
+    function toMondayKey(iso: string): string {
+      const d = new Date(iso);
+      const day = d.getDay(); // 0=Sun..6=Sat
+      const hour = d.getHours();
+      // Tue 12am–4am counts as the previous Monday's session
+      if (day === 2 && hour < 4) {
+        d.setDate(d.getDate() - 1);
+      }
+      // Now check if this falls on a Monday
+      if (d.getDay() !== 1) return "";
+      // Return date-only key for that Monday
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    const mondaySet = new Set<string>();
+    for (const c of checkins) {
+      const key = toMondayKey(c.created_at);
+      if (key) mondaySet.add(key);
+    }
+
+    // Sort Mondays descending
+    const mondays = [...mondaySet].sort().reverse();
+    let streak = 0;
+    if (mondays.length > 0) {
+      let expected = new Date(mondays[0] + "T00:00:00");
+      for (const m of mondays) {
+        const curr = new Date(m + "T00:00:00");
+        // Allow exact match within 7 days (one week apart)
+        const diffDays = Math.round(
+          (expected.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (diffDays > 7) break;
+        streak++;
+        expected = new Date(curr);
+        expected.setDate(expected.getDate() - 7);
+      }
+    }
+
+    // Global average: average contribution per villager (average of averages)
+    const byVillager = new Map<string, number[]>();
+    for (const c of allCheckins) {
+      if (c.status !== "paid") continue;
+      const arr = byVillager.get(c.villager_id) ?? [];
+      arr.push(c.intent_amount);
+      byVillager.set(c.villager_id, arr);
+    }
+    let globalAvgOfAvgs = 0;
+    if (byVillager.size > 0) {
+      let sumOfAvgs = 0;
+      for (const amounts of byVillager.values()) {
+        sumOfAvgs += amounts.reduce((a, b) => a + b, 0) / amounts.length;
+      }
+      globalAvgOfAvgs = sumOfAvgs / byVillager.size;
+    }
+    const diffFromGlobal = avgContribution - globalAvgOfAvgs;
+
+    return {
+      totalCheckins,
+      streak,
+      totalContributed,
+      avgContribution,
+      avgMonthly,
+      diffFromGlobal,
+    };
+  }, [filterVillagerId, checkins, allCheckins]);
 
   return (
     <>
@@ -271,6 +376,25 @@ export default function CheckInsPanel({ token }: { token: string }) {
           ))}
         </select>
       </div>
+
+      {/* Villager Stats */}
+      {villagerStats && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard label="Total Check-ins" value={String(villagerStats.totalCheckins)} />
+          <StatCard
+            label="Monday Streak"
+            value={`${villagerStats.streak} wk${villagerStats.streak !== 1 ? "s" : ""}`}
+          />
+          <StatCard label="Total Contributed" value={formatCents(villagerStats.totalContributed)} />
+          <StatCard label="Avg Contribution" value={formatCents(Math.round(villagerStats.avgContribution))} />
+          <StatCard label="Avg Monthly" value={formatCents(Math.round(villagerStats.avgMonthly))} />
+          <StatCard
+            label="vs. Global Avg"
+            value={`${villagerStats.diffFromGlobal >= 0 ? "+" : ""}${formatCents(Math.round(villagerStats.diffFromGlobal))}`}
+            highlight={villagerStats.diffFromGlobal >= 0 ? "green" : "red"}
+          />
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -594,5 +718,30 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: "green" | "red";
+}) {
+  const valueColor =
+    highlight === "green"
+      ? "text-green-600 dark:text-green-400"
+      : highlight === "red"
+        ? "text-red-600 dark:text-red-400"
+        : "text-[var(--color-foreground)]";
+  return (
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+      <p className="text-xs font-medium text-[var(--color-muted)]">{label}</p>
+      <p className={`mt-1 text-lg font-bold tabular-nums ${valueColor}`}>
+        {value}
+      </p>
+    </div>
   );
 }

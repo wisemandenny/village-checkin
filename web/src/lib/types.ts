@@ -2,7 +2,9 @@ export interface Villager {
   id: string;
   device_id: string;
   display_name: string;
-  primary_role: string | null;
+  ig_handle: string | null;
+  roles: string[];
+  instruments: string[];
   email: string | null;
   marketing_opt_in: boolean;
   first_visited_at: string;
@@ -20,4 +22,4 @@ export interface CheckIn {
 }
 
 export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred";
-export type CheckInStatus = "pending" | "paid";
+export type CheckInStatus = "pending" | "paid" | "skipped";
