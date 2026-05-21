@@ -92,7 +92,7 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
       <div>
         <h2 className="text-2xl font-bold">You&apos;re checked in!</h2>
         <p className="mt-2 text-[var(--color-muted)]">
-          Welcome to the studio, {displayName}. Enjoy your session.
+          Welcome to the village, {displayName}. Enjoy your session.
         </p>
       </div>
     </div>

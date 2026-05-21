@@ -79,6 +79,83 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
 };
 
+/**
+ * Map any check-in timestamp to the Monday of its week.
+ * Special case: Tue 12am–4am rolls back to the previous Monday (late session).
+ */
+function toMondayOfWeek(iso: string): string {
+  const d = new Date(iso);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const hour = d.getHours();
+
+  if (day === 2 && hour < 4) {
+    d.setDate(d.getDate() - 1);
+  } else {
+    const offset = day === 0 ? 6 : day - 1;
+    d.setDate(d.getDate() - offset);
+  }
+
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function computeStreaks(checkins: { created_at: string }[]): {
+  current: number;
+  best: number;
+} {
+  if (checkins.length === 0) return { current: 0, best: 0 };
+
+  const mondaySet = new Set<string>();
+  for (const c of checkins) {
+    mondaySet.add(toMondayOfWeek(c.created_at));
+  }
+
+  const mondays = [...mondaySet].sort().reverse();
+
+  // Current streak: count consecutive weeks from the most recent Monday
+  // The most recent Monday must be this week or last week to count as active
+  const thisMondayKey = toMondayOfWeek(new Date().toISOString());
+  const thisMon = new Date(thisMondayKey + "T00:00:00");
+  const latestMon = new Date(mondays[0] + "T00:00:00");
+  const gapFromNow = Math.round(
+    (thisMon.getTime() - latestMon.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  let current = 0;
+  if (gapFromNow <= 7) {
+    let expected = latestMon;
+    for (const m of mondays) {
+      const curr = new Date(m + "T00:00:00");
+      const diff = Math.round(
+        (expected.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (diff > 7) break;
+      current++;
+      expected = new Date(curr);
+      expected.setDate(expected.getDate() - 7);
+    }
+  }
+
+  // Best streak: find the longest run of consecutive weeks anywhere
+  let best = 0;
+  let run = 1;
+  for (let i = 1; i < mondays.length; i++) {
+    const prev = new Date(mondays[i - 1] + "T00:00:00");
+    const curr = new Date(mondays[i] + "T00:00:00");
+    const diff = Math.round(
+      (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (diff <= 7) {
+      run++;
+    } else {
+      best = Math.max(best, run);
+      run = 1;
+    }
+  }
+  best = Math.max(best, run);
+
+  return { current, best };
+}
+
 export default function CheckInsPanel({ token }: { token: string }) {
   const [checkins, setCheckins] = useState<CheckInWithVillager[]>([]);
   const [villagers, setVillagers] = useState<Villager[]>([]);
@@ -266,7 +343,6 @@ export default function CheckInsPanel({ token }: { token: string }) {
     const totalContributed = paidCheckins.reduce((sum, c) => sum + c.intent_amount, 0);
     const avgContribution = paidCheckins.length > 0 ? totalContributed / paidCheckins.length : 0;
 
-    // Average monthly contribution: total contributed / number of distinct months with paid check-ins
     const monthKeys = new Set(
       paidCheckins.map((c) => {
         const d = new Date(c.created_at);
@@ -275,47 +351,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
     );
     const avgMonthly = monthKeys.size > 0 ? totalContributed / monthKeys.size : 0;
 
-    // Monday streak: count consecutive Mondays (Mon 12am–Tue 4am) going backwards
-    // Normalize each check-in to the Monday it belongs to
-    function toMondayKey(iso: string): string {
-      const d = new Date(iso);
-      const day = d.getDay(); // 0=Sun..6=Sat
-      const hour = d.getHours();
-      // Tue 12am–4am counts as the previous Monday's session
-      if (day === 2 && hour < 4) {
-        d.setDate(d.getDate() - 1);
-      }
-      // Now check if this falls on a Monday
-      if (d.getDay() !== 1) return "";
-      // Return date-only key for that Monday
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    }
+    const { current, best } = computeStreaks(checkins);
 
-    const mondaySet = new Set<string>();
-    for (const c of checkins) {
-      const key = toMondayKey(c.created_at);
-      if (key) mondaySet.add(key);
-    }
-
-    // Sort Mondays descending
-    const mondays = [...mondaySet].sort().reverse();
-    let streak = 0;
-    if (mondays.length > 0) {
-      let expected = new Date(mondays[0] + "T00:00:00");
-      for (const m of mondays) {
-        const curr = new Date(m + "T00:00:00");
-        // Allow exact match within 7 days (one week apart)
-        const diffDays = Math.round(
-          (expected.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        if (diffDays > 7) break;
-        streak++;
-        expected = new Date(curr);
-        expected.setDate(expected.getDate() - 7);
-      }
-    }
-
-    // Global average: average contribution per villager (average of averages)
     const byVillager = new Map<string, number[]>();
     for (const c of allCheckins) {
       if (c.status !== "paid") continue;
@@ -335,13 +372,64 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
     return {
       totalCheckins,
-      streak,
+      currentStreak: current,
+      bestStreak: best,
       totalContributed,
       avgContribution,
       avgMonthly,
       diffFromGlobal,
     };
   }, [filterVillagerId, checkins, allCheckins]);
+
+  const globalStats = useMemo(() => {
+    if (filterVillagerId || allCheckins.length === 0) return null;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const todayCheckins = allCheckins.filter((c) => {
+      const d = new Date(c.created_at);
+      return d >= todayStart && d < todayEnd;
+    });
+
+    const todayPaid = todayCheckins.filter((c) => c.status === "paid");
+    const todayAvgPayment =
+      todayPaid.length > 0
+        ? todayPaid.reduce((s, c) => s + c.intent_amount, 0) / todayPaid.length
+        : 0;
+
+    // Unique villagers checked in today
+    const todayVillagerIds = new Set(todayCheckins.map((c) => c.villager_id));
+
+    // Compute streak for each villager checked in today
+    const checkinsByVillager = new Map<string, CheckInWithVillager[]>();
+    for (const c of allCheckins) {
+      const arr = checkinsByVillager.get(c.villager_id) ?? [];
+      arr.push(c);
+      checkinsByVillager.set(c.villager_id, arr);
+    }
+
+    let streakSum = 0;
+    let streakCount = 0;
+    let newVillagers = 0;
+    for (const vid of todayVillagerIds) {
+      const vCheckins = checkinsByVillager.get(vid) ?? [];
+      if (vCheckins.length === 1) newVillagers++;
+      const { current } = computeStreaks(vCheckins);
+      streakSum += current;
+      streakCount++;
+    }
+    const avgStreak = streakCount > 0 ? streakSum / streakCount : 0;
+
+    return {
+      todayCheckins: todayCheckins.length,
+      todayAvgPayment,
+      avgStreak,
+      newVillagers,
+    };
+  }, [filterVillagerId, allCheckins]);
 
   return (
     <>
@@ -379,11 +467,15 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
       {/* Villager Stats */}
       {villagerStats && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <StatCard label="Total Check-ins" value={String(villagerStats.totalCheckins)} />
           <StatCard
-            label="Monday Streak"
-            value={`${villagerStats.streak} wk${villagerStats.streak !== 1 ? "s" : ""}`}
+            label="Current Streak"
+            value={`${villagerStats.currentStreak} wk${villagerStats.currentStreak !== 1 ? "s" : ""}`}
+          />
+          <StatCard
+            label="Best Streak"
+            value={`${villagerStats.bestStreak} wk${villagerStats.bestStreak !== 1 ? "s" : ""}`}
           />
           <StatCard label="Total Contributed" value={formatCents(villagerStats.totalContributed)} />
           <StatCard label="Avg Contribution" value={formatCents(Math.round(villagerStats.avgContribution))} />
@@ -393,6 +485,16 @@ export default function CheckInsPanel({ token }: { token: string }) {
             value={`${villagerStats.diffFromGlobal >= 0 ? "+" : ""}${formatCents(Math.round(villagerStats.diffFromGlobal))}`}
             highlight={villagerStats.diffFromGlobal >= 0 ? "green" : "red"}
           />
+        </div>
+      )}
+
+      {/* Global Stats (All Villagers) */}
+      {globalStats && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Today's Check-ins" value={String(globalStats.todayCheckins)} />
+          <StatCard label="Today's Avg Payment" value={formatCents(Math.round(globalStats.todayAvgPayment))} />
+          <StatCard label="Avg Streak (Today)" value={`${globalStats.avgStreak.toFixed(1)} wks`} />
+          <StatCard label="New Villagers Today" value={String(globalStats.newVillagers)} />
         </div>
       )}
 
