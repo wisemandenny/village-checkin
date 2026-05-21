@@ -26,6 +26,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  if (search && data) {
+    const needle = search.toLowerCase();
+    const { data: allData } = await supabase
+      .from("villagers")
+      .select("*")
+      .order(sortBy, { ascending: sortDir });
+
+    if (allData) {
+      const existingIds = new Set(data.map((v) => v.id));
+      const instrumentMatches = allData.filter(
+        (v) =>
+          !existingIds.has(v.id) &&
+          Array.isArray(v.instruments) &&
+          v.instruments.some((inst: string) =>
+            inst.toLowerCase().includes(needle)
+          )
+      );
+      data.push(...instrumentMatches);
+    }
+  }
+
   return NextResponse.json({ villagers: data });
 }
 

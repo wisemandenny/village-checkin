@@ -81,11 +81,11 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     setLoading(true);
     setError(null);
 
-    let normalizedIg = igHandle.trim();
+    let normalizedIg = igHandle.trim().toLowerCase();
     if (normalizedIg && !normalizedIg.startsWith("@")) {
       normalizedIg = `@${normalizedIg}`;
-      setIgHandle(normalizedIg);
     }
+    setIgHandle(normalizedIg);
 
     try {
       const finalInstruments = roles.has("Musician")
@@ -136,7 +136,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ig_handle: recoverIg.trim(),
+          ig_handle: recoverIg.trim().toLowerCase(),
           new_device_id: deviceId,
         }),
       });
@@ -167,7 +167,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             id="recover-ig"
             type="text"
             value={recoverIg}
-            onChange={(e) => setRecoverIg(e.target.value)}
+            onChange={(e) => setRecoverIg(e.target.value.toLowerCase())}
             placeholder="@champagnepapi"
             className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
             autoFocus
@@ -215,7 +215,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           id="ig"
           type="text"
           value={igHandle}
-          onChange={(e) => setIgHandle(e.target.value)}
+          onChange={(e) => setIgHandle(e.target.value.toLowerCase())}
           placeholder="@champagnepapi"
           className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
           autoFocus

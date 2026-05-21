@@ -25,7 +25,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Villager not found" }, { status: 404 });
   }
 
-  // Update last_visited_at
+  // Check for existing check-in today
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+
+  const { data: existing } = await supabase
+    .from("check_ins")
+    .select("id")
+    .eq("villager_id", villager.id)
+    .gte("created_at", todayStart)
+    .lt("created_at", tomorrowStart)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return NextResponse.json(
+      { error: "already_checked_in" },
+      { status: 409 }
+    );
+  }
+
   await supabase
     .from("villagers")
     .update({ last_visited_at: new Date().toISOString() })

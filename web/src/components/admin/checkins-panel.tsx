@@ -98,21 +98,32 @@ function toMondayOfWeek(iso: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function computeStreaks(checkins: { created_at: string }[]): {
+interface StreakResult {
   current: number;
+  currentStart: string | null;
   best: number;
-} {
-  if (checkins.length === 0) return { current: 0, best: 0 };
+  bestStart: string | null;
+  bestEnd: string | null;
+  bestIsCurrent: boolean;
+}
+
+function formatMD(mondayKey: string): string {
+  const d = new Date(mondayKey + "T00:00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function computeStreaks(checkins: { created_at: string }[]): StreakResult {
+  const empty: StreakResult = { current: 0, currentStart: null, best: 0, bestStart: null, bestEnd: null, bestIsCurrent: false };
+  if (checkins.length === 0) return empty;
 
   const mondaySet = new Set<string>();
   for (const c of checkins) {
     mondaySet.add(toMondayOfWeek(c.created_at));
   }
 
+  // Sorted descending (most recent first)
   const mondays = [...mondaySet].sort().reverse();
 
-  // Current streak: count consecutive weeks from the most recent Monday
-  // The most recent Monday must be this week or last week to count as active
   const thisMondayKey = toMondayOfWeek(new Date().toISOString());
   const thisMon = new Date(thisMondayKey + "T00:00:00");
   const latestMon = new Date(mondays[0] + "T00:00:00");
@@ -121,6 +132,7 @@ function computeStreaks(checkins: { created_at: string }[]): {
   );
 
   let current = 0;
+  let currentStart: string | null = null;
   if (gapFromNow <= 7) {
     let expected = latestMon;
     for (const m of mondays) {
@@ -130,14 +142,19 @@ function computeStreaks(checkins: { created_at: string }[]): {
       );
       if (diff > 7) break;
       current++;
+      currentStart = m;
       expected = new Date(curr);
       expected.setDate(expected.getDate() - 7);
     }
   }
 
   // Best streak: find the longest run of consecutive weeks anywhere
+  // mondays are sorted descending, so a run's "start" is the last index and "end" is the first index
   let best = 0;
+  let bestStartIdx = 0;
+  let bestEndIdx = 0;
   let run = 1;
+  let runStartIdx = 0;
   for (let i = 1; i < mondays.length; i++) {
     const prev = new Date(mondays[i - 1] + "T00:00:00");
     const curr = new Date(mondays[i] + "T00:00:00");
@@ -147,13 +164,26 @@ function computeStreaks(checkins: { created_at: string }[]): {
     if (diff <= 7) {
       run++;
     } else {
-      best = Math.max(best, run);
+      if (run > best) {
+        best = run;
+        bestEndIdx = runStartIdx;
+        bestStartIdx = i - 1;
+      }
       run = 1;
+      runStartIdx = i;
     }
   }
-  best = Math.max(best, run);
+  if (run > best) {
+    best = run;
+    bestEndIdx = runStartIdx;
+    bestStartIdx = mondays.length - 1;
+  }
 
-  return { current, best };
+  const bestStart = mondays[bestStartIdx] ?? null;
+  const bestEnd = mondays[bestEndIdx] ?? null;
+  const bestIsCurrent = bestEnd === mondays[0] && gapFromNow <= 7;
+
+  return { current, currentStart, best, bestStart, bestEnd, bestIsCurrent };
 }
 
 export default function CheckInsPanel({ token }: { token: string }) {
@@ -351,7 +381,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
     );
     const avgMonthly = monthKeys.size > 0 ? totalContributed / monthKeys.size : 0;
 
-    const { current, best } = computeStreaks(checkins);
+    const streaks = computeStreaks(checkins);
 
     const byVillager = new Map<string, number[]>();
     for (const c of allCheckins) {
@@ -372,8 +402,12 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
     return {
       totalCheckins,
-      currentStreak: current,
-      bestStreak: best,
+      currentStreak: streaks.current,
+      currentStreakStart: streaks.currentStart,
+      bestStreak: streaks.best,
+      bestStart: streaks.bestStart,
+      bestEnd: streaks.bestEnd,
+      bestIsCurrent: streaks.bestIsCurrent,
       totalContributed,
       avgContribution,
       avgMonthly,
@@ -472,10 +506,12 @@ export default function CheckInsPanel({ token }: { token: string }) {
           <StatCard
             label="Current Streak"
             value={`${villagerStats.currentStreak} wk${villagerStats.currentStreak !== 1 ? "s" : ""}`}
+            subtitle={villagerStats.currentStreakStart ? `Starting ${formatMD(villagerStats.currentStreakStart)}` : undefined}
           />
           <StatCard
             label="Best Streak"
             value={`${villagerStats.bestStreak} wk${villagerStats.bestStreak !== 1 ? "s" : ""}`}
+            subtitle={villagerStats.bestStart ? `${formatMD(villagerStats.bestStart)} – ${villagerStats.bestIsCurrent ? "present" : formatMD(villagerStats.bestEnd!)}` : undefined}
           />
           <StatCard label="Total Contributed" value={formatCents(villagerStats.totalContributed)} />
           <StatCard label="Avg Contribution" value={formatCents(Math.round(villagerStats.avgContribution))} />
@@ -826,10 +862,12 @@ function Field({
 function StatCard({
   label,
   value,
+  subtitle,
   highlight,
 }: {
   label: string;
   value: string;
+  subtitle?: string;
   highlight?: "green" | "red";
 }) {
   const valueColor =
@@ -844,6 +882,9 @@ function StatCard({
       <p className={`mt-1 text-lg font-bold tabular-nums ${valueColor}`}>
         {value}
       </p>
+      {subtitle && (
+        <p className="mt-0.5 text-xs text-[var(--color-muted)]">{subtitle}</p>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ interface CheckInFlowProps {
   displayName: string;
 }
 
-type Step = "checking-in" | "done";
+type Step = "checking-in" | "done" | "already";
 
 export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
   const [step, setStep] = useState<Step>("checking-in");
@@ -22,6 +22,10 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ device_id: deviceId }),
         });
+        if (res.status === 409) {
+          if (!cancelled) setStep("already");
+          return;
+        }
         if (!res.ok) throw new Error("Check-in failed");
         if (!cancelled) setStep("done");
       } catch {
@@ -55,6 +59,7 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
                   body: JSON.stringify({ device_id: deviceId }),
                 })
                   .then((res) => {
+                    if (res.status === 409) { setStep("already"); return; }
                     if (!res.ok) throw new Error("Check-in failed");
                     setStep("done");
                   })
@@ -68,6 +73,29 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
             </button>
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (step === "already") {
+    return (
+      <div className="flex flex-col items-center gap-6 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-yellow-500/10">
+          <svg
+            className="h-10 w-10 text-yellow-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
       </div>
     );
   }
