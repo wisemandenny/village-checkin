@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient();
 
-  const record: Record<string, unknown> = { device_id, display_name, email };
+  const record: Record<string, unknown> = { device_id, display_name, email, marketing_opt_in: true };
   if (ig_handle) record.ig_handle = ig_handle;
   if (roles?.length) record.roles = roles;
   if (instruments?.length) record.instruments = instruments;

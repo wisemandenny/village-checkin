@@ -12,7 +12,7 @@ create table villagers (
   roles        text[] not null default '{}',
   instruments  text[] not null default '{}',
   email       text,
-  marketing_opt_in boolean not null default false,
+  marketing_opt_in boolean not null default true,
   first_visited_at timestamptz not null default now(),
   last_visited_at  timestamptz
 );

@@ -46,7 +46,7 @@ export default function Home() {
           priority
           className="h-auto w-56 sm:w-64"
         />
-        <p className="text-sm tracking-wide text-[var(--color-muted)]">
+        <p className="text-lg tracking-wide text-[var(--color-muted)] font-[family-name:var(--font-domaine)]">
           {new Date().toLocaleDateString("en-US", {
             weekday: "long",
             year: "numeric",

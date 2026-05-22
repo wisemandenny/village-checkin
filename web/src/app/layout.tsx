@@ -1,8 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
+
+const domaine = localFont({
+  src: "./fonts/Domaine Display Condensed Regular.ttf",
+  variable: "--font-domaine",
+});
 
 export const metadata: Metadata = {
   title: "Potluck Sessions — Takes a Village",
@@ -23,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geist.variable} h-full antialiased`}>
+    <html lang="en" className={`${geist.variable} ${domaine.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-[family-name:var(--font-geist)]">
         {children}
       </body>
