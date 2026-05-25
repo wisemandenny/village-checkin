@@ -8,6 +8,11 @@ import ChangelogPanel from "@/components/admin/changelog-panel";
 
 type Tab = "villagers" | "checkins" | "settings" | "changelog";
 
+const leftTabs: { key: Tab; label: string }[] = [
+  { key: "villagers", label: "Villagers" },
+  { key: "checkins", label: "Check-ins" },
+];
+
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
@@ -83,12 +88,12 @@ export default function AdminPage() {
     );
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "villagers", label: "Villagers" },
-    { key: "checkins", label: "Check-ins" },
-    { key: "settings", label: "Settings" },
-    { key: "changelog", label: "Changelog" },
-  ];
+  const tabClass = (key: Tab) =>
+    `rounded-md px-4 py-2 text-sm font-medium transition ${
+      activeTab === key
+        ? "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-sm"
+        : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"
+    }`;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -104,26 +109,33 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
-        {tabs.map((tab) => (
+      <div className="mb-6 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
+        {leftTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-              activeTab === tab.key
-                ? "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-sm"
-                : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"
-            }`}
+            className={tabClass(tab.key)}
           >
             {tab.label}
           </button>
         ))}
+        <div className="flex-1" />
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`${tabClass("settings")} inline-flex items-center gap-1.5`}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Settings
+        </button>
       </div>
 
       {/* Active panel */}
       {activeTab === "villagers" && <VillagersPanel token={token} />}
       {activeTab === "checkins" && <CheckInsPanel token={token} />}
-      {activeTab === "settings" && <SettingsPanel token={token} />}
+      {activeTab === "settings" && <SettingsPanel token={token} onShowChangelog={() => setActiveTab("changelog")} />}
       {activeTab === "changelog" && <ChangelogPanel />}
     </div>
   );

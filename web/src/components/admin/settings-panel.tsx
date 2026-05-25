@@ -4,9 +4,10 @@ import { useState, useEffect, FormEvent } from "react";
 
 interface SettingsPanelProps {
   token: string;
+  onShowChangelog?: () => void;
 }
 
-export default function SettingsPanel({ token }: SettingsPanelProps) {
+export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelProps) {
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -215,6 +216,29 @@ export default function SettingsPanel({ token }: SettingsPanelProps) {
           </p>
         )}
       </div>
+
+      {/* Changelog link */}
+      {onShowChangelog && (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Changelog</h3>
+              <p className="mt-1 text-sm text-[var(--color-muted)]">
+                View recent changes and updates to the app.
+              </p>
+            </div>
+            <button
+              onClick={onShowChangelog}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-muted)] transition hover:bg-[var(--color-background)] hover:text-[var(--color-foreground)]"
+            >
+              View changelog
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
