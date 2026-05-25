@@ -65,7 +65,7 @@ function useStripeAppearance(): Appearance {
 interface PaymentStepProps {
   checkInId: string;
   displayName: string;
-  onComplete: () => void;
+  onComplete: (paid?: boolean) => void;
 }
 
 const PRESET_AMOUNTS = [
@@ -182,7 +182,7 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
     return (
       <div className="flex w-full max-w-md flex-col items-center gap-6">
         <h2 className="text-xl font-bold">
-          Pay What You Can — ${(amountInCents / 100).toFixed(2)}
+          Support the Village! — ${(amountInCents / 100).toFixed(2)}
         </h2>
         <Elements
           stripe={stripePromise}
@@ -203,7 +203,7 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
-      <h2 className="text-2xl font-bold">Pay What You Can</h2>
+      <h2 className="text-2xl font-bold">Support the Village!</h2>
       <p className="text-sm text-[var(--color-muted)]">
         Support the Village. Every little bit helps — or don&apos;t. No judgment.
       </p>
@@ -267,7 +267,7 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
       )}
 
       <button
-        onClick={onComplete}
+        onClick={() => onComplete()}
         className="mt-2 text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
       >
         Skip for now
@@ -276,12 +276,11 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
   );
 }
 
-function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete: () => void }) {
+function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete: (paid?: boolean) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -309,22 +308,8 @@ function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete
       setError(confirmError.message || "Payment failed");
       setProcessing(false);
     } else {
-      setSuccess(true);
-      setTimeout(onComplete, 1500);
+      onComplete(true);
     }
-  }
-
-  if (success) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-4 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
-          <svg className="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <p className="font-semibold text-green-600">Payment successful!</p>
-      </div>
-    );
   }
 
   return (
@@ -340,7 +325,7 @@ function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete
       </button>
       <button
         type="button"
-        onClick={onComplete}
+        onClick={() => onComplete()}
         className="w-full text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
       >
         Skip for now

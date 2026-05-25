@@ -45,6 +45,7 @@ export async function PUT(
     "instruments",
     "email",
     "marketing_opt_in",
+    "test_account",
     "first_visited_at",
     "last_visited_at",
   ];

@@ -7,6 +7,7 @@ export interface Villager {
   instruments: string[];
   email: string | null;
   marketing_opt_in: boolean;
+  test_account: boolean;
   first_visited_at: string;
   last_visited_at: string | null;
 }

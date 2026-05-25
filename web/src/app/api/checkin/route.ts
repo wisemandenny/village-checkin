@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   // Look up villager
   const { data: villager, error: lookupErr } = await supabase
     .from("villagers")
-    .select("id")
+    .select("id, test_account")
     .eq("device_id", device_id)
     .single();
 
@@ -25,24 +25,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Villager not found" }, { status: 404 });
   }
 
-  // Check for existing check-in today
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+  // Check for existing check-in today (skip for test accounts)
+  if (!villager.test_account) {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
-  const { data: existing } = await supabase
-    .from("check_ins")
-    .select("id")
-    .eq("villager_id", villager.id)
-    .gte("created_at", todayStart)
-    .lt("created_at", tomorrowStart)
-    .limit(1);
+    const { data: existing } = await supabase
+      .from("check_ins")
+      .select("id")
+      .eq("villager_id", villager.id)
+      .gte("created_at", todayStart)
+      .lt("created_at", tomorrowStart)
+      .limit(1);
 
-  if (existing && existing.length > 0) {
-    return NextResponse.json(
-      { error: "already_checked_in" },
-      { status: 409 }
-    );
+    if (existing && existing.length > 0) {
+      return NextResponse.json(
+        { error: "already_checked_in" },
+        { status: 409 }
+      );
+    }
   }
 
   await supabase

@@ -15,6 +15,7 @@ type VillagerForm = {
   instruments_text: string;
   email: string;
   marketing_opt_in: boolean;
+  test_account: boolean;
   first_visited_at: string;
   last_visited_at: string;
 };
@@ -27,6 +28,7 @@ const EMPTY_FORM: VillagerForm = {
   instruments_text: "",
   email: "",
   marketing_opt_in: false,
+  test_account: false,
   first_visited_at: "",
   last_visited_at: "",
 };
@@ -137,6 +139,7 @@ export default function VillagersPanel({ token }: { token: string }) {
       instruments_text: (v.instruments ?? []).join(", "),
       email: v.email || "",
       marketing_opt_in: v.marketing_opt_in,
+      test_account: v.test_account,
       first_visited_at: v.first_visited_at,
       last_visited_at: v.last_visited_at || "",
     });
@@ -161,6 +164,7 @@ export default function VillagersPanel({ token }: { token: string }) {
       instruments: parseList(form.instruments_text),
       email: form.email || null,
       marketing_opt_in: form.marketing_opt_in,
+      test_account: form.test_account,
       first_visited_at: form.first_visited_at || new Date().toISOString(),
       last_visited_at: form.last_visited_at || null,
     };
@@ -315,7 +319,14 @@ export default function VillagersPanel({ token }: { token: string }) {
                   key={v.id}
                   className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
                 >
-                  <td className="px-4 py-3 font-medium">{v.display_name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {v.display_name}
+                    {v.test_account && (
+                      <span className="ml-1.5 inline-block rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
+                        test
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {v.ig_handle || "—"}
                   </td>
@@ -478,17 +489,42 @@ export default function VillagersPanel({ token }: { token: string }) {
                 </Field>
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.marketing_opt_in}
-                  onChange={(e) =>
-                    setForm({ ...form, marketing_opt_in: e.target.checked })
-                  }
-                  className="h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-accent)]"
-                />
-                Marketing opt-in
-              </label>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[var(--color-muted)]">Marketing opt-in</span>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, marketing_opt_in: !form.marketing_opt_in })}
+                  className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                    form.marketing_opt_in ? "bg-green-500" : "bg-[var(--color-border)]"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      form.marketing_opt_in ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-[var(--color-muted)]">Test account</span>
+                  <span className="text-xs text-[var(--color-muted)]">(allows multiple daily check-ins)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, test_account: !form.test_account })}
+                  className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                    form.test_account ? "bg-green-500" : "bg-[var(--color-border)]"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      form.test_account ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {formError && (

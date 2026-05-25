@@ -15,6 +15,7 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
   const [error, setError] = useState<string | null>(null);
   const [checkInId, setCheckInId] = useState<string | null>(null);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
+  const [paidSuccessfully, setPaidSuccessfully] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +132,10 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
       <PaymentStep
         checkInId={checkInId}
         displayName={displayName}
-        onComplete={() => setStep("done")}
+        onComplete={(paid?: boolean) => {
+          if (paid) setPaidSuccessfully(true);
+          setStep("done");
+        }}
       />
     );
   }
@@ -154,6 +158,11 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
         </svg>
       </div>
       <h2 className="text-2xl font-bold">Welcome back to the Village, {displayName}!</h2>
+      {paidSuccessfully && (
+        <p className="text-sm text-green-600 dark:text-green-400">
+          Payment complete — thanks for supporting the Village!
+        </p>
+      )}
     </div>
   );
 }

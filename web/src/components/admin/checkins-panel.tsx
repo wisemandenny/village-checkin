@@ -518,8 +518,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
           <StatCard label="Avg Monthly" value={formatCents(Math.round(villagerStats.avgMonthly))} />
           <StatCard
             label="vs. Global Avg"
-            value={`${villagerStats.diffFromGlobal >= 0 ? "+" : ""}${formatCents(Math.round(villagerStats.diffFromGlobal))}`}
-            highlight={villagerStats.diffFromGlobal >= 0 ? "green" : "red"}
+            value={`${Math.round(villagerStats.diffFromGlobal) === 0 ? "±" : villagerStats.diffFromGlobal > 0 ? "+" : ""}${formatCents(Math.round(villagerStats.diffFromGlobal))}`}
+            highlight={Math.round(villagerStats.diffFromGlobal) === 0 ? "yellow" : villagerStats.diffFromGlobal > 0 ? "green" : "red"}
           />
         </div>
       )}
@@ -868,14 +868,16 @@ function StatCard({
   label: string;
   value: string;
   subtitle?: string;
-  highlight?: "green" | "red";
+  highlight?: "green" | "red" | "yellow";
 }) {
   const valueColor =
     highlight === "green"
       ? "text-green-600 dark:text-green-400"
       : highlight === "red"
         ? "text-red-600 dark:text-red-400"
-        : "text-[var(--color-foreground)]";
+        : highlight === "yellow"
+          ? "text-yellow-600 dark:text-yellow-400"
+          : "text-[var(--color-foreground)]";
   return (
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
       <p className="text-xs font-medium text-[var(--color-muted)]">{label}</p>

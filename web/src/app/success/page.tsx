@@ -16,9 +16,9 @@ export default function SuccessPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </div>
-      <h1 className="text-3xl font-bold">Payment Complete</h1>
-      <p className="mt-3 text-lg text-[var(--color-muted)]">
-        Thanks for supporting the studio. Enjoy the session!
+      <h1 className="text-3xl font-bold">Welcome to the Village!</h1>
+      <p className="mt-3 text-sm text-green-600 dark:text-green-400">
+        Payment complete — thanks for supporting the Village!
       </p>
       <Link
         href="/"
