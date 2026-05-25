@@ -4,8 +4,9 @@ import { useState, useEffect, FormEvent } from "react";
 import VillagersPanel from "@/components/admin/villagers-panel";
 import CheckInsPanel from "@/components/admin/checkins-panel";
 import SettingsPanel from "@/components/admin/settings-panel";
+import ChangelogPanel from "@/components/admin/changelog-panel";
 
-type Tab = "villagers" | "checkins" | "settings";
+type Tab = "villagers" | "checkins" | "settings" | "changelog";
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
@@ -86,6 +87,7 @@ export default function AdminPage() {
     { key: "villagers", label: "Villagers" },
     { key: "checkins", label: "Check-ins" },
     { key: "settings", label: "Settings" },
+    { key: "changelog", label: "Changelog" },
   ];
 
   return (
@@ -122,6 +124,7 @@ export default function AdminPage() {
       {activeTab === "villagers" && <VillagersPanel token={token} />}
       {activeTab === "checkins" && <CheckInsPanel token={token} />}
       {activeTab === "settings" && <SettingsPanel token={token} />}
+      {activeTab === "changelog" && <ChangelogPanel />}
     </div>
   );
 }
