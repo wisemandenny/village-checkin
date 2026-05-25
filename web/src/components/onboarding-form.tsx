@@ -262,7 +262,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
               key={r}
               type="button"
               onClick={() => toggleRole(r)}
-              className={`h-11 rounded-xl border text-sm font-medium transition-all font-[family-name:var(--font-domaine)] ${
+              className={`h-12 rounded-xl border text-base font-medium transition-all font-[family-name:var(--font-domaine)] ${
                 roles.has(r)
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
                   : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
@@ -285,7 +285,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
                 key={inst}
                 type="button"
                 onClick={() => toggleInstrument(inst)}
-                className={`h-11 rounded-xl border text-sm font-medium transition-all font-[family-name:var(--font-domaine)] ${
+                className={`h-12 rounded-xl border text-base font-medium transition-all font-[family-name:var(--font-domaine)] ${
                   instruments.has(inst)
                     ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
                     : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"

@@ -1,32 +1,38 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import type { Appearance } from "@stripe/stripe-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-function useStripeAppearance(): Appearance {
-  const [isDark, setIsDark] = useState(false);
+const darkModeQuery = "(prefers-color-scheme: dark)";
 
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    setIsDark(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+function subscribeDarkMode(callback: () => void) {
+  const mq = window.matchMedia(darkModeQuery);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
 
-  return useMemo<Appearance>(() => ({
-    theme: "flat",
+function getSnapshotDarkMode() {
+  return window.matchMedia(darkModeQuery).matches;
+}
+
+function useDarkMode() {
+  return useSyncExternalStore(subscribeDarkMode, getSnapshotDarkMode, () => false);
+}
+
+function buildStripeAppearance(isDark: boolean): Appearance {
+  return {
+    theme: isDark ? "night" : "flat",
     variables: {
       colorPrimary: isDark ? "#ef4444" : "#dc2626",
-      colorBackground: isDark ? "#141414" : "#fafafa",
+      colorBackground: isDark ? "#0a0a0a" : "#ffffff",
       colorText: isDark ? "#f0f0f0" : "#1a1a1a",
       colorTextSecondary: isDark ? "#9ca3af" : "#6b7280",
       colorDanger: "#ef4444",
-      fontFamily: "var(--font-geist), ui-sans-serif, system-ui, sans-serif",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       fontSizeBase: "14px",
       borderRadius: "8px",
       spacingUnit: "4px",
@@ -49,17 +55,17 @@ function useStripeAppearance(): Appearance {
       },
       ".Tab": {
         border: `1px solid ${isDark ? "#262626" : "#e5e7eb"}`,
-        backgroundColor: isDark ? "#141414" : "#fafafa",
+        backgroundColor: isDark ? "#0a0a0a" : "#ffffff",
       },
       ".Tab--selected": {
         border: `1px solid ${isDark ? "#ef4444" : "#dc2626"}`,
-        backgroundColor: isDark ? "#0a0a0a" : "#ffffff",
+        backgroundColor: isDark ? "#141414" : "#fafafa",
       },
       ".Tab:hover": {
         border: `1px solid ${isDark ? "#ef4444" : "#dc2626"}`,
       },
     },
-  }), [isDark]);
+  };
 }
 
 interface PaymentStepProps {
@@ -68,9 +74,9 @@ interface PaymentStepProps {
 }
 
 const PRESET_AMOUNTS = [
-  { label: "$5", cents: 500 },
-  { label: "$10", cents: 1000 },
-  { label: "$20", cents: 2000 },
+  { label: "$ 5", cents: 500 },
+  { label: "$ 10", cents: 1000 },
+  { label: "$ 20", cents: 2000 },
 ];
 
 const BILL_COLORS: Record<number, { bg: string; border: string; text: string }> = {
@@ -87,7 +93,8 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const appearance = useStripeAppearance();
+  const isDark = useDarkMode();
+  const appearance = useMemo(() => buildStripeAppearance(isDark), [isDark]);
 
   const amountInCents = useCustom
     ? Math.round(parseFloat(customAmount || "0") * 100)
@@ -162,6 +169,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
           Support the Village! — ${(amountInCents / 100).toFixed(2)}
         </h2>
         <Elements
+          key={isDark ? "dark" : "light"}
           stripe={stripePromise}
           options={{ clientSecret, appearance }}
         >
@@ -194,7 +202,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
               key={preset.cents}
               onClick={() => handleAmountSelect(preset.cents)}
               disabled={loading}
-              className={`rounded-lg border px-3 py-4 text-base font-bold transition ${
+              className={`rounded-lg border px-3 py-5 text-2xl font-bold font-[family-name:var(--font-domaine)] transition ${
                 isSelected
                   ? `${colors.border} ${colors.bg} ${colors.text} ring-2 ring-[var(--color-accent)]/40`
                   : `${colors.border} ${colors.bg} ${colors.text} hover:opacity-80`
@@ -209,7 +217,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
       <button
         onClick={() => { setUseCustom(true); setSelectedAmount(null); setClientSecret(null); }}
         disabled={loading}
-        className={`w-full rounded-lg border px-3 py-3 text-sm font-medium transition ${
+        className={`w-full rounded-lg border px-3 py-4 text-xl font-medium font-[family-name:var(--font-domaine)] transition ${
           useCustom
             ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
             : "border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
@@ -233,7 +241,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
           <button
             onClick={handleCustomConfirm}
             disabled={loading || !customAmount || parseFloat(customAmount) < 0.5}
-            className="rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+            className="rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
           >
             {loading ? "..." : "Go"}
           </button>
@@ -301,7 +309,7 @@ function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete
       <button
         type="submit"
         disabled={!stripe || processing}
-        className="w-full rounded-lg bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+        className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
       >
         {processing ? "Processing..." : "Pay"}
       </button>
