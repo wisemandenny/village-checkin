@@ -51,8 +51,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const chargedAmount = Math.ceil((amount + 30) / (1 - 0.029));
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: chargedAmount,
       currency: "cad",
       automatic_payment_methods: { enabled: true },
       metadata: { check_in_id },

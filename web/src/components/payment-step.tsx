@@ -82,6 +82,10 @@ interface SavedCard {
   exp_year: number;
 }
 
+function calcProcessingFee(cents: number): number {
+  return Math.ceil((cents + 30) / (1 - 0.029)) - cents;
+}
+
 const PRESET_AMOUNTS = [
   { label: "$ 5", cents: 500 },
   { label: "$ 10", cents: 1000 },
@@ -223,12 +227,15 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
         <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">
           Support the Village! — ${(amountInCents / 100).toFixed(2)}
         </h2>
+        <p className="text-xs text-[var(--color-muted)]">
+          + ${(calcProcessingFee(amountInCents) / 100).toFixed(2)} payment processor fee
+        </p>
         <Elements
           key={isDark ? "dark" : "light"}
           stripe={stripePromise}
           options={{ clientSecret, appearance }}
         >
-          <CheckoutForm checkInId={checkInId} onComplete={onComplete} />
+          <CheckoutForm checkInId={checkInId} totalCents={amountInCents + calcProcessingFee(amountInCents)} onComplete={onComplete} />
         </Elements>
         <button
           type="button"
@@ -307,6 +314,13 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
         </div>
       )}
 
+      {/* Fee note when an amount is selected */}
+      {selectedAmount && !useCustom && (
+        <p className="text-xs text-[var(--color-muted)]">
+          + ${(calcProcessingFee(selectedAmount) / 100).toFixed(2)} payment processor fee
+        </p>
+      )}
+
       {/* Saved card one-tap payment — only show when an amount is selected */}
       {savedCards.length > 0 && selectedAmount && !useCustom && (
         <div className="w-full space-y-2">
@@ -321,8 +335,8 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
                 <span className="font-medium">{BRAND_DISPLAY[card.brand] ?? card.brand}</span>
                 <span className="text-[var(--color-muted)]">•••• {card.last4}</span>
               </span>
-              <span className="font-semibold font-[family-name:var(--font-domaine)] text-[var(--color-accent)]">
-                {chargingSaved ? "Paying..." : `Pay $${(selectedAmount / 100).toFixed(2)}`}
+              <span className="font-semibold text-[var(--color-accent)]">
+                {chargingSaved ? "Paying..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
               </span>
             </button>
           ))}
@@ -347,7 +361,7 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
           disabled={loading}
           className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
         >
-          {loading ? "Setting up..." : `Pay $${(selectedAmount / 100).toFixed(2)}`}
+          {loading ? "Setting up..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
         </button>
       )}
 
@@ -369,7 +383,7 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
   );
 }
 
-function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete: (paid?: boolean) => void }) {
+function CheckoutForm({ checkInId, totalCents, onComplete }: { checkInId: string; totalCents: number; onComplete: (paid?: boolean) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -414,7 +428,7 @@ function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete
         disabled={!stripe || processing}
         className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
       >
-        {processing ? "Processing..." : "Pay"}
+        {processing ? "Processing..." : `Pay — $${(totalCents / 100).toFixed(2)}`}
       </button>
     </form>
   );

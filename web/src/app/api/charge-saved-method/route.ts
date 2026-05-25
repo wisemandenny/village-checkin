@@ -33,8 +33,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const stripe = getStripe();
+    const chargedAmount = Math.ceil((amount + 30) / (1 - 0.029));
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: chargedAmount,
       currency: "cad",
       customer: villager.stripe_customer_id,
       payment_method: payment_method_id,
