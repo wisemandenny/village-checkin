@@ -419,25 +419,26 @@ export default function CheckInsPanel({ token }: { token: string }) {
     if (filterVillagerId || allCheckins.length === 0) return null;
 
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    const day = now.getDay();
+    const mondayOffset = day === 0 ? 6 : day - 1;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
 
-    const todayCheckins = allCheckins.filter((c) => {
+    const weekCheckins = allCheckins.filter((c) => {
       const d = new Date(c.created_at);
-      return d >= todayStart && d < todayEnd;
+      return d >= weekStart && d < weekEnd;
     });
 
-    const todayPaid = todayCheckins.filter((c) => c.status === "paid");
-    const todayAvgPayment =
-      todayPaid.length > 0
-        ? todayPaid.reduce((s, c) => s + c.intent_amount, 0) / todayPaid.length
+    const weekPaid = weekCheckins.filter((c) => c.status === "paid");
+    const weekTotal = weekPaid.reduce((s, c) => s + c.intent_amount, 0);
+    const weekAvgPayment =
+      weekPaid.length > 0
+        ? weekTotal / weekPaid.length
         : 0;
 
-    // Unique villagers checked in today
-    const todayVillagerIds = new Set(todayCheckins.map((c) => c.villager_id));
+    const weekVillagerIds = new Set(weekCheckins.map((c) => c.villager_id));
 
-    // Compute streak for each villager checked in today
     const checkinsByVillager = new Map<string, CheckInWithVillager[]>();
     for (const c of allCheckins) {
       const arr = checkinsByVillager.get(c.villager_id) ?? [];
@@ -448,7 +449,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
     let streakSum = 0;
     let streakCount = 0;
     let newVillagers = 0;
-    for (const vid of todayVillagerIds) {
+    for (const vid of weekVillagerIds) {
       const vCheckins = checkinsByVillager.get(vid) ?? [];
       if (vCheckins.length === 1) newVillagers++;
       const { current } = computeStreaks(vCheckins);
@@ -457,24 +458,10 @@ export default function CheckInsPanel({ token }: { token: string }) {
     }
     const avgStreak = streakCount > 0 ? streakSum / streakCount : 0;
 
-    const day = now.getDay();
-    const mondayOffset = day === 0 ? 6 : day - 1;
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-
-    const weekTotal = allCheckins
-      .filter((c) => {
-        if (c.status !== "paid") return false;
-        const d = new Date(c.created_at);
-        return d >= weekStart && d < weekEnd;
-      })
-      .reduce((s, c) => s + c.intent_amount, 0);
-
     return {
-      todayCheckins: todayCheckins.length,
+      weekCheckins: weekCheckins.length,
       weekTotal,
-      todayAvgPayment,
+      weekAvgPayment,
       avgStreak,
       newVillagers,
     };
@@ -542,11 +529,11 @@ export default function CheckInsPanel({ token }: { token: string }) {
       {/* Global Stats (All Villagers) */}
       {globalStats && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Today's Check-ins" value={String(globalStats.todayCheckins)} />
+          <StatCard label="This Week's Check-ins" value={String(globalStats.weekCheckins)} />
           <StatCard label="This Week's Total" value={formatCents(globalStats.weekTotal)} />
-          <StatCard label="Today's Avg Payment" value={formatCents(Math.round(globalStats.todayAvgPayment))} />
-          <StatCard label="Avg Streak (Today)" value={`${globalStats.avgStreak.toFixed(1)} wks`} />
-          <StatCard label="New Villagers Today" value={String(globalStats.newVillagers)} />
+          <StatCard label="This Week's Avg Payment" value={formatCents(Math.round(globalStats.weekAvgPayment))} />
+          <StatCard label="Avg Streak (This Week)" value={`${globalStats.avgStreak.toFixed(1)} wks`} />
+          <StatCard label="New Villagers This Week" value={String(globalStats.newVillagers)} />
         </div>
       )}
 
