@@ -457,8 +457,23 @@ export default function CheckInsPanel({ token }: { token: string }) {
     }
     const avgStreak = streakCount > 0 ? streakSum / streakCount : 0;
 
+    const day = now.getDay();
+    const mondayOffset = day === 0 ? 6 : day - 1;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const weekTotal = allCheckins
+      .filter((c) => {
+        if (c.status !== "paid") return false;
+        const d = new Date(c.created_at);
+        return d >= weekStart && d < weekEnd;
+      })
+      .reduce((s, c) => s + c.intent_amount, 0);
+
     return {
       todayCheckins: todayCheckins.length,
+      weekTotal,
       todayAvgPayment,
       avgStreak,
       newVillagers,
@@ -526,8 +541,9 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
       {/* Global Stats (All Villagers) */}
       {globalStats && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label="Today's Check-ins" value={String(globalStats.todayCheckins)} />
+          <StatCard label="This Week's Total" value={formatCents(globalStats.weekTotal)} />
           <StatCard label="Today's Avg Payment" value={formatCents(Math.round(globalStats.todayAvgPayment))} />
           <StatCard label="Avg Streak (Today)" value={`${globalStats.avgStreak.toFixed(1)} wks`} />
           <StatCard label="New Villagers Today" value={String(globalStats.newVillagers)} />
