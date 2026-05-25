@@ -148,6 +148,14 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
     onComplete();
   }, [onComplete]);
 
+  const handleBackToAmounts = useCallback(() => {
+    setClientSecret(null);
+    setSelectedAmount(null);
+    setUseCustom(false);
+    setCustomAmount("");
+    setError(null);
+  }, []);
+
   if (selectedAmount === 0 && !useCustom) {
     return (
       <div className="flex flex-col items-center gap-6 text-center">
@@ -169,14 +177,6 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
       </div>
     );
   }
-
-  const handleBackToAmounts = useCallback(() => {
-    setClientSecret(null);
-    setSelectedAmount(null);
-    setUseCustom(false);
-    setCustomAmount("");
-    setError(null);
-  }, []);
 
   if (clientSecret) {
     return (
