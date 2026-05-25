@@ -112,6 +112,14 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
     );
   }
 
+  const handleBackToAmounts = useCallback(() => {
+    setClientSecret(null);
+    setSelectedAmount(null);
+    setUseCustom(false);
+    setCustomAmount("");
+    setError(null);
+  }, []);
+
   if (clientSecret) {
     return (
       <div className="flex w-full max-w-md flex-col items-center gap-6">
@@ -133,6 +141,13 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
         >
           <CheckoutForm checkInId={checkInId} onComplete={onComplete} />
         </Elements>
+        <button
+          type="button"
+          onClick={handleBackToAmounts}
+          className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
+        >
+          &larr; Change amount
+        </button>
       </div>
     );
   }

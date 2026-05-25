@@ -71,6 +71,12 @@ export default function AdminPage() {
           >
             {loggingIn ? "Signing in…" : "Sign In"}
           </button>
+          <a
+            href="/"
+            className="mt-4 block text-center text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
+          >
+            &larr; Back to check-in
+          </a>
         </form>
       </div>
     );
