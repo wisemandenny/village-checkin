@@ -625,7 +625,16 @@ export default function CheckInsPanel({ token }: { token: string }) {
                     {formatDate(c.created_at)}
                   </td>
                   <td className="hidden px-4 py-3 font-mono text-xs text-[var(--color-muted)] lg:table-cell">
-                    {c.stripe_transaction_id || "—"}
+                    {c.stripe_transaction_id ? (
+                      <a
+                        href={`https://dashboard.stripe.com/acct_1Tb0L0Fgl7j6G6BK/payments/${c.stripe_transaction_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--color-accent)] underline underline-offset-4 transition hover:text-[var(--color-accent-light)]"
+                      >
+                        {c.stripe_transaction_id}
+                      </a>
+                    ) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
