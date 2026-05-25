@@ -182,7 +182,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         <button
           type="submit"
           disabled={!recoverIg.trim() || loading}
-          className="h-14 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-14 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold font-[family-name:var(--font-domaine)] transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? "Looking you up..." : "Reconnect"}
         </button>

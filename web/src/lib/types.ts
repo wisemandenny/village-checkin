@@ -8,6 +8,7 @@ export interface Villager {
   email: string | null;
   marketing_opt_in: boolean;
   test_account: boolean;
+  stripe_customer_id: string | null;
   first_visited_at: string;
   last_visited_at: string | null;
 }

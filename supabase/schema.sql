@@ -14,6 +14,7 @@ create table villagers (
   email       text,
   marketing_opt_in boolean not null default true,
   test_account     boolean not null default false,
+  stripe_customer_id text,
   first_visited_at timestamptz not null default now(),
   last_visited_at  timestamptz
 );

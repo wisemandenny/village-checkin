@@ -131,6 +131,7 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
     return (
       <PaymentStep
         checkInId={checkInId}
+        deviceId={deviceId}
         onComplete={(paid?: boolean) => {
           if (paid) setPaidSuccessfully(true);
           setStep("done");

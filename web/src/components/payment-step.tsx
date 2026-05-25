@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useState, useCallback, useMemo, useEffect, useSyncExternalStore } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import type { Appearance } from "@stripe/stripe-js";
@@ -70,7 +70,16 @@ function buildStripeAppearance(isDark: boolean): Appearance {
 
 interface PaymentStepProps {
   checkInId: string;
+  deviceId: string;
   onComplete: (paid?: boolean) => void;
+}
+
+interface SavedCard {
+  id: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
 }
 
 const PRESET_AMOUNTS = [
@@ -85,16 +94,34 @@ const BILL_COLORS: Record<number, { bg: string; border: string; text: string }> 
   2000: { bg: "bg-emerald-100 dark:bg-emerald-950", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-800 dark:text-emerald-200" },
 };
 
-export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
+const BRAND_DISPLAY: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  amex: "Amex",
+  discover: "Discover",
+};
+
+export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProps) {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [chargingSaved, setChargingSaved] = useState(false);
 
   const isDark = useDarkMode();
   const appearance = useMemo(() => buildStripeAppearance(isDark), [isDark]);
+
+  useEffect(() => {
+    fetch(`/api/payment-methods?device_id=${encodeURIComponent(deviceId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.methods?.length) setSavedCards(data.methods);
+      })
+      .catch(() => {});
+  }, [deviceId]);
 
   const amountInCents = useCustom
     ? Math.round(parseFloat(customAmount || "0") * 100)
@@ -112,7 +139,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
       const res = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: cents, check_in_id: checkInId }),
+        body: JSON.stringify({ amount: cents, check_in_id: checkInId, device_id: deviceId }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -125,7 +152,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
     } finally {
       setLoading(false);
     }
-  }, [checkInId]);
+  }, [checkInId, deviceId]);
 
   const handleCustomConfirm = useCallback(async () => {
     const cents = Math.round(parseFloat(customAmount || "0") * 100);
@@ -139,7 +166,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
       const res = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: cents, check_in_id: checkInId }),
+        body: JSON.stringify({ amount: cents, check_in_id: checkInId, device_id: deviceId }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -152,7 +179,35 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
     } finally {
       setLoading(false);
     }
-  }, [customAmount, checkInId]);
+  }, [customAmount, checkInId, deviceId]);
+
+  const handleSavedCardPayment = useCallback(async (card: SavedCard, cents: number) => {
+    setChargingSaved(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/charge-saved-method", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: cents,
+          check_in_id: checkInId,
+          device_id: deviceId,
+          payment_method_id: card.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Payment failed");
+      if (data.status === "succeeded") {
+        onComplete(true);
+      } else {
+        throw new Error("Payment requires additional action. Please use a new card.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment failed");
+    } finally {
+      setChargingSaved(false);
+    }
+  }, [checkInId, deviceId, onComplete]);
 
   const handleBackToAmounts = useCallback(() => {
     setClientSecret(null);
@@ -200,8 +255,12 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
           return (
             <button
               key={preset.cents}
-              onClick={() => handleAmountSelect(preset.cents)}
-              disabled={loading}
+              onClick={() => {
+                setSelectedAmount(preset.cents);
+                setUseCustom(false);
+                setError(null);
+              }}
+              disabled={loading || chargingSaved}
               className={`rounded-lg border px-3 py-5 text-2xl font-bold font-[family-name:var(--font-domaine)] transition ${
                 isSelected
                   ? `${colors.border} ${colors.bg} ${colors.text} ring-2 ring-[var(--color-accent)]/40`
@@ -216,7 +275,7 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
 
       <button
         onClick={() => { setUseCustom(true); setSelectedAmount(null); setClientSecret(null); }}
-        disabled={loading}
+        disabled={loading || chargingSaved}
         className={`w-full rounded-lg border px-3 py-4 text-xl font-medium font-[family-name:var(--font-domaine)] transition ${
           useCustom
             ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
@@ -248,11 +307,55 @@ export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
         </div>
       )}
 
+      {/* Saved card one-tap payment — only show when an amount is selected */}
+      {savedCards.length > 0 && selectedAmount && !useCustom && (
+        <div className="w-full space-y-2">
+          {savedCards.map((card) => (
+            <button
+              key={card.id}
+              onClick={() => handleSavedCardPayment(card, selectedAmount)}
+              disabled={chargingSaved || loading}
+              className="flex w-full items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm transition hover:border-[var(--color-accent)]/50 disabled:opacity-50"
+            >
+              <span className="flex items-center gap-2">
+                <span className="font-medium">{BRAND_DISPLAY[card.brand] ?? card.brand}</span>
+                <span className="text-[var(--color-muted)]">•••• {card.last4}</span>
+              </span>
+              <span className="font-semibold font-[family-name:var(--font-domaine)] text-[var(--color-accent)]">
+                {chargingSaved ? "Paying..." : `Pay $${(selectedAmount / 100).toFixed(2)}`}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* New card option when an amount is selected and saved cards exist */}
+      {savedCards.length > 0 && selectedAmount && !useCustom && (
+        <button
+          onClick={() => handleAmountSelect(selectedAmount)}
+          disabled={loading || chargingSaved}
+          className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
+        >
+          Use a new card instead
+        </button>
+      )}
+
+      {/* Direct proceed when no saved cards and an amount is selected */}
+      {savedCards.length === 0 && selectedAmount && !useCustom && (
+        <button
+          onClick={() => handleAmountSelect(selectedAmount)}
+          disabled={loading}
+          className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+        >
+          {loading ? "Setting up..." : `Pay $${(selectedAmount / 100).toFixed(2)}`}
+        </button>
+      )}
+
       {error && (
         <p className="text-sm text-red-500">{error}</p>
       )}
 
-      {loading && (
+      {loading && !selectedAmount && (
         <p className="text-sm text-[var(--color-muted)]">Setting up payment...</p>
       )}
 
