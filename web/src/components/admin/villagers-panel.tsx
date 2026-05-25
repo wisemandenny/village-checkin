@@ -328,7 +328,16 @@ export default function VillagersPanel({ token }: { token: string }) {
                     )}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
-                    {v.ig_handle || "—"}
+                    {v.ig_handle ? (
+                      <a
+                        href={`https://instagram.com/${v.ig_handle.replace(/^@/, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--color-accent)] underline underline-offset-4 transition hover:text-[var(--color-accent-light)]"
+                      >
+                        {v.ig_handle}
+                      </a>
+                    ) : "—"}
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                     {v.roles?.length ? v.roles.join(", ") : "—"}
