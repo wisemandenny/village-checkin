@@ -313,13 +313,6 @@ function CheckoutForm({ checkInId, onComplete }: { checkInId: string; onComplete
       >
         {processing ? "Processing..." : "Pay"}
       </button>
-      <button
-        type="button"
-        onClick={() => onComplete()}
-        className="w-full text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
-      >
-        Skip for now
-      </button>
     </form>
   );
 }
