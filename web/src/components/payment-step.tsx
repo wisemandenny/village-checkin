@@ -64,19 +64,22 @@ function useStripeAppearance(): Appearance {
 
 interface PaymentStepProps {
   checkInId: string;
-  displayName: string;
   onComplete: (paid?: boolean) => void;
 }
 
 const PRESET_AMOUNTS = [
-  { label: "Broke Artist", cents: 0 },
   { label: "$5", cents: 500 },
   { label: "$10", cents: 1000 },
-  { label: "$15", cents: 1500 },
   { label: "$20", cents: 2000 },
 ];
 
-export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepProps) {
+const BILL_COLORS: Record<number, { bg: string; border: string; text: string }> = {
+  500:  { bg: "bg-sky-100 dark:bg-sky-950",     border: "border-sky-300 dark:border-sky-700",     text: "text-sky-800 dark:text-sky-200" },
+  1000: { bg: "bg-purple-100 dark:bg-purple-950", border: "border-purple-300 dark:border-purple-700", text: "text-purple-800 dark:text-purple-200" },
+  2000: { bg: "bg-emerald-100 dark:bg-emerald-950", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-800 dark:text-emerald-200" },
+};
+
+export function PaymentStep({ checkInId, onComplete }: PaymentStepProps) {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
@@ -144,10 +147,6 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
     }
   }, [customAmount, checkInId]);
 
-  const handleBrokeArtist = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
-
   const handleBackToAmounts = useCallback(() => {
     setClientSecret(null);
     setSelectedAmount(null);
@@ -156,32 +155,10 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
     setError(null);
   }, []);
 
-  if (selectedAmount === 0 && !useCustom) {
-    return (
-      <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
-          <svg className="h-10 w-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-2xl font-bold">No worries, {displayName}!</h2>
-        <p className="text-[var(--color-muted)]">
-          The Village is for everyone. Enjoy your session.
-        </p>
-        <button
-          onClick={handleBrokeArtist}
-          className="mt-2 rounded-lg bg-[var(--color-accent)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)]"
-        >
-          Continue
-        </button>
-      </div>
-    );
-  }
-
   if (clientSecret) {
     return (
       <div className="flex w-full max-w-md flex-col items-center gap-6">
-        <h2 className="text-xl font-bold">
+        <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">
           Support the Village! — ${(amountInCents / 100).toFixed(2)}
         </h2>
         <Elements
@@ -203,38 +180,43 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
-      <h2 className="text-2xl font-bold">Support the Village!</h2>
+      <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">Support the Village!</h2>
       <p className="text-sm text-[var(--color-muted)]">
-        Support the Village. Every little bit helps — or don&apos;t. No judgment.
+        Every little bit helps — the Village is for everyone, no matter what.
       </p>
 
-      <div className="grid w-full grid-cols-3 gap-2">
-        {PRESET_AMOUNTS.map((preset) => (
-          <button
-            key={preset.cents}
-            onClick={() => preset.cents === 0 ? handleAmountSelect(0) : handleAmountSelect(preset.cents)}
-            disabled={loading}
-            className={`rounded-lg border px-3 py-3 text-sm font-medium transition ${
-              selectedAmount === preset.cents && !useCustom
-                ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-                : "border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
-            } disabled:opacity-50`}
-          >
-            {preset.label}
-          </button>
-        ))}
-        <button
-          onClick={() => { setUseCustom(true); setSelectedAmount(null); setClientSecret(null); }}
-          disabled={loading}
-          className={`rounded-lg border px-3 py-3 text-sm font-medium transition ${
-            useCustom
-              ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-              : "border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
-          } disabled:opacity-50`}
-        >
-          Custom
-        </button>
+      <div className="grid w-full grid-cols-3 gap-3">
+        {PRESET_AMOUNTS.map((preset) => {
+          const colors = BILL_COLORS[preset.cents];
+          const isSelected = selectedAmount === preset.cents && !useCustom;
+          return (
+            <button
+              key={preset.cents}
+              onClick={() => handleAmountSelect(preset.cents)}
+              disabled={loading}
+              className={`rounded-lg border px-3 py-4 text-base font-bold transition ${
+                isSelected
+                  ? `${colors.border} ${colors.bg} ${colors.text} ring-2 ring-[var(--color-accent)]/40`
+                  : `${colors.border} ${colors.bg} ${colors.text} hover:opacity-80`
+              } disabled:opacity-50`}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
       </div>
+
+      <button
+        onClick={() => { setUseCustom(true); setSelectedAmount(null); setClientSecret(null); }}
+        disabled={loading}
+        className={`w-full rounded-lg border px-3 py-3 text-sm font-medium transition ${
+          useCustom
+            ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+            : "border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
+        } disabled:opacity-50`}
+      >
+        Custom Amount
+      </button>
 
       {useCustom && (
         <div className="flex w-full items-center gap-2">
@@ -270,7 +252,7 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
         onClick={() => onComplete()}
         className="mt-2 text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
       >
-        Skip for now
+        Broke Artist
       </button>
     </div>
   );
