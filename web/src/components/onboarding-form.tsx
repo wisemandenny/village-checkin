@@ -208,21 +208,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   return (
     <form onSubmit={handleRegister} className="flex flex-col gap-6 w-full max-w-sm">
       <div className="flex flex-col gap-2">
-        <label htmlFor="ig" className="text-sm font-medium text-[var(--color-muted)]">
-          What&apos;s your IG?
-        </label>
-        <input
-          id="ig"
-          type="text"
-          value={igHandle}
-          onChange={(e) => setIgHandle(e.target.value.toLowerCase())}
-          placeholder="@champagnepapi"
-          className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-          autoFocus
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
         <label htmlFor="name" className="text-sm font-medium text-[var(--color-muted)]">
           What should we call you?
         </label>
@@ -233,7 +218,22 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder="Your name or artist name..."
           className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+          autoFocus
           required
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="ig" className="text-sm font-medium text-[var(--color-muted)]">
+          What&apos;s your IG?
+        </label>
+        <input
+          id="ig"
+          type="text"
+          value={igHandle}
+          onChange={(e) => setIgHandle(e.target.value.toLowerCase())}
+          placeholder="@champagnepapi"
+          className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
         />
       </div>
 
