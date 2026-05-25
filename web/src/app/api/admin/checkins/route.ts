@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
-  const denied = verifyAdmin(req);
+  const denied = await verifyAdmin(req);
   if (denied) return denied;
 
   const supabase = createServerClient();
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = verifyAdmin(req);
+  const denied = await verifyAdmin(req);
   if (denied) return denied;
 
   const body = await req.json();

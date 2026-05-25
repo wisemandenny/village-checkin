@@ -1,40 +1,60 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaymentStep } from "@/components/payment-step";
 
 interface CheckInFlowProps {
   deviceId: string;
   displayName: string;
 }
 
-type Step = "checking-in" | "done" | "already";
+type Step = "checking-in" | "payment" | "done" | "already";
 
 export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
   const [step, setStep] = useState<Step>("checking-in");
   const [error, setError] = useState<string | null>(null);
+  const [checkInId, setCheckInId] = useState<string | null>(null);
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
-        const res = await fetch("/api/checkin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device_id: deviceId }),
-        });
-        if (res.status === 409) {
-          if (!cancelled) setStep("already");
+        const [checkinRes, settingsRes] = await Promise.all([
+          fetch("/api/checkin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: deviceId }),
+          }),
+          fetch("/api/settings"),
+        ]);
+
+        if (cancelled) return;
+
+        const settings = settingsRes.ok ? await settingsRes.json() : {};
+        setPaymentsEnabled(settings.payments_enabled === true);
+
+        if (checkinRes.status === 409) {
+          setStep("already");
           return;
         }
-        if (!res.ok) throw new Error("Check-in failed");
-        if (!cancelled) setStep("done");
+        if (!checkinRes.ok) throw new Error("Check-in failed");
+
+        const { check_in } = await checkinRes.json();
+        setCheckInId(check_in.id);
+
+        if (settings.payments_enabled === true) {
+          setStep("payment");
+        } else {
+          setStep("done");
+        }
       } catch {
         if (!cancelled) setError("Could not check in. Please try again.");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+
+    return () => { cancelled = true; };
   }, [deviceId]);
 
   if (step === "checking-in") {
@@ -58,10 +78,16 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ device_id: deviceId }),
                 })
-                  .then((res) => {
+                  .then(async (res) => {
                     if (res.status === 409) { setStep("already"); return; }
                     if (!res.ok) throw new Error("Check-in failed");
-                    setStep("done");
+                    const { check_in } = await res.json();
+                    setCheckInId(check_in.id);
+                    if (paymentsEnabled) {
+                      setStep("payment");
+                    } else {
+                      setStep("done");
+                    }
                   })
                   .catch(() =>
                     setError("Could not check in. Please try again.")
@@ -97,6 +123,16 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
         </div>
         <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
       </div>
+    );
+  }
+
+  if (step === "payment" && checkInId) {
+    return (
+      <PaymentStep
+        checkInId={checkInId}
+        displayName={displayName}
+        onComplete={() => setStep("done")}
+      />
     );
   }
 

@@ -6,7 +6,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = verifyAdmin(req);
+  const denied = await verifyAdmin(req);
   if (denied) return denied;
 
   const { id } = await params;
@@ -46,7 +46,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = verifyAdmin(req);
+  const denied = await verifyAdmin(req);
   if (denied) return denied;
 
   const { id } = await params;

@@ -71,3 +71,18 @@ create policy "Check-ins can be updated by service role"
 
 -- Deletes: only service role (admin) can delete; no anon delete policy needed
 -- since the admin panel uses the service role key which bypasses RLS.
+
+-- Studio settings: key-value store for feature flags and configuration
+create table studio_settings (
+  key   text primary key,
+  value jsonb not null default 'false'::jsonb
+);
+
+insert into studio_settings (key, value) values ('payments_enabled', 'false');
+insert into studio_settings (key, value) values ('admin_password', 'null');
+
+alter table studio_settings enable row level security;
+
+create policy "Settings are viewable by anon"
+  on studio_settings for select
+  using (true);
