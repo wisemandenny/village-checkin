@@ -1,10 +1,66 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import type { Appearance } from "@stripe/stripe-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+function useStripeAppearance(): Appearance {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setIsDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  return useMemo<Appearance>(() => ({
+    theme: "flat",
+    variables: {
+      colorPrimary: isDark ? "#ef4444" : "#dc2626",
+      colorBackground: isDark ? "#141414" : "#fafafa",
+      colorText: isDark ? "#f0f0f0" : "#1a1a1a",
+      colorTextSecondary: isDark ? "#9ca3af" : "#6b7280",
+      colorDanger: "#ef4444",
+      fontFamily: "var(--font-geist), ui-sans-serif, system-ui, sans-serif",
+      fontSizeBase: "14px",
+      borderRadius: "8px",
+      spacingUnit: "4px",
+    },
+    rules: {
+      ".Input": {
+        border: `1px solid ${isDark ? "#262626" : "#e5e7eb"}`,
+        backgroundColor: isDark ? "#0a0a0a" : "#ffffff",
+        boxShadow: "none",
+        transition: "border-color 0.15s, box-shadow 0.15s",
+      },
+      ".Input:focus": {
+        border: `1px solid ${isDark ? "#ef4444" : "#dc2626"}`,
+        boxShadow: `0 0 0 3px ${isDark ? "rgba(239,68,68,0.25)" : "rgba(220,38,38,0.25)"}`,
+      },
+      ".Label": {
+        color: isDark ? "#9ca3af" : "#6b7280",
+        fontWeight: "500",
+        fontSize: "13px",
+      },
+      ".Tab": {
+        border: `1px solid ${isDark ? "#262626" : "#e5e7eb"}`,
+        backgroundColor: isDark ? "#141414" : "#fafafa",
+      },
+      ".Tab--selected": {
+        border: `1px solid ${isDark ? "#ef4444" : "#dc2626"}`,
+        backgroundColor: isDark ? "#0a0a0a" : "#ffffff",
+      },
+      ".Tab:hover": {
+        border: `1px solid ${isDark ? "#ef4444" : "#dc2626"}`,
+      },
+    },
+  }), [isDark]);
+}
 
 interface PaymentStepProps {
   checkInId: string;
@@ -27,6 +83,8 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const appearance = useStripeAppearance();
 
   const amountInCents = useCustom
     ? Math.round(parseFloat(customAmount || "0") * 100)
@@ -128,16 +186,7 @@ export function PaymentStep({ checkInId, displayName, onComplete }: PaymentStepP
         </h2>
         <Elements
           stripe={stripePromise}
-          options={{
-            clientSecret,
-            appearance: {
-              theme: "flat",
-              variables: {
-                colorPrimary: "#dc2626",
-                fontFamily: "inherit",
-              },
-            },
-          }}
+          options={{ clientSecret, appearance }}
         >
           <CheckoutForm checkInId={checkInId} onComplete={onComplete} />
         </Elements>
