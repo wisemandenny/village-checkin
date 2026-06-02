@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import type { createServerClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import {
   addTag,
@@ -7,8 +7,10 @@ import {
   findSubscriberByEmail,
   getKitTagId,
   isKitConfigured,
+  isKitPurchasesConfigured,
   removeTag,
 } from "@/lib/kit";
+import { getKitAccessToken } from "@/lib/kit-oauth";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
 
@@ -172,11 +174,48 @@ export async function recordKitPurchase(
   email: string | null,
   input: { transactionId: string; amountCents: number; currency: string; productName: string; productId: string }
 ): Promise<void> {
-  if (!isKitConfigured() || !email || input.amountCents <= 0) return;
+  // TEMP DIAGNOSTIC: record outcome to studio_settings so prod failures are
+  // observable without log access. Remove once purchase sync is confirmed.
+  const debug: Record<string, unknown> = {
+    at: new Date().toISOString(),
+    email,
+    txn: input.transactionId,
+    amountCents: input.amountCents,
+    kitConfigured: isKitConfigured(),
+    purchasesConfigured: isKitPurchasesConfigured(),
+    result: "unset",
+    error: null,
+  };
   try {
-    await createPurchase({ email, ...input });
+    debug.tokenPresent = Boolean(await getKitAccessToken());
   } catch (err) {
-    console.error("[kit] recordKitPurchase failed", err);
+    debug.tokenPresent = false;
+    debug.error = err instanceof Error ? err.message : String(err);
+  }
+
+  if (!isKitConfigured() || !email || input.amountCents <= 0) {
+    debug.result = "skipped:guard";
+  } else {
+    try {
+      await createPurchase({ email, ...input });
+      debug.result = "createPurchase:returned";
+    } catch (err) {
+      debug.result = "createPurchase:threw";
+      debug.error = err instanceof Error ? err.message : String(err);
+      console.error("[kit] recordKitPurchase failed", err);
+    }
+  }
+
+  try {
+    const supabase = createServerClient();
+    await supabase
+      .from("studio_settings")
+      .upsert(
+        { key: "kit_last_purchase_debug", value: debug },
+        { onConflict: "key" }
+      );
+  } catch {
+    // best-effort diagnostic only
   }
 }
 
