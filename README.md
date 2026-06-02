@@ -71,7 +71,8 @@ npx expo start
 | `KIT_FORM_ID` | Kit Form id new subscribers are added to (triggers your welcome sequence). |
 | `KIT_TAG_WEEKLY_ID` | Kit Tag id applied to active weekly supporters. |
 | `KIT_TAG_MONTHLY_ID` | Kit Tag id applied to active monthly supporters. |
-| `KIT_OAUTH_TOKEN` | (Optional) Kit OAuth access token. Required only for Kit purchase records; the purchases API rejects API-key auth. Without it, purchase tracking is skipped (tags + the subscriptions table remain the source of truth). |
+| `KIT_OAUTH_CLIENT_ID` / `KIT_OAUTH_CLIENT_SECRET` | (Optional) Kit OAuth app credentials. Required only for Kit purchase records; the `/v4/purchases` API rejects API-key auth. Without them, purchase tracking is skipped (tags + the subscriptions table remain the source of truth). |
+| `KIT_OAUTH_SETUP_SECRET` | (Optional) Random string that gates the one-time `/api/kit/oauth/start` authorization route. |
 
 ### Kit integration
 
@@ -91,6 +92,25 @@ villagers to Kit** to backfill existing villagers (idempotent; safe to re-run).
 
 Stripe webhook events used: `customer.subscription.created/updated/deleted`,
 `invoice.paid`, `payment_intent.succeeded`, `checkout.session.completed`.
+
+#### Kit purchase records (optional, OAuth)
+
+Mailing-list sync and supporter tags work with just `KIT_API_KEY`. Kit's
+`/v4/purchases` endpoint, however, requires **OAuth** and rejects API keys, so
+logging each charge as a Kit purchase needs a one-time OAuth setup:
+
+1. In Kit, create an **app** with OAuth enabled (Developer / App Store → Build →
+   Authentication). Register the redirect URI `https://YOUR-DOMAIN/api/kit/oauth/callback`
+   and copy the **Client ID** + **Client Secret**.
+2. Set `KIT_OAUTH_CLIENT_ID`, `KIT_OAUTH_CLIENT_SECRET`, and a random
+   `KIT_OAUTH_SETUP_SECRET` in the environment, then deploy.
+3. Visit `https://YOUR-DOMAIN/api/kit/oauth/start?secret=YOUR_SETUP_SECRET`
+   while logged into the Kit account and approve. Tokens are stored in
+   `studio_settings` and auto-refreshed (refresh-token rotation handled), so no
+   token ever needs to live in env.
+
+If OAuth is not configured, purchase recording simply no-ops; tags and the
+`subscriptions` table remain the source of truth for supporter status.
 
 ## Payment Flow
 

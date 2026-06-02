@@ -2,6 +2,8 @@
 // Server-only. Mirrors the lazy-config pattern used by lib/stripe.ts.
 // Docs: https://developers.kit.com/api-reference
 
+import { getKitAccessToken, isKitOAuthConfigured } from "@/lib/kit-oauth";
+
 const KIT_API_BASE = "https://api.kit.com/v4";
 
 export interface KitSubscriber {
@@ -183,17 +185,17 @@ export interface KitPurchaseInput {
 }
 
 // True when Kit purchase tracking can be used. Kit's /v4/purchases endpoint
-// requires OAuth (it rejects API-key auth with 401), so a Kit OAuth access
-// token must be configured separately from KIT_API_KEY.
+// requires OAuth (it rejects API-key auth with 401), configured separately
+// from KIT_API_KEY. See lib/kit-oauth.ts.
 export function isKitPurchasesConfigured(): boolean {
-  return Boolean(process.env.KIT_OAUTH_TOKEN);
+  return isKitOAuthConfigured();
 }
 
 // Records a purchase against a subscriber for revenue/segmentation. This does
 // not move money -- Stripe remains the processor. Purely a Kit tracking record.
-// No-ops unless a Kit OAuth token is configured (see isKitPurchasesConfigured).
+// No-ops unless Kit OAuth is configured and authorized (see kit-oauth.ts).
 export async function createPurchase(input: KitPurchaseInput): Promise<void> {
-  const token = process.env.KIT_OAUTH_TOKEN;
+  const token = await getKitAccessToken();
   if (!token) return;
 
   const amount = input.amountCents / 100;
