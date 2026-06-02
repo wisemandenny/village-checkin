@@ -64,6 +64,32 @@ npx expo start
 | `STRIPE_SECRET_KEY` | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `NEXT_PUBLIC_BASE_URL` | Public URL of the web app |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (browser) |
+| `ADMIN_PASSWORD` | Fallback admin password (if not set in DB) |
+| `STRIPE_SUPPORTER_PRODUCT_ID` | (Recommended) Stripe Product id for recurring support. If unset, one is created on demand. |
+| `KIT_API_KEY` | Kit (v4) API key — server only. Enables mailing-list + supporter sync. |
+| `KIT_FORM_ID` | Kit Form id new subscribers are added to (triggers your welcome sequence). |
+| `KIT_TAG_WEEKLY_ID` | Kit Tag id applied to active weekly supporters. |
+| `KIT_TAG_MONTHLY_ID` | Kit Tag id applied to active monthly supporters. |
+
+### Kit integration
+
+Stripe stays the payment processor; Kit mirrors mailing-list membership and
+supporter tiers. If `KIT_API_KEY` is unset, all Kit syncing is skipped (the app
+works exactly as before).
+
+Setup in the Kit dashboard:
+
+1. Create (or pick) the **Form** new villagers subscribe to → set `KIT_FORM_ID`.
+2. Create two **Tags** (e.g. `supporter-weekly`, `supporter-monthly`) → set
+   `KIT_TAG_WEEKLY_ID` / `KIT_TAG_MONTHLY_ID`.
+3. Generate a **v4 API key** → set `KIT_API_KEY`.
+
+Then, in the admin **Settings → Integrations** panel, click **Sync all
+villagers to Kit** to backfill existing villagers (idempotent; safe to re-run).
+
+Stripe webhook events used: `customer.subscription.created/updated/deleted`,
+`invoice.paid`, `payment_intent.succeeded`, `checkout.session.completed`.
 
 ## Payment Flow
 
@@ -72,3 +98,12 @@ npx expo start
 3. **Terminal path:** API broadcasts payment request via Supabase Realtime → tablet receives it → initiates Stripe Terminal charge → user taps card
 4. **Online path:** API creates Stripe Checkout session → user completes payment on phone
 5. Webhook/tablet updates `check_ins` record to `paid`
+
+### Recurring support (pay what you can)
+
+- In the check-in payment step, users can switch to **Recurring** and set up a
+  weekly (suggested $5) or monthly (suggested $15) Stripe subscription inline.
+- The standalone **`/support`** page (linkable from the Kit newsletter) sets up
+  the same via Stripe hosted Checkout.
+- Active subscriptions are mirrored to the local `subscriptions` table and to
+  Kit (tier tag + a purchase record per charge) by the Stripe webhook.

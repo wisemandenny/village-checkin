@@ -9,8 +9,22 @@ export interface Villager {
   marketing_opt_in: boolean;
   test_account: boolean;
   stripe_customer_id: string | null;
+  kit_subscriber_id: string | null;
   first_visited_at: string;
   last_visited_at: string | null;
+}
+
+export type SubscriptionInterval = "week" | "month";
+
+export interface Subscription {
+  id: string;
+  villager_id: string;
+  stripe_subscription_id: string;
+  status: string;
+  amount: number;
+  interval: SubscriptionInterval;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CheckIn {

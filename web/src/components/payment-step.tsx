@@ -105,7 +105,10 @@ const BRAND_DISPLAY: Record<string, string> = {
   discover: "Discover",
 };
 
+const SUGGESTED_RECURRING: Record<"week" | "month", number> = { week: 5, month: 15 };
+
 export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProps) {
+  const [mode, setMode] = useState<"once" | "recurring">("once");
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
@@ -114,6 +117,11 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
   const [error, setError] = useState<string | null>(null);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [chargingSaved, setChargingSaved] = useState(false);
+
+  const [recurringInterval, setRecurringInterval] = useState<"week" | "month">("month");
+  const [recurringAmount, setRecurringAmount] = useState(String(SUGGESTED_RECURRING.month));
+  const [recurringCustomized, setRecurringCustomized] = useState(false);
+  const [subClientSecret, setSubClientSecret] = useState<string | null>(null);
 
   const isDark = useDarkMode();
   const appearance = useMemo(() => buildStripeAppearance(isDark), [isDark]);
@@ -221,6 +229,77 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
     setError(null);
   }, []);
 
+  const selectRecurringInterval = useCallback((next: "week" | "month") => {
+    setRecurringInterval(next);
+    setRecurringCustomized((customized) => {
+      if (!customized) setRecurringAmount(String(SUGGESTED_RECURRING[next]));
+      return customized;
+    });
+  }, []);
+
+  const handleRecurringSetup = useCallback(async () => {
+    const cents = Math.round(parseFloat(recurringAmount || "0") * 100);
+    if (cents < 50) {
+      setError("Minimum amount is $0.50");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/create-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: cents, interval: recurringInterval, device_id: deviceId, check_in_id: checkInId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to set up subscription");
+      setSubClientSecret(data.client_secret);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, [recurringAmount, recurringInterval, deviceId]);
+
+  const handleBackFromRecurring = useCallback(() => {
+    setSubClientSecret(null);
+    setError(null);
+  }, []);
+
+  const recurringCents = Math.round(parseFloat(recurringAmount || "0") * 100);
+
+  if (subClientSecret) {
+    return (
+      <div className="flex w-full max-w-md flex-col items-center gap-6">
+        <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">
+          ${(recurringCents / 100).toFixed(2)}/{recurringInterval === "week" ? "week" : "month"}
+        </h2>
+        <p className="text-xs text-[var(--color-muted)]">
+          Recurring support — cancel anytime.
+        </p>
+        <Elements
+          key={isDark ? "dark-sub" : "light-sub"}
+          stripe={stripePromise}
+          options={{ clientSecret: subClientSecret, appearance }}
+        >
+          <CheckoutForm
+            checkInId={checkInId}
+            totalCents={recurringCents}
+            onComplete={onComplete}
+            recurringInterval={recurringInterval}
+          />
+        </Elements>
+        <button
+          type="button"
+          onClick={handleBackFromRecurring}
+          className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
+        >
+          &larr; Back
+        </button>
+      </div>
+    );
+  }
+
   if (clientSecret) {
     return (
       <div className="flex w-full max-w-md flex-col items-center gap-6">
@@ -255,6 +334,26 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
         Every little bit helps — the Village is for everyone, no matter what.
       </p>
 
+      <div className="grid w-full grid-cols-2 gap-2">
+        {(["once", "recurring"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => { setMode(m); setError(null); }}
+            disabled={loading || chargingSaved}
+            className={`h-11 rounded-xl border text-sm font-medium transition-all font-[family-name:var(--font-domaine)] ${
+              mode === m
+                ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
+            } disabled:opacity-50`}
+          >
+            {m === "once" ? "One-time" : "Recurring"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "once" && (
+      <div className="contents">
       <div className="grid w-full grid-cols-3 gap-3">
         {PRESET_AMOUNTS.map((preset) => {
           const colors = BILL_COLORS[preset.cents];
@@ -364,6 +463,55 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
           {loading ? "Setting up..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
         </button>
       )}
+      </div>
+      )}
+
+      {mode === "recurring" && (
+      <div className="contents">
+        <div className="grid w-full grid-cols-2 gap-2">
+          {(["week", "month"] as const).map((i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => selectRecurringInterval(i)}
+              disabled={loading}
+              className={`h-12 rounded-xl border text-base font-medium transition-all font-[family-name:var(--font-domaine)] ${
+                recurringInterval === i
+                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
+              } disabled:opacity-50`}
+            >
+              {i === "week" ? "Weekly" : "Monthly"}
+            </button>
+          ))}
+        </div>
+
+        <p className="text-xs text-[var(--color-muted)]">
+          Suggested ${SUGGESTED_RECURRING[recurringInterval]}/{recurringInterval === "week" ? "week" : "month"} — pay what you can.
+        </p>
+
+        <div className="flex w-full items-center gap-2">
+          <span className="text-lg font-medium">$</span>
+          <input
+            type="number"
+            min="0.50"
+            step="0.01"
+            value={recurringAmount}
+            onChange={(e) => { setRecurringCustomized(true); setRecurringAmount(e.target.value); }}
+            className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+          />
+          <span className="text-sm text-[var(--color-muted)]">/ {recurringInterval === "week" ? "wk" : "mo"}</span>
+        </div>
+
+        <button
+          onClick={handleRecurringSetup}
+          disabled={loading || recurringCents < 50}
+          className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+        >
+          {loading ? "Setting up..." : `Support $${(recurringCents / 100).toFixed(2)}/${recurringInterval === "week" ? "wk" : "mo"}`}
+        </button>
+      </div>
+      )}
 
       {error && (
         <p className="text-sm text-red-500">{error}</p>
@@ -383,7 +531,17 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
   );
 }
 
-function CheckoutForm({ checkInId, totalCents, onComplete }: { checkInId: string; totalCents: number; onComplete: (paid?: boolean) => void }) {
+function CheckoutForm({
+  checkInId,
+  totalCents,
+  onComplete,
+  recurringInterval,
+}: {
+  checkInId: string;
+  totalCents: number;
+  onComplete: (paid?: boolean) => void;
+  recurringInterval?: "week" | "month";
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -403,11 +561,13 @@ function CheckoutForm({ checkInId, totalCents, onComplete }: { checkInId: string
       return;
     }
 
+    // This form only renders inside the check-in flow, so a 3DS redirect
+    // should return to the check-in success page (not the standalone /support).
+    const returnUrl = `${window.location.origin}/success?check_in_id=${checkInId}`;
+
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/success?check_in_id=${checkInId}`,
-      },
+      confirmParams: { return_url: returnUrl },
       redirect: "if_required",
     });
 
@@ -419,6 +579,10 @@ function CheckoutForm({ checkInId, totalCents, onComplete }: { checkInId: string
     }
   }
 
+  const label = recurringInterval
+    ? `Support $${(totalCents / 100).toFixed(2)}/${recurringInterval === "week" ? "wk" : "mo"}`
+    : `Pay — $${(totalCents / 100).toFixed(2)}`;
+
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-4">
       <PaymentElement />
@@ -428,7 +592,7 @@ function CheckoutForm({ checkInId, totalCents, onComplete }: { checkInId: string
         disabled={!stripe || processing}
         className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
       >
-        {processing ? "Processing..." : `Pay — $${(totalCents / 100).toFixed(2)}`}
+        {processing ? "Processing..." : label}
       </button>
     </form>
   );

@@ -15,6 +15,7 @@ create table villagers (
   marketing_opt_in boolean not null default true,
   test_account     boolean not null default false,
   stripe_customer_id text,
+  kit_subscriber_id  text,
   first_visited_at timestamptz not null default now(),
   last_visited_at  timestamptz
 );
@@ -30,9 +31,27 @@ create table check_ins (
   stripe_transaction_id text
 );
 
+-- Subscriptions table: recurring support pledges processed by Stripe.
+-- Stripe remains the source of truth; this table is a history-capable mirror
+-- written by the Stripe webhook (and reconcilable via the admin "Refresh from
+-- Stripe" action). Mirrored into Kit as tags + purchase records.
+create table subscriptions (
+  id                     uuid primary key default gen_random_uuid(),
+  villager_id            uuid not null references villagers(id) on delete cascade,
+  stripe_subscription_id text unique not null,
+  status                 text not null,
+  amount                 integer not null,
+  interval               text not null check (interval in ('week', 'month')),
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
+);
+
 -- Case-insensitive unique constraint on display_name for identity recovery
 create unique index idx_villagers_display_name_unique
   on villagers (lower(display_name));
+
+-- Index for fast lookups of a villager's subscriptions
+create index idx_subscriptions_villager_id on subscriptions(villager_id);
 
 -- Index for fast lookups by device_id
 create index idx_villagers_device_id on villagers(device_id);
@@ -44,6 +63,9 @@ create index idx_check_ins_villager_id on check_ins(villager_id);
 -- For now, keep it simple: service role has full access, anon can read/insert villagers
 alter table villagers enable row level security;
 alter table check_ins enable row level security;
+-- subscriptions are only read/written via the service role (webhook + admin),
+-- so RLS is enabled with no anon policies.
+alter table subscriptions enable row level security;
 
 -- Allow anon key to look up villagers by device_id
 create policy "Villagers are viewable by anon"

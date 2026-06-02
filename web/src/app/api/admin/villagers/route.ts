@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
+import { syncMarketingOptIn } from "@/lib/kit-sync";
 
 export async function GET(req: NextRequest) {
   const denied = await verifyAdmin(req);
@@ -75,6 +76,22 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (data.email) {
+    const { kitSubscriberId } = await syncMarketingOptIn({
+      email: data.email,
+      firstName: data.display_name,
+      optIn: Boolean(data.marketing_opt_in),
+      kitSubscriberId: null,
+    });
+    if (kitSubscriberId) {
+      await supabase
+        .from("villagers")
+        .update({ kit_subscriber_id: kitSubscriberId })
+        .eq("id", data.id);
+      data.kit_subscriber_id = kitSubscriberId;
+    }
   }
 
   return NextResponse.json({ villager: data }, { status: 201 });

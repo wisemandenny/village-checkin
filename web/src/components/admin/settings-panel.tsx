@@ -19,6 +19,10 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [kitSyncing, setKitSyncing] = useState(false);
+  const [subRefreshing, setSubRefreshing] = useState(false);
+  const [integrationMessage, setIntegrationMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -126,6 +130,48 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     }
   }
 
+  async function syncKit() {
+    setKitSyncing(true);
+    setIntegrationMessage(null);
+    try {
+      const res = await fetch("/api/admin/kit/sync-all", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+      setIntegrationMessage({
+        type: "success",
+        text: `Synced ${data.total} villagers — ${data.subscribed} subscribed, ${data.unsubscribed} unsubscribed, ${data.skipped} skipped${data.failed ? `, ${data.failed} failed` : ""}.`,
+      });
+    } catch (err) {
+      setIntegrationMessage({ type: "error", text: err instanceof Error ? err.message : "Sync failed" });
+    } finally {
+      setKitSyncing(false);
+    }
+  }
+
+  async function refreshSubscriptions() {
+    setSubRefreshing(true);
+    setIntegrationMessage(null);
+    try {
+      const res = await fetch("/api/admin/subscriptions/refresh", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Refresh failed");
+      setIntegrationMessage({
+        type: "success",
+        text: `Reconciled ${data.synced} subscriptions from Stripe${data.failed ? ` (${data.failed} failed)` : ""}.`,
+      });
+    } catch (err) {
+      setIntegrationMessage({ type: "error", text: err instanceof Error ? err.message : "Refresh failed" });
+    } finally {
+      setSubRefreshing(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -162,6 +208,49 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
         {message && (
           <p className={`mt-3 text-sm ${message.type === "success" ? "text-green-500" : "text-red-500"}`}>
             {message.text}
+          </p>
+        )}
+      </div>
+
+      {/* Integrations: Kit + Stripe subscriptions */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <h3 className="text-lg font-semibold">Integrations</h3>
+        <div className="mt-4 space-y-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Kit mailing list</p>
+              <p className="mt-1 text-sm text-[var(--color-muted)]">
+                Reconcile every villager with Kit based on their marketing opt-in. Safe to run repeatedly.
+              </p>
+            </div>
+            <button
+              onClick={syncKit}
+              disabled={kitSyncing}
+              className="shrink-0 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+            >
+              {kitSyncing ? "Syncing…" : "Sync all villagers to Kit"}
+            </button>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 border-t border-[var(--color-border)] pt-5">
+            <div>
+              <p className="text-sm font-medium">Recurring subscriptions</p>
+              <p className="mt-1 text-sm text-[var(--color-muted)]">
+                Re-sync the local subscriptions table from Stripe in case a webhook was missed.
+              </p>
+            </div>
+            <button
+              onClick={refreshSubscriptions}
+              disabled={subRefreshing}
+              className="shrink-0 rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-muted)] transition hover:bg-[var(--color-background)] hover:text-[var(--color-foreground)] disabled:opacity-50"
+            >
+              {subRefreshing ? "Refreshing…" : "Refresh from Stripe"}
+            </button>
+          </div>
+        </div>
+        {integrationMessage && (
+          <p className={`mt-4 text-sm ${integrationMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+            {integrationMessage.text}
           </p>
         )}
       </div>

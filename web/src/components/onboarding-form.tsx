@@ -28,6 +28,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [roles, setRoles] = useState<Set<string>>(new Set());
   const [instruments, setInstruments] = useState<Set<string>>(new Set());
   const [otherInstrument, setOtherInstrument] = useState("");
+  const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [recoverIg, setRecoverIg] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           ig_handle: normalizedIg || undefined,
           roles: [...roles],
           instruments: finalInstruments.length ? finalInstruments : undefined,
+          marketing_opt_in: marketingOptIn,
         }),
       });
 
@@ -307,6 +309,33 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           )}
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={() => setMarketingOptIn((v) => !v)}
+        className="flex items-start justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-accent)]/40"
+      >
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-[var(--color-foreground)]">
+            Keep me in the loop
+          </span>
+          <span className="text-xs text-[var(--color-muted)]">
+            Get the Village newsletter and updates by email.
+          </span>
+        </span>
+        <span
+          aria-hidden
+          className={`relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
+            marketingOptIn ? "bg-green-500" : "bg-[var(--color-border)]"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+              marketingOptIn ? "translate-x-5" : "translate-x-1"
+            }`}
+          />
+        </span>
+      </button>
 
       {error && (
         <p className="text-sm text-red-500 text-center">{error}</p>
