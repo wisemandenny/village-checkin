@@ -71,6 +71,7 @@ npx expo start
 | `KIT_FORM_ID` | Kit Form id new subscribers are added to (triggers your welcome sequence). |
 | `KIT_TAG_WEEKLY_ID` | Kit Tag id applied to active weekly supporters. |
 | `KIT_TAG_MONTHLY_ID` | Kit Tag id applied to active monthly supporters. |
+| `KIT_OAUTH_TOKEN` | (Optional) Kit OAuth access token. Required only for Kit purchase records; the purchases API rejects API-key auth. Without it, purchase tracking is skipped (tags + the subscriptions table remain the source of truth). |
 
 ### Kit integration
 
@@ -106,4 +107,5 @@ Stripe webhook events used: `customer.subscription.created/updated/deleted`,
 - The standalone **`/support`** page (linkable from the Kit newsletter) sets up
   the same via Stripe hosted Checkout.
 - Active subscriptions are mirrored to the local `subscriptions` table and to
-  Kit (tier tag + a purchase record per charge) by the Stripe webhook.
+  Kit (a tier tag, plus a purchase record per charge when `KIT_OAUTH_TOKEN` is
+  configured) by the Stripe webhook.

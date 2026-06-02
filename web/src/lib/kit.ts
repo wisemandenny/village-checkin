@@ -182,13 +182,30 @@ export interface KitPurchaseInput {
   transactionTime?: string;
 }
 
+// True when Kit purchase tracking can be used. Kit's /v4/purchases endpoint
+// requires OAuth (it rejects API-key auth with 401), so a Kit OAuth access
+// token must be configured separately from KIT_API_KEY.
+export function isKitPurchasesConfigured(): boolean {
+  return Boolean(process.env.KIT_OAUTH_TOKEN);
+}
+
 // Records a purchase against a subscriber for revenue/segmentation. This does
 // not move money -- Stripe remains the processor. Purely a Kit tracking record.
+// No-ops unless a Kit OAuth token is configured (see isKitPurchasesConfigured).
 export async function createPurchase(input: KitPurchaseInput): Promise<void> {
+  const token = process.env.KIT_OAUTH_TOKEN;
+  if (!token) return;
+
   const amount = input.amountCents / 100;
-  await kitFetch(`/purchases`, {
+  const res = await fetch(`${KIT_API_BASE}/purchases`, {
     method: "POST",
-    body: {
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    body: JSON.stringify({
       email_address: input.email,
       ...(input.firstName ? { first_name: input.firstName } : {}),
       currency: (input.currency ?? "CAD").toUpperCase(),
@@ -206,9 +223,13 @@ export async function createPurchase(input: KitPurchaseInput): Promise<void> {
           quantity: 1,
         },
       ],
-    },
-    // Purchases must be unique by transaction_id; tolerate a re-send of the
-    // same charge (e.g. duplicate webhook delivery).
-    tolerate: [422],
+    }),
   });
+
+  // Purchases must be unique by transaction_id; tolerate a re-send of the same
+  // charge (duplicate webhook delivery).
+  if (res.status === 422) return;
+  if (!res.ok) {
+    throw new Error(`Kit purchases error: ${res.status} ${await res.text()}`);
+  }
 }
