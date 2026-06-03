@@ -193,7 +193,8 @@ export async function recordKitPurchase(
     debug.error = err instanceof Error ? err.message : String(err);
   }
 
-  if (!isKitConfigured() || !email || input.amountCents <= 0) {
+  // Purchases use OAuth (not the API key), so gate on OAuth configuration.
+  if (!isKitPurchasesConfigured() || !email || input.amountCents <= 0) {
     debug.result = "skipped:guard";
   } else {
     try {
