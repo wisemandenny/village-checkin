@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -68,5 +69,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
 
-  return NextResponse.json({ check_in: checkIn }, { status: 201 });
+  // Returning supporters with an active recurring pledge shouldn't be asked
+  // to pay again at check-in.
+  const { data: subscriptions } = await supabase
+    .from("subscriptions")
+    .select("status")
+    .eq("villager_id", villager.id);
+
+  const hasActiveSubscription = (subscriptions ?? []).some((s) =>
+    ACTIVE_STATUSES.has(s.status as string)
+  );
+
+  return NextResponse.json(
+    { check_in: checkIn, has_active_subscription: hasActiveSubscription },
+    { status: 201 }
+  );
 }

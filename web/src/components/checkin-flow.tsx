@@ -6,11 +6,12 @@ import { PaymentStep } from "@/components/payment-step";
 interface CheckInFlowProps {
   deviceId: string;
   displayName: string;
+  isNewRegistration?: boolean;
 }
 
 type Step = "checking-in" | "payment" | "done" | "already";
 
-export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
+export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }: CheckInFlowProps) {
   const [step, setStep] = useState<Step>("checking-in");
   const [error, setError] = useState<string | null>(null);
   const [checkInId, setCheckInId] = useState<string | null>(null);
@@ -42,10 +43,10 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
         }
         if (!checkinRes.ok) throw new Error("Check-in failed");
 
-        const { check_in } = await checkinRes.json();
+        const { check_in, has_active_subscription } = await checkinRes.json();
         setCheckInId(check_in.id);
 
-        if (settings.payments_enabled === true) {
+        if (settings.payments_enabled === true && !has_active_subscription) {
           setStep("payment");
         } else {
           setStep("done");
@@ -82,9 +83,9 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
                   .then(async (res) => {
                     if (res.status === 409) { setStep("already"); return; }
                     if (!res.ok) throw new Error("Check-in failed");
-                    const { check_in } = await res.json();
+                    const { check_in, has_active_subscription } = await res.json();
                     setCheckInId(check_in.id);
-                    if (paymentsEnabled) {
+                    if (paymentsEnabled && !has_active_subscription) {
                       setStep("payment");
                     } else {
                       setStep("done");
@@ -157,7 +158,9 @@ export function CheckInFlow({ deviceId, displayName }: CheckInFlowProps) {
           />
         </svg>
       </div>
-      <h2 className="text-2xl font-bold">Welcome back to the Village, {displayName}!</h2>
+      <h2 className="text-2xl font-bold">
+        {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
+      </h2>
       {paidSuccessfully && (
         <p className="text-sm text-green-600 dark:text-green-400">
           Payment complete — thanks for supporting the Village!

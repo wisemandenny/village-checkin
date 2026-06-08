@@ -12,6 +12,7 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [deviceId, setDeviceId] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("");
+  const [isNewRegistration, setIsNewRegistration] = useState(false);
 
   useEffect(() => {
     const { deviceId: id, isNew } = getOrCreateDeviceId();
@@ -67,15 +68,20 @@ export default function Home() {
       {screen === "onboarding" && (
         <OnboardingForm
           deviceId={deviceId}
-          onComplete={(name) => {
+          onComplete={(name, isNew) => {
             setDisplayName(name);
+            setIsNewRegistration(isNew);
             setScreen("checkin");
           }}
         />
       )}
 
       {screen === "checkin" && (
-        <CheckInFlow deviceId={deviceId} displayName={displayName} />
+        <CheckInFlow
+          deviceId={deviceId}
+          displayName={displayName}
+          isNewRegistration={isNewRegistration}
+        />
       )}
     </main>
   );

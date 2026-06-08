@@ -5,7 +5,7 @@ import { setDeviceId } from "@/lib/device-id";
 
 interface OnboardingFormProps {
   deviceId: string;
-  onComplete: (displayName: string) => void;
+  onComplete: (displayName: string, isNewRegistration: boolean) => void;
 }
 
 const ROLES = ["Producer", "Vocalist", "Musician", "Just Vibing"] as const;
@@ -118,7 +118,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         throw new Error(message);
       }
 
-      onComplete(displayName.trim());
+      onComplete(displayName.trim(), true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -150,7 +150,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
       }
 
       setDeviceId(deviceId);
-      onComplete(data.villager.display_name);
+      onComplete(data.villager.display_name, false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
