@@ -326,6 +326,11 @@ export default function VillagersPanel({ token }: { token: string }) {
                         test
                       </span>
                     )}
+                    {v.roles?.includes("exclusive") && (
+                      <span className="ml-1.5 inline-block rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+                        exclusive
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {v.ig_handle ? (
@@ -340,7 +345,10 @@ export default function VillagersPanel({ token }: { token: string }) {
                     ) : "—"}
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
-                    {v.roles?.length ? v.roles.join(", ") : "—"}
+                    {(() => {
+                      const shown = (v.roles ?? []).filter((r) => r !== "exclusive");
+                      return shown.length ? shown.join(", ") : "—";
+                    })()}
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                     {v.instruments?.length ? v.instruments.join(", ") : "—"}

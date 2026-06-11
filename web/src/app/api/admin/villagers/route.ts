@@ -36,15 +36,19 @@ export async function GET(req: NextRequest) {
 
     if (allData) {
       const existingIds = new Set(data.map((v) => v.id));
-      const instrumentMatches = allData.filter(
+      const arrayMatches = allData.filter(
         (v) =>
           !existingIds.has(v.id) &&
-          Array.isArray(v.instruments) &&
-          v.instruments.some((inst: string) =>
-            inst.toLowerCase().includes(needle)
-          )
+          ((Array.isArray(v.instruments) &&
+            v.instruments.some((inst: string) =>
+              inst.toLowerCase().includes(needle)
+            )) ||
+            (Array.isArray(v.roles) &&
+              v.roles.some((role: string) =>
+                role.toLowerCase().includes(needle)
+              )))
       );
-      data.push(...instrumentMatches);
+      data.push(...arrayMatches);
     }
   }
 
