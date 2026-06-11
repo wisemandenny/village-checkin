@@ -327,7 +327,7 @@ export default function VillagersPanel({ token }: { token: string }) {
                       </span>
                     )}
                     {v.roles?.includes("exclusive") && (
-                      <span className="ml-1.5 inline-block rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+                      <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-[#2e4600] px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">
                         exclusive
                       </span>
                     )}
