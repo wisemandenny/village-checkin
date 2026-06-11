@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { resolveExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -41,6 +42,14 @@ export async function POST(req: NextRequest) {
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
+
+  // Permanent allowlist: re-apply the exclusive role on recovery in case the
+  // handle was added after this villager first registered.
+  await resolveExclusive(supabase, {
+    id: villager.id,
+    ig_handle: villager.ig_handle,
+    roles: villager.roles,
+  });
 
   return NextResponse.json({
     villager: { ...villager, device_id: new_device_id },

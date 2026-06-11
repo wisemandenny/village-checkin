@@ -71,6 +71,7 @@ function buildStripeAppearance(isDark: boolean): Appearance {
 interface PaymentStepProps {
   checkInId: string;
   deviceId: string;
+  isExclusive?: boolean;
   onComplete: (paid?: boolean) => void;
 }
 
@@ -88,14 +89,13 @@ function calcProcessingFee(cents: number): number {
 
 const PRESET_AMOUNTS = [
   { label: "$ 5", cents: 500 },
-  { label: "$ 10", cents: 1000 },
-  { label: "$ 20", cents: 2000 },
 ];
+
+// Minimum for a one-time custom amount (also the single preset).
+const ONE_OFF_MIN_CENTS = 500;
 
 const BILL_COLORS: Record<number, { bg: string; border: string; text: string }> = {
   500:  { bg: "bg-sky-100 dark:bg-sky-950",     border: "border-sky-300 dark:border-sky-700",     text: "text-sky-800 dark:text-sky-200" },
-  1000: { bg: "bg-purple-100 dark:bg-purple-950", border: "border-purple-300 dark:border-purple-700", text: "text-purple-800 dark:text-purple-200" },
-  2000: { bg: "bg-emerald-100 dark:bg-emerald-950", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-800 dark:text-emerald-200" },
 };
 
 const BRAND_DISPLAY: Record<string, string> = {
@@ -105,9 +105,12 @@ const BRAND_DISPLAY: Record<string, string> = {
   discover: "Discover",
 };
 
-const SUGGESTED_RECURRING: Record<"week" | "month", number> = { week: 5, month: 15 };
+// Recurring tier defaults: exclusive villagers pledge $10/month (editable up),
+// everyone else gets a fixed $5/week.
+const EXCLUSIVE_MIN_DOLLARS = 10;
+const STANDARD_WEEKLY_DOLLARS = 5;
 
-export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProps) {
+export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComplete }: PaymentStepProps) {
   const [mode, setMode] = useState<"once" | "recurring">("once");
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
@@ -118,9 +121,13 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [chargingSaved, setChargingSaved] = useState(false);
 
-  const [recurringInterval, setRecurringInterval] = useState<"week" | "month">("month");
-  const [recurringAmount, setRecurringAmount] = useState(String(SUGGESTED_RECURRING.month));
-  const [recurringCustomized, setRecurringCustomized] = useState(false);
+  // Tier-driven recurring config. Exclusive: monthly, editable, $10 minimum.
+  // Standard: weekly, fixed at $5.
+  const recurringInterval: "week" | "month" = isExclusive ? "month" : "week";
+  const recurringMinCents = isExclusive ? EXCLUSIVE_MIN_DOLLARS * 100 : STANDARD_WEEKLY_DOLLARS * 100;
+  const [recurringAmount, setRecurringAmount] = useState(
+    String(isExclusive ? EXCLUSIVE_MIN_DOLLARS : STANDARD_WEEKLY_DOLLARS)
+  );
   const [subClientSecret, setSubClientSecret] = useState<string | null>(null);
 
   const isDark = useDarkMode();
@@ -168,8 +175,8 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
 
   const handleCustomConfirm = useCallback(async () => {
     const cents = Math.round(parseFloat(customAmount || "0") * 100);
-    if (cents < 50) {
-      setError("Minimum payment amount is $0.50");
+    if (cents < ONE_OFF_MIN_CENTS) {
+      setError("Minimum payment amount is $5");
       return;
     }
     setError(null);
@@ -229,18 +236,12 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
     setError(null);
   }, []);
 
-  const selectRecurringInterval = useCallback((next: "week" | "month") => {
-    setRecurringInterval(next);
-    setRecurringCustomized((customized) => {
-      if (!customized) setRecurringAmount(String(SUGGESTED_RECURRING[next]));
-      return customized;
-    });
-  }, []);
-
   const handleRecurringSetup = useCallback(async () => {
-    const cents = Math.round(parseFloat(recurringAmount || "0") * 100);
-    if (cents < 50) {
-      setError("Minimum amount is $0.50");
+    const cents = isExclusive
+      ? Math.round(parseFloat(recurringAmount || "0") * 100)
+      : recurringMinCents;
+    if (cents < recurringMinCents) {
+      setError(`Minimum amount is $${(recurringMinCents / 100).toFixed(0)}`);
       return;
     }
     setError(null);
@@ -259,7 +260,7 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
     } finally {
       setLoading(false);
     }
-  }, [recurringAmount, recurringInterval, deviceId]);
+  }, [isExclusive, recurringAmount, recurringMinCents, recurringInterval, deviceId, checkInId]);
 
   const handleBackFromRecurring = useCallback(() => {
     setSubClientSecret(null);
@@ -354,7 +355,7 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
 
       {mode === "once" && (
       <div className="contents">
-      <div className="grid w-full grid-cols-3 gap-3">
+      <div className="grid w-full grid-cols-1 gap-3">
         {PRESET_AMOUNTS.map((preset) => {
           const colors = BILL_COLORS[preset.cents];
           const isSelected = selectedAmount === preset.cents && !useCustom;
@@ -396,7 +397,7 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
           <span className="text-lg font-medium">$</span>
           <input
             type="number"
-            min="0.50"
+            min="5"
             step="0.01"
             value={customAmount}
             onChange={(e) => setCustomAmount(e.target.value)}
@@ -405,7 +406,7 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
           />
           <button
             onClick={handleCustomConfirm}
-            disabled={loading || !customAmount || parseFloat(customAmount) < 0.5}
+            disabled={loading || !customAmount || parseFloat(customAmount) < 5}
             className="rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
           >
             {loading ? "..." : "Go"}
@@ -468,44 +469,33 @@ export function PaymentStep({ checkInId, deviceId, onComplete }: PaymentStepProp
 
       {mode === "recurring" && (
       <div className="contents">
-        <div className="grid w-full grid-cols-2 gap-2">
-          {(["week", "month"] as const).map((i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => selectRecurringInterval(i)}
-              disabled={loading}
-              className={`h-12 rounded-xl border text-base font-medium transition-all font-[family-name:var(--font-domaine)] ${
-                recurringInterval === i
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
-              } disabled:opacity-50`}
-            >
-              {i === "week" ? "Weekly" : "Monthly"}
-            </button>
-          ))}
-        </div>
-
-        <p className="text-xs text-[var(--color-muted)]">
-          Suggested ${SUGGESTED_RECURRING[recurringInterval]}/{recurringInterval === "week" ? "week" : "month"} — pay what you can.
-        </p>
-
-        <div className="flex w-full items-center gap-2">
-          <span className="text-lg font-medium">$</span>
-          <input
-            type="number"
-            min="0.50"
-            step="0.01"
-            value={recurringAmount}
-            onChange={(e) => { setRecurringCustomized(true); setRecurringAmount(e.target.value); }}
-            className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
-          />
-          <span className="text-sm text-[var(--color-muted)]">/ {recurringInterval === "week" ? "wk" : "mo"}</span>
-        </div>
+        {isExclusive ? (
+          <>
+            <p className="text-xs text-[var(--color-muted)]">
+              Exclusive supporter tier — ${EXCLUSIVE_MIN_DOLLARS}/month minimum. Pay more if you can. Cancel anytime.
+            </p>
+            <div className="flex w-full items-center gap-2">
+              <span className="text-lg font-medium">$</span>
+              <input
+                type="number"
+                min={EXCLUSIVE_MIN_DOLLARS}
+                step="0.01"
+                value={recurringAmount}
+                onChange={(e) => setRecurringAmount(e.target.value)}
+                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+              />
+              <span className="text-sm text-[var(--color-muted)]">/ mo</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-[var(--color-muted)]">
+            ${STANDARD_WEEKLY_DOLLARS}/week, charged weekly. Cancel anytime.
+          </p>
+        )}
 
         <button
           onClick={handleRecurringSetup}
-          disabled={loading || recurringCents < 50}
+          disabled={loading || recurringCents < recurringMinCents}
           className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
         >
           {loading ? "Setting up..." : `Support $${(recurringCents / 100).toFixed(2)}/${recurringInterval === "week" ? "wk" : "mo"}`}

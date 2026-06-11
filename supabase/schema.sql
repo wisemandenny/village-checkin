@@ -104,6 +104,8 @@ create table studio_settings (
 
 insert into studio_settings (key, value) values ('payments_enabled', 'false');
 insert into studio_settings (key, value) values ('admin_password', 'null');
+-- Permanent allowlist of IG handles eligible for the exclusive ($10/month) tier.
+insert into studio_settings (key, value) values ('exclusive_handles', '[]'::jsonb);
 
 alter table studio_settings enable row level security;
 

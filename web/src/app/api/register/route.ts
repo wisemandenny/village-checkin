@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { syncMarketingOptIn } from "@/lib/kit-sync";
+import { EXCLUSIVE_ROLE, getExclusiveHandles, isHandleExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -18,9 +19,22 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient();
 
+  // Never trust a client-supplied exclusive role — it can only be granted via
+  // the admin allowlist (it unlocks cheaper recurring pricing).
+  const finalRoles: string[] = Array.isArray(roles)
+    ? roles.filter((r: unknown) => typeof r === "string" && r.toLowerCase() !== EXCLUSIVE_ROLE)
+    : [];
+
+  if (ig_handle) {
+    const allowlist = await getExclusiveHandles(supabase);
+    if (isHandleExclusive(ig_handle, allowlist)) {
+      finalRoles.push(EXCLUSIVE_ROLE);
+    }
+  }
+
   const record: Record<string, unknown> = { device_id, display_name, email, marketing_opt_in };
   if (ig_handle) record.ig_handle = ig_handle;
-  if (roles?.length) record.roles = roles;
+  if (finalRoles.length) record.roles = finalRoles;
   if (instruments?.length) record.instruments = instruments;
 
   const { data, error } = await supabase

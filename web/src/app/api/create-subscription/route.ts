@@ -1,7 +1,11 @@
 import { getStripe, getSupporterProductId } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
+import { resolveExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
+
+const EXCLUSIVE_MIN_CENTS = 1000; // $10/month, editable up
+const STANDARD_WEEKLY_CENTS = 500; // $5/week, fixed
 
 const VALID_INTERVALS = ["week", "month"] as const;
 type Interval = (typeof VALID_INTERVALS)[number];
@@ -40,12 +44,33 @@ export async function POST(req: NextRequest) {
 
     const { data: villager } = await supabase
       .from("villagers")
-      .select("id, stripe_customer_id, display_name, email")
+      .select("id, stripe_customer_id, display_name, email, roles, ig_handle")
       .eq("device_id", device_id)
       .single();
 
     if (!villager) {
       return NextResponse.json({ error: "Villager not found" }, { status: 404 });
+    }
+
+    // Enforce tier pricing server-side: exclusive villagers pledge monthly
+    // ($10 minimum, editable up); everyone else gets a fixed $5/week.
+    const isExclusive = await resolveExclusive(supabase, {
+      id: villager.id,
+      ig_handle: villager.ig_handle,
+      roles: villager.roles,
+    });
+
+    if (isExclusive) {
+      if (interval !== "month") {
+        return NextResponse.json({ error: "Exclusive tier is billed monthly" }, { status: 400 });
+      }
+      if (amount < EXCLUSIVE_MIN_CENTS) {
+        return NextResponse.json({ error: "Exclusive tier minimum is $10/month" }, { status: 400 });
+      }
+    } else {
+      if (interval !== "week" || amount !== STANDARD_WEEKLY_CENTS) {
+        return NextResponse.json({ error: "Recurring support is $5/week" }, { status: 400 });
+      }
     }
 
     let customerId = villager.stripe_customer_id;

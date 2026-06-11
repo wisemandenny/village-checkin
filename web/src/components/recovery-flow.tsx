@@ -123,7 +123,11 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
           <span className="text-sm font-medium text-[var(--color-muted)]">
             Select your profile
           </span>
-          {results.map((a) => (
+          {results.map((a) => {
+            const visibleRoles = (a.roles ?? []).filter(
+              (r) => r.toLowerCase() !== "exclusive"
+            );
+            return (
             <button
               key={a.id}
               onClick={() => handleClaim(a)}
@@ -132,9 +136,9 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
             >
               <div>
                 <span className="text-lg font-semibold">{a.display_name}</span>
-                {a.roles?.length > 0 && (
+                {visibleRoles.length > 0 && (
                   <span className="ml-2 text-sm text-[var(--color-muted)]">
-                    {a.roles.join(", ")}
+                    {visibleRoles.join(", ")}
                   </span>
                 )}
               </div>
@@ -142,7 +146,8 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
                 Since {formatDate(a.first_visited_at)}
               </span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 

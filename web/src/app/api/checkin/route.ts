@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
+import { resolveExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   // Look up villager
   const { data: villager, error: lookupErr } = await supabase
     .from("villagers")
-    .select("id, test_account")
+    .select("id, test_account, roles, ig_handle")
     .eq("device_id", device_id)
     .single();
 
@@ -80,8 +81,19 @@ export async function POST(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
+  // Exclusive tier eligibility drives which recurring pricing the client shows.
+  const isExclusive = await resolveExclusive(supabase, {
+    id: villager.id,
+    ig_handle: villager.ig_handle,
+    roles: villager.roles,
+  });
+
   return NextResponse.json(
-    { check_in: checkIn, has_active_subscription: hasActiveSubscription },
+    {
+      check_in: checkIn,
+      has_active_subscription: hasActiveSubscription,
+      is_exclusive: isExclusive,
+    },
     { status: 201 }
   );
 }

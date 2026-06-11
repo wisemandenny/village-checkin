@@ -16,6 +16,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
   const [error, setError] = useState<string | null>(null);
   const [checkInId, setCheckInId] = useState<string | null>(null);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
+  const [isExclusive, setIsExclusive] = useState(false);
   const [paidSuccessfully, setPaidSuccessfully] = useState(false);
 
   useEffect(() => {
@@ -43,8 +44,9 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         }
         if (!checkinRes.ok) throw new Error("Check-in failed");
 
-        const { check_in, has_active_subscription } = await checkinRes.json();
+        const { check_in, has_active_subscription, is_exclusive } = await checkinRes.json();
         setCheckInId(check_in.id);
+        setIsExclusive(is_exclusive === true);
 
         if (settings.payments_enabled === true && !has_active_subscription) {
           setStep("payment");
@@ -83,8 +85,9 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
                   .then(async (res) => {
                     if (res.status === 409) { setStep("already"); return; }
                     if (!res.ok) throw new Error("Check-in failed");
-                    const { check_in, has_active_subscription } = await res.json();
+                    const { check_in, has_active_subscription, is_exclusive } = await res.json();
                     setCheckInId(check_in.id);
+                    setIsExclusive(is_exclusive === true);
                     if (paymentsEnabled && !has_active_subscription) {
                       setStep("payment");
                     } else {
@@ -133,6 +136,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
       <PaymentStep
         checkInId={checkInId}
         deviceId={deviceId}
+        isExclusive={isExclusive}
         onComplete={(paid?: boolean) => {
           if (paid) setPaidSuccessfully(true);
           setStep("done");

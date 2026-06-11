@@ -23,8 +23,13 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [subRefreshing, setSubRefreshing] = useState(false);
   const [integrationMessage, setIntegrationMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [exclusiveHandles, setExclusiveHandles] = useState("");
+  const [exclusiveSaving, setExclusiveSaving] = useState(false);
+  const [exclusiveMessage, setExclusiveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     loadSettings();
+    loadExclusiveHandles();
   }, []);
 
   async function loadSettings() {
@@ -127,6 +132,45 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setPasswordMessage({ type: "error", text: "Failed to reset password" });
     } finally {
       setPasswordSaving(false);
+    }
+  }
+
+  async function loadExclusiveHandles() {
+    try {
+      const res = await fetch("/api/admin/exclusive-handles", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setExclusiveHandles((data.handles ?? []).join("\n"));
+    } catch {
+      // non-fatal; admin can still edit and save
+    }
+  }
+
+  async function saveExclusiveHandles() {
+    setExclusiveSaving(true);
+    setExclusiveMessage(null);
+    try {
+      const res = await fetch("/api/admin/exclusive-handles", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text: exclusiveHandles }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save");
+      setExclusiveHandles((data.handles ?? []).join("\n"));
+      setExclusiveMessage({
+        type: "success",
+        text: `Saved ${data.handles.length} handle${data.handles.length === 1 ? "" : "s"} — granted the exclusive role to ${data.applied} registered villager${data.applied === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setExclusiveMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to save" });
+    } finally {
+      setExclusiveSaving(false);
     }
   }
 
@@ -253,6 +297,37 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
             {integrationMessage.text}
           </p>
         )}
+      </div>
+
+      {/* Exclusive tier */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <h3 className="text-lg font-semibold">Exclusive tier</h3>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">
+          One IG handle per line (e.g. <code>@champagnepapi</code>). Handles on this list unlock the
+          $10/month recurring tier. Registered villagers get the exclusive role on save; anyone not
+          registered yet gets it automatically when they sign up.
+        </p>
+        <textarea
+          value={exclusiveHandles}
+          onChange={(e) => setExclusiveHandles(e.target.value)}
+          rows={6}
+          placeholder={"@handle_one\n@handle_two"}
+          className="mt-4 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 font-mono text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+        />
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={saveExclusiveHandles}
+            disabled={exclusiveSaving}
+            className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+          >
+            {exclusiveSaving ? "Saving…" : "Save exclusive tier"}
+          </button>
+          {exclusiveMessage && (
+            <p className={`text-sm ${exclusiveMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+              {exclusiveMessage.text}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Admin password */}
