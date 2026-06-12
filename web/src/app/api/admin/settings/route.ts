@@ -1,4 +1,5 @@
 import { verifyAdmin } from "@/lib/admin-auth";
+import { maintenanceKey } from "@/lib/app-env";
 import { createServerClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -24,6 +25,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Maintenance mode is stored per-environment; expose the value for THIS
+  // environment under the stable logical `maintenance_mode` key the UI uses.
+  settings.maintenance_mode = settings[maintenanceKey()] === true;
+
   return NextResponse.json(settings);
 }
 
@@ -43,10 +48,14 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid setting key" }, { status: 400 });
   }
 
+  // Maintenance mode is scoped to the current environment so that local dev
+  // (which shares prod's database) can't lock down production and vice versa.
+  const storageKey = key === "maintenance_mode" ? maintenanceKey() : key;
+
   const supabase = createServerClient();
   const { error } = await supabase
     .from("studio_settings")
-    .upsert({ key, value }, { onConflict: "key" });
+    .upsert({ key: storageKey, value }, { onConflict: "key" });
 
   if (error) {
     return NextResponse.json({ error: "Failed to update setting" }, { status: 500 });

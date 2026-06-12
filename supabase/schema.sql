@@ -106,7 +106,12 @@ insert into studio_settings (key, value) values ('payments_enabled', 'false');
 insert into studio_settings (key, value) values ('admin_password', 'null');
 -- Maintenance mode: when true, the whole site is locked down (only the admin
 -- panel and Stripe webhooks stay reachable). OFF by default.
-insert into studio_settings (key, value) values ('maintenance_mode', 'false');
+--
+-- The flag is namespaced per environment (key 'maintenance_mode:<APP_ENV>',
+-- e.g. 'maintenance_mode:production') because local dev shares production's
+-- Supabase project — a single shared key would let local lock down prod. These
+-- rows are created on demand the first time an admin toggles the setting, so we
+-- intentionally do not seed them here.
 -- Permanent allowlist of IG handles eligible for the exclusive ($10/month) tier.
 insert into studio_settings (key, value) values ('exclusive_handles', '[]'::jsonb);
 
