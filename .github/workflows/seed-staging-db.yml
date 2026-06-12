@@ -19,7 +19,7 @@ jobs:
       # Match this to your Supabase Postgres major version (see STAGING.md).
       - name: Install PostgreSQL client
         env:
-          PG_MAJOR: "16"
+          PG_MAJOR: "17"
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-common

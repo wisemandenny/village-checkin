@@ -161,8 +161,9 @@ One-time setup:
    - If the password has URL-special characters (`@ : / ? # [ ] %`),
      URL-encode them (`@`→`%40`, `#`→`%23`, …). Easiest is to reset it to a long
      alphanumeric password so no encoding is needed.
-2. If your Supabase Postgres major version isn't 16, edit `PG_MAJOR` in the
-   workflow to match (a `pg_dump` older than the server will fail).
+2. The workflow installs `pg_dump`/`psql` for `PG_MAJOR` (default `17`). If your
+   Supabase Postgres major version differs (see Settings → Infrastructure), edit
+   `PG_MAJOR` in the workflow to match — a `pg_dump` older than the server fails.
 
 To run it: GitHub → **Actions → "Seed staging DB from production" → Run
 workflow** (on the default branch). The script refuses to run if the prod and
