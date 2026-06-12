@@ -11,24 +11,26 @@ type SubscriptionWithVillager = Subscription & {
   } | null;
 };
 
-type Group = "active" | "ending" | "paused" | "ended";
+type Group = "active" | "ending" | "pending" | "paused" | "ended";
 
-const GROUP_ORDER: Group[] = ["active", "ending", "paused", "ended"];
+const GROUP_ORDER: Group[] = ["active", "ending", "pending", "paused", "ended"];
 
 const GROUP_FOR_STATUS: Record<string, Group> = {
   active: "active",
   trialing: "active",
   past_due: "active",
+  // Initial payment not completed yet — a transient state, not a final one.
+  incomplete: "pending",
   paused: "paused",
   canceled: "ended",
   incomplete_expired: "ended",
   unpaid: "ended",
-  incomplete: "ended",
 };
 
 const GROUP_LABELS: Record<Group, string> = {
   active: "Active",
   ending: "Ending",
+  pending: "Pending",
   paused: "Paused",
   ended: "Ended",
 };
@@ -37,6 +39,8 @@ const STATUS_STYLES: Record<Group, string> = {
   active: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
   ending:
     "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+  pending:
+    "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
   paused:
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
   ended: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
@@ -137,6 +141,7 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
     const buckets: Record<Group, SubscriptionWithVillager[]> = {
       active: [],
       ending: [],
+      pending: [],
       paused: [],
       ended: [],
     };
@@ -154,7 +159,8 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
           <h2 className="text-xl font-bold">Subscriptions</h2>
           <p className="text-sm text-[var(--color-muted)]">
             {grouped.active.length} active · {grouped.ending.length} ending ·{" "}
-            {grouped.paused.length} paused · {grouped.ended.length} ended
+            {grouped.pending.length} pending · {grouped.paused.length} paused ·{" "}
+            {grouped.ended.length} ended
           </p>
         </div>
         <button
