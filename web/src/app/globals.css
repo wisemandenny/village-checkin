@@ -31,6 +31,127 @@ body {
   animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/*
+ * Onboarding motion primitives.
+ *
+ * Each utility renders statically by default (no transform, fully visible) and
+ * only animates when motion is allowed, so `prefers-reduced-motion: reduce`
+ * never leaves an element stuck mid-transition (e.g. at opacity 0). The
+ * `animations_enabled` admin flag gates these classes at the React layer: the
+ * motion primitives only attach them when the flag is on.
+ */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.anim-reveal {
+  opacity: 1;
+}
+
+.anim-pop {
+  /* selected state still renders without animation when motion is off */
+}
+
+.anim-shake {
+  opacity: 1;
+}
+
+.anim-check path {
+  stroke-dasharray: 28;
+  stroke-dashoffset: 0;
+}
+
+/* Selectable chip: a soft accent gradient fades in behind the label on hover. */
+.chip-anim {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.chip-anim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--color-accent) 14%, transparent),
+    color-mix(in srgb, var(--color-accent-light) 20%, transparent)
+  );
+  opacity: 0;
+  /* Fade-out (return to this state) runs twice as long as the fade-in. */
+  transition: opacity 0.8s ease;
+}
+.chip-anim:hover::before {
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-anim::before {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .anim-reveal {
+    opacity: 0;
+    animation: reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation-delay: var(--reveal-delay, 0ms);
+  }
+
+  .anim-pop {
+    animation: pop 0.25s ease-out;
+  }
+
+  .anim-shake {
+    animation: shake 0.35s ease-in-out;
+  }
+
+  .anim-check path {
+    stroke-dashoffset: 28;
+    animation: draw 0.45s ease-out 0.15s forwards;
+  }
+}
+
 .input {
   width: 100%;
   border-radius: 0.5rem;
