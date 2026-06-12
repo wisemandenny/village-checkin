@@ -510,13 +510,6 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
       {loading && !selectedAmount && (
         <p className="text-sm text-[var(--color-muted)]">Setting up payment...</p>
       )}
-
-      <button
-        onClick={() => onComplete()}
-        className="mt-2 text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
-      >
-        Broke Artist
-      </button>
     </div>
   );
 }
