@@ -37,7 +37,7 @@ export interface CheckIn {
   stripe_transaction_id: string | null;
 }
 
-export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred";
+export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred" | "subscription";
 export type CheckInStatus = "pending" | "paid" | "skipped";
 
 export interface StudioSettings {
