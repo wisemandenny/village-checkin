@@ -112,11 +112,7 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
     }
   }, [apiFetch]);
 
-  useEffect(() => {
-    loadSubscriptions();
-  }, [loadSubscriptions]);
-
-  async function handleRefresh() {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     setRefreshMessage("");
     setError("");
@@ -135,7 +131,16 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
     } finally {
       setRefreshing(false);
     }
-  }
+  }, [apiFetch, loadSubscriptions]);
+
+  // On load, show whatever is in the DB immediately, then reconcile from Stripe
+  // so the panel always reflects live subscription state without a manual click.
+  useEffect(() => {
+    (async () => {
+      await loadSubscriptions();
+      await handleRefresh();
+    })();
+  }, [loadSubscriptions, handleRefresh]);
 
   const grouped = useMemo(() => {
     const buckets: Record<Group, SubscriptionWithVillager[]> = {
