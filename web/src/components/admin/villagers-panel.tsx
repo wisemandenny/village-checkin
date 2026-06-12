@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, FormEvent } from "react";
 import type { Villager } from "@/lib/types";
 import { sortRoles, sortInstruments } from "@/lib/tag-order";
 
@@ -63,6 +63,7 @@ export default function VillagersPanel({ token }: { token: string }) {
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortField>("first_visited_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -94,9 +95,7 @@ export default function VillagersPanel({ token }: { token: string }) {
     setError("");
     try {
       const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      params.set("sort_by", sortBy);
-      params.set("sort_dir", sortDir);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       const res = await apiFetch(`/api/admin/villagers?${params}`);
       if (!res.ok) {
         const body = await res.json();
@@ -109,11 +108,31 @@ export default function VillagersPanel({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [search, sortBy, sortDir, apiFetch]);
+  }, [debouncedSearch, apiFetch]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     loadVillagers();
   }, [loadVillagers]);
+
+  const sortedVillagers = useMemo(() => {
+    const dateFields = new Set(["first_visited_at", "last_visited_at"]);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...villagers].sort((a, b) => {
+      const av = a[sortBy];
+      const bv = b[sortBy];
+      if (dateFields.has(sortBy as string)) {
+        const at = av ? new Date(av as string).getTime() : 0;
+        const bt = bv ? new Date(bv as string).getTime() : 0;
+        return (at - bt) * dir;
+      }
+      return String(av ?? "").localeCompare(String(bv ?? "")) * dir;
+    });
+  }, [villagers, sortBy, sortDir]);
 
   function handleSort(field: SortField) {
     if (sortBy === field) {
@@ -302,7 +321,7 @@ export default function VillagersPanel({ token }: { token: string }) {
                 </td>
               </tr>
             )}
-            {!loading && villagers.length === 0 && (
+            {!loading && sortedVillagers.length === 0 && (
               <tr>
                 <td
                   colSpan={columns.length + 1}
@@ -315,7 +334,7 @@ export default function VillagersPanel({ token }: { token: string }) {
               </tr>
             )}
             {!loading &&
-              villagers.map((v) => (
+              sortedVillagers.map((v) => (
                 <tr
                   key={v.id}
                   className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
