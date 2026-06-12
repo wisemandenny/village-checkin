@@ -3,14 +3,16 @@
 import { useState, useEffect, FormEvent } from "react";
 import VillagersPanel from "@/components/admin/villagers-panel";
 import CheckInsPanel from "@/components/admin/checkins-panel";
+import SubscriptionsPanel from "@/components/admin/subscriptions-panel";
 import SettingsPanel from "@/components/admin/settings-panel";
 import ChangelogPanel from "@/components/admin/changelog-panel";
 
-type Tab = "villagers" | "checkins" | "settings" | "changelog";
+type Tab = "villagers" | "checkins" | "subscriptions" | "settings" | "changelog";
 
 const leftTabs: { key: Tab; label: string }[] = [
   { key: "villagers", label: "Villagers" },
   { key: "checkins", label: "Check-ins" },
+  { key: "subscriptions", label: "Subscriptions" },
 ];
 
 export default function AdminPage() {
@@ -135,6 +137,7 @@ export default function AdminPage() {
       {/* Active panel */}
       {activeTab === "villagers" && <VillagersPanel token={token} />}
       {activeTab === "checkins" && <CheckInsPanel token={token} />}
+      {activeTab === "subscriptions" && <SubscriptionsPanel token={token} />}
       {activeTab === "settings" && <SettingsPanel token={token} onShowChangelog={() => setActiveTab("changelog")} />}
       {activeTab === "changelog" && <ChangelogPanel />}
     </div>

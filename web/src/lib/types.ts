@@ -30,6 +30,7 @@ export interface Subscription {
   status: string;
   amount: number;
   interval: SubscriptionInterval;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -44,7 +45,7 @@ export interface CheckIn {
   stripe_transaction_id: string | null;
 }
 
-export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred";
+export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred" | "subscription";
 export type CheckInStatus = "pending" | "paid" | "skipped" | "first-time";
 
 export interface StudioSettings {

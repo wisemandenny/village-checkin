@@ -62,6 +62,17 @@ export async function POST(req: NextRequest) {
     roles: villager.roles,
   });
 
+  // Returning supporters with an active recurring pledge shouldn't be asked
+  // to pay again at check-in — their visit is already covered by the pledge.
+  const { data: subscriptions } = await supabase
+    .from("subscriptions")
+    .select("status")
+    .eq("villager_id", villager.id);
+
+  const hasActiveSubscription = (subscriptions ?? []).some((s) =>
+    ACTIVE_STATUSES.has(s.status as string)
+  );
+
   // A non-exclusive villager's first-ever check-in is on the house: record it as
   // "first-time" and let the client skip payment entirely.
   const { data: prior } = await supabase
@@ -71,18 +82,21 @@ export async function POST(req: NextRequest) {
     .limit(1);
   const isFirstTimeFree = (!prior || prior.length === 0) && !isExclusive;
 
-  // Create check-in record
+  // Create check-in record. An active subscriber's visit is recorded as paid
+  // via the subscription; otherwise a non-exclusive first visit is free.
   const { data: checkIn, error: insertErr } = await supabase
     .from("check_ins")
     .insert({
       villager_id: villager.id,
       intent_amount,
-      payment_method,
-      status: isFirstTimeFree
-        ? "first-time"
-        : payment_method === "skipped"
-          ? "skipped"
-          : "pending",
+      payment_method: hasActiveSubscription ? "subscription" : payment_method,
+      status: hasActiveSubscription
+        ? "paid"
+        : isFirstTimeFree
+          ? "first-time"
+          : payment_method === "skipped"
+            ? "skipped"
+            : "pending",
     })
     .select()
     .single();
@@ -90,17 +104,6 @@ export async function POST(req: NextRequest) {
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
-
-  // Returning supporters with an active recurring pledge shouldn't be asked
-  // to pay again at check-in.
-  const { data: subscriptions } = await supabase
-    .from("subscriptions")
-    .select("status")
-    .eq("villager_id", villager.id);
-
-  const hasActiveSubscription = (subscriptions ?? []).some((s) =>
-    ACTIVE_STATUSES.has(s.status as string)
-  );
 
   return NextResponse.json(
     {

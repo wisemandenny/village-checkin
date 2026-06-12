@@ -281,6 +281,7 @@ export async function syncSubscriptionFromStripe(
       status: sub.status,
       amount,
       interval,
+      cancel_at_period_end: sub.cancel_at_period_end ?? false,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "stripe_subscription_id" }
