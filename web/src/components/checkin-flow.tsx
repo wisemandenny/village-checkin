@@ -5,19 +5,20 @@ import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
 import type { PaymentMethod } from "@/lib/types";
 
+type Step = "checking-in" | "payment" | "done" | "already";
+
 interface CheckInFlowProps {
   deviceId: string;
   displayName: string;
   isNewRegistration?: boolean;
+  onCheckInState?: (state: { checkInId: string | null; step: Step }) => void;
 }
-
-type Step = "checking-in" | "payment" | "done" | "already";
 
 // How often the phone re-checks its check-in status, so a cash payment recorded
 // by an admin surfaces without the villager manually refreshing.
 const STATUS_POLL_MS = 5000;
 
-export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }: CheckInFlowProps) {
+export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, onCheckInState }: CheckInFlowProps) {
   const [step, setStep] = useState<Step>("checking-in");
   const [error, setError] = useState<string | null>(null);
   const [checkInId, setCheckInId] = useState<string | null>(null);
@@ -31,6 +32,12 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
     setPaidMethod(method);
     setStep("done");
   }, []);
+
+  // Surface the live check-in id and step so the parent can run history-driven
+  // cleanup (browser Back from the payment stage) without owning this state.
+  useEffect(() => {
+    onCheckInState?.({ checkInId, step });
+  }, [checkInId, step, onCheckInState]);
 
   useEffect(() => {
     let cancelled = false;
