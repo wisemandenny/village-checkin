@@ -207,6 +207,14 @@ export default function CheckInsPanel({ token }: { token: string }) {
   );
   const [deleting, setDeleting] = useState(false);
 
+  // Quick "mark paid (cash)" flow — a single amount field instead of the full
+  // edit modal, for the common case of a villager paying cash at the desk.
+  const [quickPayTarget, setQuickPayTarget] =
+    useState<CheckInWithVillager | null>(null);
+  const [quickPayAmount, setQuickPayAmount] = useState("5");
+  const [quickPaying, setQuickPaying] = useState(false);
+  const [quickPayError, setQuickPayError] = useState("");
+
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
       return fetch(url, {
@@ -362,6 +370,46 @@ export default function CheckInsPanel({ token }: { token: string }) {
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  function openQuickPay(c: CheckInWithVillager) {
+    setQuickPayTarget(c);
+    setQuickPayAmount(
+      c.intent_amount > 0 ? (c.intent_amount / 100).toString() : "5"
+    );
+    setQuickPayError("");
+  }
+
+  async function handleQuickPay() {
+    if (!quickPayTarget) return;
+    const dollars = parseFloat(quickPayAmount);
+    if (isNaN(dollars) || dollars < 0) {
+      setQuickPayError("Enter a valid amount.");
+      return;
+    }
+    setQuickPaying(true);
+    setQuickPayError("");
+    try {
+      const res = await apiFetch(`/api/admin/checkins/${quickPayTarget.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          status: "paid",
+          payment_method: "cash",
+          intent_amount: Math.round(dollars * 100),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error || "Failed to mark paid");
+      }
+      setQuickPayTarget(null);
+      loadCheckins();
+      loadAllCheckins();
+    } catch (e: unknown) {
+      setQuickPayError(e instanceof Error ? e.message : "Failed to mark paid");
+    } finally {
+      setQuickPaying(false);
     }
   }
 
@@ -636,7 +684,15 @@ export default function CheckInsPanel({ token }: { token: string }) {
                       </a>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {c.status !== "paid" && (
+                      <button
+                        onClick={() => openQuickPay(c)}
+                        className="mr-2 rounded px-2 py-1 text-xs font-medium text-green-600 transition hover:bg-green-500/10 dark:text-green-400"
+                      >
+                        Mark Paid
+                      </button>
+                    )}
                     <button
                       onClick={() => openEdit(c)}
                       className="mr-2 rounded px-2 py-1 text-xs font-medium text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/10"
@@ -802,6 +858,63 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   : modalMode === "create"
                     ? "Create"
                     : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Quick "Mark Paid (Cash)" */}
+      {quickPayTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setQuickPayTarget(null)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleQuickPay();
+            }}
+            className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-xl"
+          >
+            <h2 className="mb-1 text-lg font-bold">Mark Paid — Cash</h2>
+            <p className="mb-4 text-sm text-[var(--color-muted)]">
+              Recording a cash payment for{" "}
+              <strong className="text-[var(--color-foreground)]">
+                {quickPayTarget.villagers?.display_name || "Unknown"}
+              </strong>
+              .
+            </p>
+            <Field label="Amount ($)" required>
+              <input
+                type="number"
+                required
+                min="0"
+                step="0.01"
+                autoFocus
+                value={quickPayAmount}
+                onChange={(e) => setQuickPayAmount(e.target.value)}
+                className="input"
+              />
+            </Field>
+            {quickPayError && (
+              <p className="mt-3 text-sm text-red-500">{quickPayError}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setQuickPayTarget(null)}
+                className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm transition hover:bg-[var(--color-surface)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={quickPaying}
+                className="rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
+              >
+                {quickPaying ? "Saving…" : "Mark Paid"}
               </button>
             </div>
           </form>
