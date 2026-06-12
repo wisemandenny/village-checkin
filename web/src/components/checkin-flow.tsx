@@ -23,6 +23,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
   const [checkInId, setCheckInId] = useState<string | null>(null);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
 
@@ -71,11 +72,12 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         }
         if (!checkinRes.ok) throw new Error("Check-in failed");
 
-        const { check_in, has_active_subscription, is_exclusive } = await checkinRes.json();
+        const { check_in, has_active_subscription, is_exclusive, is_first_time } = await checkinRes.json();
         setCheckInId(check_in.id);
         setIsExclusive(is_exclusive === true);
+        setIsFirstTime(is_first_time === true);
 
-        if (settings.payments_enabled === true && !has_active_subscription) {
+        if (settings.payments_enabled === true && !has_active_subscription && !is_first_time) {
           setStep("payment");
         } else {
           setStep("done");
@@ -141,10 +143,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
                   .then(async (res) => {
                     if (res.status === 409) { setStep("already"); return; }
                     if (!res.ok) throw new Error("Check-in failed");
-                    const { check_in, has_active_subscription, is_exclusive } = await res.json();
+                    const { check_in, has_active_subscription, is_exclusive, is_first_time } = await res.json();
                     setCheckInId(check_in.id);
                     setIsExclusive(is_exclusive === true);
-                    if (paymentsEnabled && !has_active_subscription) {
+                    setIsFirstTime(is_first_time === true);
+                    if (paymentsEnabled && !has_active_subscription && !is_first_time) {
                       setStep("payment");
                     } else {
                       setStep("done");
@@ -223,6 +226,13 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
             {paidMethod === "cash"
               ? "Cash payment received — thanks for supporting the Village!"
               : "Payment complete — thanks for supporting the Village!"}
+          </p>
+        </Reveal>
+      )}
+      {!paid && isFirstTime && (
+        <Reveal delay={220}>
+          <p className="text-sm text-green-600 dark:text-green-400">
+            Your first check-in is on us — welcome to the Village!
           </p>
         </Reveal>
       )}
