@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
 import type { Villager } from "@/lib/types";
+import { sortRoles, sortInstruments } from "@/lib/tag-order";
 
 type SortField = keyof Villager;
 type SortDir = "asc" | "desc";
@@ -346,12 +347,16 @@ export default function VillagersPanel({ token }: { token: string }) {
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                     {(() => {
-                      const shown = (v.roles ?? []).filter((r) => r !== "exclusive");
+                      const shown = sortRoles(
+                        (v.roles ?? []).filter((r) => r !== "exclusive")
+                      );
                       return shown.length ? shown.join(", ") : "—";
                     })()}
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
-                    {v.instruments?.length ? v.instruments.join(", ") : "—"}
+                    {v.instruments?.length
+                      ? sortInstruments(v.instruments).join(", ")
+                      : "—"}
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                     {v.email || "—"}

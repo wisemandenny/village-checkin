@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { sortRoles } from "@/lib/tag-order";
 
 interface RecoveryFlowProps {
   deviceId: string;
@@ -124,8 +125,8 @@ export function RecoveryFlow({ deviceId, onRecovered, onCancel }: RecoveryFlowPr
             Select your profile
           </span>
           {results.map((a) => {
-            const visibleRoles = (a.roles ?? []).filter(
-              (r) => r.toLowerCase() !== "exclusive"
+            const visibleRoles = sortRoles(
+              (a.roles ?? []).filter((r) => r.toLowerCase() !== "exclusive")
             );
             return (
             <button

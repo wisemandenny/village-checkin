@@ -1,0 +1,15 @@
+-- Maintenance mode toggle
+-- Incremental, idempotent migration for an existing database.
+--
+-- When true, the whole site is locked down: every public page and API route is
+-- blocked except the admin panel (and Stripe webhooks). OFF by default.
+--
+-- The flag is namespaced per environment (key 'maintenance_mode:<APP_ENV>',
+-- e.g. 'maintenance_mode:production' / ':staging' / ':local') because local dev
+-- shares production's Supabase project; a single shared key would let local lock
+-- down prod. The app creates the row on demand the first time an admin toggles
+-- the setting and treats a missing row as OFF, so there is nothing to seed here.
+--
+-- A pre-namespacing build briefly used a single 'maintenance_mode' key. Drop it
+-- if present so it doesn't linger as a confusing orphan.
+delete from studio_settings where key = 'maintenance_mode';
