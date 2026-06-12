@@ -11,7 +11,9 @@ interface OnboardingFormProps {
 
 const ROLES = ROLE_ORDER;
 
-const INSTRUMENTS = INSTRUMENT_ORDER;
+// "Other" is replaced by the free-form custom-instrument badges below, so it is
+// filtered out of the preset buttons.
+const INSTRUMENTS = INSTRUMENT_ORDER.filter((inst) => inst !== "Other");
 
 export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [mode, setMode] = useState<"register" | "recover">("register");
@@ -20,7 +22,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [igHandle, setIgHandle] = useState("");
   const [roles, setRoles] = useState<Set<string>>(new Set());
   const [instruments, setInstruments] = useState<Set<string>>(new Set());
-  const [otherInstrument, setOtherInstrument] = useState("");
+  const [customInstruments, setCustomInstruments] = useState<string[]>([]);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [recoverIg, setRecoverIg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         next.delete(role);
         if (role === "Musician") {
           setInstruments(new Set());
-          setOtherInstrument("");
+          setCustomInstruments([]);
         }
       } else {
         next.add(role);
@@ -47,7 +49,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
       const next = new Set(prev);
       if (next.has(inst)) {
         next.delete(inst);
-        if (inst === "Other") setOtherInstrument("");
       } else {
         next.add(inst);
       }
@@ -55,15 +56,23 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     });
   }
 
+  function addCustomInstrument() {
+    setCustomInstruments((prev) => [...prev, ""]);
+  }
+
+  function updateCustomInstrument(index: number, value: string) {
+    setCustomInstruments((prev) => prev.map((v, i) => (i === index ? value : v)));
+  }
+
+  function removeCustomInstrument(index: number) {
+    setCustomInstruments((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function buildInstrumentsList(): string[] {
-    const list: string[] = [];
-    for (const inst of instruments) {
-      if (inst === "Other") {
-        const trimmed = otherInstrument.trim();
-        if (trimmed) list.push(trimmed);
-      } else {
-        list.push(inst);
-      }
+    const list: string[] = [...instruments];
+    for (const custom of customInstruments) {
+      const trimmed = custom.trim();
+      if (trimmed) list.push(trimmed);
     }
     return list;
   }
@@ -289,16 +298,43 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
                 {inst}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={addCustomInstrument}
+              aria-label="Add another instrument"
+              className="flex h-12 items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/60 hover:text-[var(--color-accent)]"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+              </svg>
+            </button>
           </div>
 
-          {instruments.has("Other") && (
-            <input
-              type="text"
-              value={otherInstrument}
-              onChange={(e) => setOtherInstrument(e.target.value)}
-              placeholder="What instrument?"
-              className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-            />
+          {customInstruments.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {customInstruments.map((value, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => updateCustomInstrument(i, e.target.value)}
+                    placeholder="What instrument?"
+                    autoFocus
+                    className="h-12 flex-1 rounded-xl border border-[var(--color-accent)] bg-[var(--color-accent)]/10 px-4 text-base text-[var(--color-accent)] placeholder:text-[var(--color-accent)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCustomInstrument(i)}
+                    aria-label="Remove instrument"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)]"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -339,7 +375,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         disabled={!displayName.trim() || !email.trim() || loading}
         className="h-14 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed font-[family-name:var(--font-domaine)]"
       >
-        {loading ? "Setting up..." : "Register"}
+        {loading ? "Setting up..." : "Enter"}
       </button>
 
       <button
