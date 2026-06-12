@@ -39,10 +39,10 @@ git push -u origin staging
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
-4. From **Settings → Database → Connection string**, copy the **direct**
-   connection URI (the session one, port `5432`, not the `6543` pooler). You'll
-   use this for the seed Action as `STAGING_DATABASE_URL`. Append
-   `?sslmode=require` if it isn't already present.
+4. From **Settings → Database → Connection string**, switch the dropdown to
+   **"Session pooler"** and copy that URI — you'll use it for the seed Action as
+   `STAGING_DATABASE_URL`. See the connection-string notes in step 6 before
+   filling in the password.
 
 > Note the project's **Postgres major version** (Settings → Infrastructure).
 > You'll match the seed Action's client to it in step 6.
@@ -97,13 +97,33 @@ You want Kit fully separated so staging never emails real people.
 
 ### 5d. Stripe test webhook (needs the staging URL)
 
-1. Stripe (Test mode) → **Developers → Webhooks → Add endpoint**.
-2. Endpoint URL: `https://<staging-domain>/api/webhook/stripe`.
-3. Subscribe to: `customer.subscription.created`, `customer.subscription.updated`,
-   `customer.subscription.deleted`, `invoice.paid`, `payment_intent.succeeded`,
-   `checkout.session.completed`.
-4. Copy the endpoint's **Signing secret** (`whsec_…`) → set `STRIPE_WEBHOOK_SECRET`
-   in the staging Vercel project and redeploy.
+You need the staging domain first (the `*.vercel.app` URL from step 5, i.e. the
+value in `NEXT_PUBLIC_BASE_URL`). Test mode and live mode have **separate**
+webhooks and signing secrets, so make sure you're in test mode throughout.
+
+1. In Stripe, confirm **Test mode** is on (top-right toggle; the URL reads
+   `dashboard.stripe.com/test/...`).
+2. Open **Developers → Webhooks** (newer accounts: **Developers → Workbench →
+   Webhooks** tab). Direct link: <https://dashboard.stripe.com/test/webhooks>.
+3. Click **+ Add endpoint** ("Add an endpoint" / "Add destination").
+4. **Endpoint URL:** `https://<staging-domain>/api/webhook/stripe`
+   (e.g. `https://village-checkin-staging.vercel.app/api/webhook/stripe`).
+5. Leave "Listen to events on your account" selected.
+6. Click **Select events** and add these six (search each by name and check it):
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.paid`
+   - `payment_intent.succeeded`
+   - `checkout.session.completed`
+7. Click **Add events**, then **Add endpoint** to save.
+8. On the endpoint's detail page, find **Signing secret** → click **Reveal** →
+   copy the value (`whsec_…`). This is `STRIPE_WEBHOOK_SECRET`.
+9. Set it in **both** places, then redeploy the staging project:
+   - local `web/.env.staging`
+   - the staging Vercel project's Environment Variables (Production scope)
+10. (Optional) Verify with **Send test webhook** → `payment_intent.succeeded` →
+    confirm a `200` response from the staging URL.
 
 ## 6. Seeding staging with production data (on demand)
 
@@ -117,9 +137,30 @@ One-time setup:
 
 1. Add two **GitHub repository secrets** (Settings → Secrets and variables →
    Actions):
-   - `PROD_DATABASE_URL` — direct connection URI for the **production**
-     Supabase DB.
-   - `STAGING_DATABASE_URL` — direct connection URI for the **staging** DB.
+   - `PROD_DATABASE_URL` — connection string for the **production** Supabase DB.
+   - `STAGING_DATABASE_URL` — connection string for the **staging** DB.
+
+   **Use the "Session pooler" connection string**, not the direct one. In each
+   Supabase project, go to **Settings → Database → Connection string**, switch
+   the dropdown to **Session pooler**, and copy it. It looks like:
+
+   ```
+   postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres
+   ```
+
+   Why the pooler: the **direct** host (`db.<ref>.supabase.co`) is IPv6-only
+   unless you've added Supabase's IPv4 add-on, and GitHub Actions runners are
+   IPv4 — so a direct URL fails to connect. The session pooler is IPv4-friendly
+   and supports `pg_dump`.
+
+   Filling in the password:
+   - Replace the **entire** `[YOUR-PASSWORD]` placeholder (brackets included)
+     with your **database password** — the one set when the project was created
+     (reset it under **Settings → Database → Reset database password** if you
+     don't have it). This is *not* your Supabase login or the API keys.
+   - If the password has URL-special characters (`@ : / ? # [ ] %`),
+     URL-encode them (`@`→`%40`, `#`→`%23`, …). Easiest is to reset it to a long
+     alphanumeric password so no encoding is needed.
 2. If your Supabase Postgres major version isn't 16, edit `PG_MAJOR` in the
    workflow to match (a `pg_dump` older than the server will fail).
 
