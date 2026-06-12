@@ -3,6 +3,14 @@ import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { syncMarketingOptIn } from "@/lib/kit-sync";
 import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
+import {
+  EMAIL_TAKEN,
+  IG_TAKEN,
+  findDuplicateField,
+  normalizeEmail,
+  normalizeIgHandle,
+  uniqueViolationMessage,
+} from "@/lib/villager-dedupe";
 
 const VILLAGER_SELECT = "*, subscriptions(status, amount, interval, created_at)";
 
@@ -104,15 +112,29 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = createServerClient();
 
+  const normalizedEmail = body.email ? normalizeEmail(body.email) : null;
+  const normalizedIg = body.ig_handle ? normalizeIgHandle(body.ig_handle) : null;
+
+  const duplicate = await findDuplicateField(supabase, {
+    email: normalizedEmail,
+    igHandle: normalizedIg,
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: duplicate === "email" ? EMAIL_TAKEN : IG_TAKEN },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await supabase
     .from("villagers")
     .insert({
       device_id: body.device_id,
       display_name: body.display_name,
-      ig_handle: body.ig_handle || null,
+      ig_handle: normalizedIg,
       roles: body.roles ?? [],
       instruments: body.instruments ?? [],
-      email: body.email || null,
+      email: normalizedEmail,
       marketing_opt_in: body.marketing_opt_in ?? false,
       first_visited_at: body.first_visited_at || new Date().toISOString(),
       last_visited_at: body.last_visited_at || null,
@@ -121,6 +143,12 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: uniqueViolationMessage(error) },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 

@@ -47,9 +47,14 @@ create table subscriptions (
   updated_at             timestamptz not null default now()
 );
 
--- Case-insensitive unique constraint on display_name for identity recovery
-create unique index idx_villagers_display_name_unique
-  on villagers (lower(display_name));
+-- Email and Instagram handle are unique (case-insensitive). Both columns are
+-- nullable, so the unique indexes are partial to allow multiple NULLs.
+-- Duplicate display_names are intentionally allowed.
+create unique index idx_villagers_email_unique
+  on villagers (lower(email)) where email is not null;
+
+create unique index idx_villagers_ig_handle_unique
+  on villagers (lower(ig_handle)) where ig_handle is not null;
 
 -- Index for fast lookups of a villager's subscriptions
 create index idx_subscriptions_villager_id on subscriptions(villager_id);
