@@ -17,6 +17,7 @@ Data flows one way only: a manual GitHub Action copies prod data **into**
 staging. Staging never writes to any production service.
 
 ---
+commit
 
 ## 1. Create the `staging` branch
 
