@@ -25,9 +25,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Villager not found" }, { status: 404 });
   }
 
-  // Brand-new registrations get fully removed. Guard against deleting an
-  // established account by refusing when the villager has any subscriptions —
-  // a freshly registered villager never does.
+  // Brand-new registrations get fully removed. Two guards keep this from ever
+  // touching an established account:
+  //   1. Refuse if the villager has any subscriptions (lapsed/canceled rows
+  //      persist as history, so this catches returning supporters).
+  //   2. Refuse if the villager has any check-in other than this session's —
+  //      a freshly registered villager has exactly one, so extra rows mean it
+  //      is not a fresh account and a cascade delete would destroy real history.
   if (delete_villager) {
     const { data: subscriptions } = await supabase
       .from("subscriptions")
@@ -35,7 +39,19 @@ export async function POST(req: NextRequest) {
       .eq("villager_id", villager.id)
       .limit(1);
 
-    if (!subscriptions || subscriptions.length === 0) {
+    let otherCheckInsQuery = supabase
+      .from("check_ins")
+      .select("id", { count: "exact", head: true })
+      .eq("villager_id", villager.id);
+    if (check_in_id) {
+      otherCheckInsQuery = otherCheckInsQuery.neq("id", check_in_id);
+    }
+    const { count: otherCheckIns } = await otherCheckInsQuery;
+
+    const hasNoSubscriptions = !subscriptions || subscriptions.length === 0;
+    const hasNoOtherCheckIns = (otherCheckIns ?? 0) === 0;
+
+    if (hasNoSubscriptions && hasNoOtherCheckIns) {
       // Cascade clears this session's check-in along with the villager.
       const { error } = await supabase
         .from("villagers")
