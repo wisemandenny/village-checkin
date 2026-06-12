@@ -261,7 +261,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       {!paid && isFirstTime && (
         <Reveal delay={220}>
           <p className="text-sm text-green-600 dark:text-green-400">
-            Your first check-in is on us — welcome to the Village!
+            Your first session is on us — make it count!
           </p>
         </Reveal>
       )}
