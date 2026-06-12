@@ -1,0 +1,36 @@
+name: Seed staging DB from production
+
+# Manual trigger only — run from the GitHub Actions tab ("Run workflow") when
+# you want to refresh staging with a fresh copy of production data.
+on:
+  workflow_dispatch:
+
+# Prevent two seeds from clobbering each other.
+concurrency:
+  group: seed-staging-db
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Match this to your Supabase Postgres major version (see STAGING.md).
+      - name: Install PostgreSQL client
+        env:
+          PG_MAJOR: "16"
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y "postgresql-client-${PG_MAJOR}"
+
+      - name: Seed staging from production
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: bash scripts/seed-staging-db.sh
