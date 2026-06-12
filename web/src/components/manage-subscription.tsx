@@ -171,6 +171,7 @@ export function ManageSubscription() {
 
   const periodEnd = formatDate(sub.current_period_end);
   const pendingCancel = sub.cancel_at_period_end;
+  const amountChanged = Math.round(parseFloat(amount || "0") * 100) !== sub.amount;
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
@@ -230,7 +231,7 @@ export function ManageSubscription() {
               <button
                 type="button"
                 onClick={handleUpdate}
-                disabled={busy}
+                disabled={busy || !amountChanged}
                 className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
               >
                 {busy ? "Updating…" : "Update amount"}
