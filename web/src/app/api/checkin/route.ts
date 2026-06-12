@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, intent_amount = 0, payment_method = "skipped" } = body;
+  const { device_id, intent_amount = 0 } = body;
 
   if (!device_id) {
     return NextResponse.json(
@@ -54,21 +54,13 @@ export async function POST(req: NextRequest) {
     .update({ last_visited_at: new Date().toISOString() })
     .eq("id", villager.id);
 
-  // Create check-in record
-  const { data: checkIn, error: insertErr } = await supabase
-    .from("check_ins")
-    .insert({
-      villager_id: villager.id,
-      intent_amount,
-      payment_method,
-      status: payment_method === "skipped" ? "skipped" : "pending",
-    })
-    .select()
-    .single();
-
-  if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
-  }
+  // Whether the studio asks villagers to pay at all.
+  const { data: paySetting } = await supabase
+    .from("studio_settings")
+    .select("value")
+    .eq("key", "payments_enabled")
+    .maybeSingle();
+  const paymentsEnabled = paySetting?.value === true;
 
   // Returning supporters with an active recurring pledge shouldn't be asked
   // to pay again at check-in.
@@ -80,6 +72,29 @@ export async function POST(req: NextRequest) {
   const hasActiveSubscription = (subscriptions ?? []).some((s) =>
     ACTIVE_STATUSES.has(s.status as string)
   );
+
+  // A payment is only expected when payments are on and the villager has no
+  // active pledge. In that case the visit starts as `pending` (payment
+  // deferred until they complete it); otherwise nothing is owed, so `skipped`.
+  const paymentExpected = paymentsEnabled && !hasActiveSubscription;
+  const insertMethod = paymentExpected ? "deferred" : "skipped";
+  const insertStatus = paymentExpected ? "pending" : "skipped";
+
+  // Create check-in record
+  const { data: checkIn, error: insertErr } = await supabase
+    .from("check_ins")
+    .insert({
+      villager_id: villager.id,
+      intent_amount,
+      payment_method: insertMethod,
+      status: insertStatus,
+    })
+    .select()
+    .single();
+
+  if (insertErr) {
+    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  }
 
   // Exclusive tier eligibility drives which recurring pricing the client shows.
   const isExclusive = await resolveExclusive(supabase, {

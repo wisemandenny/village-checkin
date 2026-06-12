@@ -1,8 +1,10 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-// Public board data: villagers who checked in today and completed (paid or
-// skipped), excluding test accounts. Returns only safe public fields.
+// Public board data: villagers who checked in today, excluding test accounts.
+// Includes every payment state (paid, pending, skipped) since a check-in means
+// the villager is physically present regardless of whether they've paid yet.
+// Returns only safe public fields.
 export async function GET() {
   const supabase = createServerClient();
 
@@ -23,7 +25,7 @@ export async function GET() {
     .select(
       "created_at, villagers!inner(id, display_name, avatar_head, avatar_body, test_account)"
     )
-    .in("status", ["paid", "skipped"])
+    .in("status", ["paid", "pending", "skipped"])
     .eq("villagers.test_account", false)
     .gte("created_at", todayStart)
     .lt("created_at", tomorrowStart)
