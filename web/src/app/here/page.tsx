@@ -85,7 +85,7 @@ export default function HerePage() {
         <p className="mt-1 text-sm text-[var(--color-muted)]">
           {loading
             ? "Loading…"
-            : `${displayVillagers.length} ${displayVillagers.length === 1 ? "soul" : "souls"} here`}
+            : `${displayVillagers.length} here`}
         </p>
 
         {me && (
