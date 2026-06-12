@@ -410,7 +410,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             onClick={() => { setMode("recover"); setError(null); setDisplayName(""); }}
             className="w-full text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
           >
-            I&apos;ve been here before
+            I&apos;ve already registered
           </button>
         </Reveal>
       </Stagger>
