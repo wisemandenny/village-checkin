@@ -43,4 +43,5 @@ export type CheckInStatus = "pending" | "paid" | "skipped";
 export interface StudioSettings {
   payments_enabled: boolean;
   admin_password: string | null;
+  maintenance_mode: boolean;
 }

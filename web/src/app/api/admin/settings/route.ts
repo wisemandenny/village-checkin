@@ -38,7 +38,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "key and value are required" }, { status: 400 });
   }
 
-  const allowedKeys = ["payments_enabled", "admin_password"];
+  const allowedKeys = ["payments_enabled", "admin_password", "maintenance_mode"];
   if (!allowedKeys.includes(key)) {
     return NextResponse.json({ error: "Invalid setting key" }, { status: 400 });
   }

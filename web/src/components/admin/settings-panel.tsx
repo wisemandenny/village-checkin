@@ -13,6 +13,10 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const [hasDbPassword, setHasDbPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -41,6 +45,7 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       setPaymentsEnabled(data.payments_enabled === true);
+      setMaintenanceMode(data.maintenance_mode === true);
       setHasDbPassword(data.admin_password === "(set)");
     } catch {
       setMessage({ type: "error", text: "Failed to load settings" });
@@ -69,6 +74,42 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setMessage({ type: "error", text: "Failed to update setting" });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function toggleMaintenance() {
+    const newValue = !maintenanceMode;
+    if (
+      newValue &&
+      !window.confirm(
+        "Turn ON maintenance mode? This makes the entire site inaccessible to everyone except this admin panel."
+      )
+    ) {
+      return;
+    }
+    setMaintenanceSaving(true);
+    setMaintenanceMessage(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ key: "maintenance_mode", value: newValue }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setMaintenanceMode(newValue);
+      setMaintenanceMessage({
+        type: "success",
+        text: newValue
+          ? "Maintenance mode ON — the site is locked down for everyone but admins."
+          : "Maintenance mode OFF — the site is live again.",
+      });
+    } catch {
+      setMaintenanceMessage({ type: "error", text: "Failed to update setting" });
+    } finally {
+      setMaintenanceSaving(false);
     }
   }
 
@@ -226,6 +267,47 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
 
   return (
     <div className="space-y-8">
+      {/* Maintenance mode toggle */}
+      <div
+        className={`rounded-xl border bg-[var(--color-surface)] p-6 ${
+          maintenanceMode ? "border-[var(--color-accent)]" : "border-[var(--color-border)]"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Maintenance mode</h3>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              When ON, the entire site is inaccessible (check-in, payments, every page and API)
+              except this admin panel. Visitors see a &ldquo;down for maintenance&rdquo; page. OFF by default.
+            </p>
+          </div>
+          <button
+            onClick={toggleMaintenance}
+            disabled={maintenanceSaving}
+            aria-pressed={maintenanceMode}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+              maintenanceMode ? "bg-[var(--color-accent)]" : "bg-[var(--color-border)]"
+            } ${maintenanceSaving ? "opacity-50" : ""}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                maintenanceMode ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+        {maintenanceMode && (
+          <p className="mt-3 text-sm font-medium text-[var(--color-accent)]">
+            The site is currently locked down.
+          </p>
+        )}
+        {maintenanceMessage && (
+          <p className={`mt-3 text-sm ${maintenanceMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+            {maintenanceMessage.text}
+          </p>
+        )}
+      </div>
+
       {/* Payments toggle */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <div className="flex items-center justify-between">

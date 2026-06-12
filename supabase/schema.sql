@@ -104,6 +104,9 @@ create table studio_settings (
 
 insert into studio_settings (key, value) values ('payments_enabled', 'false');
 insert into studio_settings (key, value) values ('admin_password', 'null');
+-- Maintenance mode: when true, the whole site is locked down (only the admin
+-- panel and Stripe webhooks stay reachable). OFF by default.
+insert into studio_settings (key, value) values ('maintenance_mode', 'false');
 -- Permanent allowlist of IG handles eligible for the exclusive ($10/month) tier.
 insert into studio_settings (key, value) values ('exclusive_handles', '[]'::jsonb);
 
