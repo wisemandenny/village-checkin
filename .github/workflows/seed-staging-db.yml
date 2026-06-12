@@ -26,6 +26,10 @@ jobs:
           # Official PostgreSQL repo setup; -y runs it non-interactively (no tty).
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y "postgresql-client-${PG_MAJOR}"
+          # /usr/bin/pg_dump is a wrapper that defaults to the runner's
+          # preinstalled v16 cluster; put the real versioned binaries first so
+          # pg_dump/psql match the Supabase server version.
+          echo "/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_PATH"
 
       - name: Seed staging from production
         env:
