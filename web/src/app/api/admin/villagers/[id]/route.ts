@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { syncMarketingOptIn } from "@/lib/kit-sync";
+import {
+  EMAIL_TAKEN,
+  IG_TAKEN,
+  findDuplicateField,
+  normalizeEmail,
+  normalizeIgHandle,
+  uniqueViolationMessage,
+} from "@/lib/villager-dedupe";
 
 export async function GET(
   req: NextRequest,
@@ -57,6 +65,30 @@ export async function PUT(
     }
   }
 
+  // Normalize the unique fields when present so storage/comparison stay
+  // case-insensitive and consistent with registration.
+  if ("email" in updates) {
+    updates.email = updates.email ? normalizeEmail(updates.email as string) : null;
+  }
+  if ("ig_handle" in updates) {
+    updates.ig_handle = updates.ig_handle
+      ? normalizeIgHandle(updates.ig_handle as string)
+      : null;
+  }
+
+  // Reject duplicates against other villagers (excluding this row).
+  const duplicate = await findDuplicateField(supabase, {
+    email: "email" in updates ? (updates.email as string | null) : null,
+    igHandle: "ig_handle" in updates ? (updates.ig_handle as string | null) : null,
+    excludeId: id,
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: duplicate === "email" ? EMAIL_TAKEN : IG_TAKEN },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await supabase
     .from("villagers")
     .update(updates)
@@ -65,6 +97,12 @@ export async function PUT(
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: uniqueViolationMessage(error) },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
