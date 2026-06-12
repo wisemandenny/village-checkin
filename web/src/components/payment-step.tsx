@@ -128,6 +128,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
   const [recurringAmount, setRecurringAmount] = useState(
     String(isExclusive ? EXCLUSIVE_MIN_DOLLARS : STANDARD_WEEKLY_DOLLARS)
   );
+  const [recurringUseCustom, setRecurringUseCustom] = useState(false);
   const [subClientSecret, setSubClientSecret] = useState<string | null>(null);
 
   const isDark = useDarkMode();
@@ -275,7 +276,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
         <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">
           ${(recurringCents / 100).toFixed(2)}/{recurringInterval === "week" ? "week" : "month"}
         </h2>
-        <p className="text-xs text-[var(--color-muted)]">
+        <p className="text-sm text-[var(--color-muted)]">
           Recurring support — cancel anytime.
         </p>
         <Elements
@@ -469,29 +470,68 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
 
       {mode === "recurring" && (
       <div className="contents">
-        {isExclusive ? (
-          <>
-            <p className="text-xs text-[var(--color-muted)]">
-              Exclusive supporter tier — ${EXCLUSIVE_MIN_DOLLARS}/month minimum. Pay more if you can. Cancel anytime.
-            </p>
-            <div className="flex w-full items-center gap-2">
-              <span className="text-lg font-medium">$</span>
-              <input
-                type="number"
-                min={EXCLUSIVE_MIN_DOLLARS}
-                step="0.01"
-                value={recurringAmount}
-                onChange={(e) => setRecurringAmount(e.target.value)}
-                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
-              />
-              <span className="text-sm text-[var(--color-muted)]">/ mo</span>
+        {(() => {
+          const bill = BILL_COLORS[500];
+          const baseDollars = isExclusive ? EXCLUSIVE_MIN_DOLLARS : STANDARD_WEEKLY_DOLLARS;
+          const intervalShort = recurringInterval === "week" ? "wk" : "mo";
+          return (
+            <div className="grid w-full grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setRecurringUseCustom(false);
+                  setRecurringAmount(String(baseDollars));
+                  setError(null);
+                }}
+                disabled={loading}
+                className={`rounded-lg border px-3 py-5 text-2xl font-bold font-[family-name:var(--font-domaine)] transition ${
+                  !recurringUseCustom
+                    ? `${bill.border} ${bill.bg} ${bill.text} ring-2 ring-[var(--color-accent)]/40`
+                    : `${bill.border} ${bill.bg} ${bill.text} hover:opacity-80`
+                } disabled:opacity-50`}
+              >
+                $ {baseDollars}
+                <span className="text-base font-medium"> / {intervalShort}</span>
+              </button>
             </div>
-          </>
-        ) : (
-          <p className="text-xs text-[var(--color-muted)]">
-            ${STANDARD_WEEKLY_DOLLARS}/week, charged weekly. Cancel anytime.
-          </p>
+          );
+        })()}
+
+        {isExclusive && (
+          <button
+            type="button"
+            onClick={() => { setRecurringUseCustom(true); setError(null); }}
+            disabled={loading}
+            className={`w-full rounded-lg border px-3 py-4 text-xl font-medium font-[family-name:var(--font-domaine)] transition ${
+              recurringUseCustom
+                ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                : "border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
+            } disabled:opacity-50`}
+          >
+            Custom Amount
+          </button>
         )}
+
+        {isExclusive && recurringUseCustom && (
+          <div className="flex w-full items-center gap-2">
+            <span className="text-lg font-medium">$</span>
+            <input
+              type="number"
+              min={EXCLUSIVE_MIN_DOLLARS}
+              step="0.01"
+              value={recurringAmount}
+              onChange={(e) => setRecurringAmount(e.target.value)}
+              className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+            />
+            <span className="text-sm text-[var(--color-muted)]">/ mo</span>
+          </div>
+        )}
+
+        <p className="text-sm text-[var(--color-muted)]">
+          {isExclusive
+            ? `Exclusive supporter tier — $${EXCLUSIVE_MIN_DOLLARS}/month minimum. Pay more if you can. Cancel anytime.`
+            : `$${STANDARD_WEEKLY_DOLLARS}/week, charged weekly. Cancel anytime.`}
+        </p>
 
         <button
           onClick={handleRecurringSetup}
