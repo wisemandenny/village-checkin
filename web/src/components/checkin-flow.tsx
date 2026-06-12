@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PaymentStep } from "@/components/payment-step";
+import type { PaymentMethod } from "@/lib/types";
 
 interface CheckInFlowProps {
   deviceId: string;
@@ -11,13 +12,24 @@ interface CheckInFlowProps {
 
 type Step = "checking-in" | "payment" | "done" | "already";
 
+// How often the phone re-checks its check-in status, so a cash payment recorded
+// by an admin surfaces without the villager manually refreshing.
+const STATUS_POLL_MS = 5000;
+
 export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }: CheckInFlowProps) {
   const [step, setStep] = useState<Step>("checking-in");
   const [error, setError] = useState<string | null>(null);
   const [checkInId, setCheckInId] = useState<string | null>(null);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
-  const [paidSuccessfully, setPaidSuccessfully] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
+
+  const markPaid = useCallback((method: PaymentMethod | null) => {
+    setPaid(true);
+    setPaidMethod(method);
+    setStep("done");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,8 +50,22 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         const settings = settingsRes.ok ? await settingsRes.json() : {};
         setPaymentsEnabled(settings.payments_enabled === true);
 
+        // Already checked in today (e.g. a refresh): read the real status so a
+        // completed payment — including cash recorded by an admin — is shown.
         if (checkinRes.status === 409) {
-          setStep("already");
+          const statusRes = await fetch(
+            `/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`
+          );
+          if (cancelled) return;
+          const { check_in } = statusRes.ok
+            ? await statusRes.json()
+            : { check_in: null };
+          if (check_in?.id) setCheckInId(check_in.id);
+          if (check_in?.status === "paid") {
+            markPaid(check_in.payment_method ?? null);
+          } else {
+            setStep("already");
+          }
           return;
         }
         if (!checkinRes.ok) throw new Error("Check-in failed");
@@ -59,7 +85,36 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
     })();
 
     return () => { cancelled = true; };
-  }, [deviceId]);
+  }, [deviceId, markPaid]);
+
+  // While the villager is waiting to pay (or sitting on the "already checked
+  // in" screen), poll for a status change so an admin-recorded cash payment
+  // flips the screen to a completed state without a manual refresh.
+  useEffect(() => {
+    if (paid) return;
+    if (step !== "payment" && step !== "already") return;
+
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`
+        );
+        if (cancelled || !res.ok) return;
+        const { check_in } = await res.json();
+        if (check_in?.status === "paid") {
+          markPaid(check_in.payment_method ?? null);
+        }
+      } catch {
+        // Transient network errors are ignored; the next tick retries.
+      }
+    }, STATUS_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [step, paid, deviceId, markPaid]);
 
   if (step === "checking-in") {
     return (
@@ -137,9 +192,12 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         checkInId={checkInId}
         deviceId={deviceId}
         isExclusive={isExclusive}
-        onComplete={(paid?: boolean) => {
-          if (paid) setPaidSuccessfully(true);
-          setStep("done");
+        onComplete={(didPay?: boolean) => {
+          if (didPay) {
+            markPaid(null);
+          } else {
+            setStep("done");
+          }
         }}
       />
     );
@@ -165,9 +223,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
       <h2 className="text-2xl font-bold">
         {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
       </h2>
-      {paidSuccessfully && (
+      {paid && (
         <p className="text-sm text-green-600 dark:text-green-400">
-          Payment complete — thanks for supporting the Village!
+          {paidMethod === "cash"
+            ? "Cash payment received — thanks for supporting the Village!"
+            : "Payment complete — thanks for supporting the Village!"}
         </p>
       )}
     </div>
