@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
 import type { PaymentMethod } from "@/lib/types";
@@ -23,6 +24,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
   const [checkInId, setCheckInId] = useState<string | null>(null);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
@@ -59,9 +61,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
             `/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`
           );
           if (cancelled) return;
-          const { check_in } = statusRes.ok
+          const statusData = statusRes.ok
             ? await statusRes.json()
-            : { check_in: null };
+            : { check_in: null, has_active_subscription: false };
+          const check_in = statusData.check_in;
+          setHasActiveSubscription(statusData.has_active_subscription === true);
           if (check_in?.id) setCheckInId(check_in.id);
           if (check_in?.status === "paid") {
             markPaid(check_in.payment_method ?? null);
@@ -75,6 +79,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         const { check_in, has_active_subscription, is_exclusive, is_first_time } = await checkinRes.json();
         setCheckInId(check_in.id);
         setIsExclusive(is_exclusive === true);
+        setHasActiveSubscription(has_active_subscription === true);
         setIsFirstTime(is_first_time === true);
 
         if (settings.payments_enabled === true && !has_active_subscription && !is_first_time) {
@@ -146,6 +151,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
                     const { check_in, has_active_subscription, is_exclusive, is_first_time } = await res.json();
                     setCheckInId(check_in.id);
                     setIsExclusive(is_exclusive === true);
+                    setHasActiveSubscription(has_active_subscription === true);
                     setIsFirstTime(is_first_time === true);
                     if (paymentsEnabled && !has_active_subscription && !is_first_time) {
                       setStep("payment");
@@ -220,14 +226,28 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
           {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
         </h2>
       </Reveal>
-      {paid && (
-        <Reveal delay={220}>
+      {hasActiveSubscription ? (
+        <Reveal delay={220} className="flex flex-col items-center gap-3">
           <p className="text-sm text-green-600 dark:text-green-400">
-            {paidMethod === "cash"
-              ? "Cash payment received — thanks for supporting the Village!"
-              : "Payment complete — thanks for supporting the Village!"}
+            You&apos;re an active supporter — thanks for keeping the Village going!
           </p>
+          <Link
+            href="/manage"
+            className="text-sm text-[var(--color-accent)] underline underline-offset-4 transition hover:text-[var(--color-accent-light)]"
+          >
+            Manage your support
+          </Link>
         </Reveal>
+      ) : (
+        paid && (
+          <Reveal delay={220}>
+            <p className="text-sm text-green-600 dark:text-green-400">
+              {paidMethod === "cash"
+                ? "Cash payment received — thanks for supporting the Village!"
+                : "Payment complete — thanks for supporting the Village!"}
+            </p>
+          </Reveal>
+        )
       )}
       {!paid && isFirstTime && (
         <Reveal delay={220}>

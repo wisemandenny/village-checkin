@@ -112,7 +112,9 @@ const EXCLUSIVE_MIN_DOLLARS = 10;
 const STANDARD_WEEKLY_DOLLARS = 5;
 
 export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
-  const [mode, setMode] = useState<"once" | "recurring">("once");
+  // Exclusive villagers commit to a recurring pledge only; standard villagers
+  // get the one-time flow. The mode is fixed by tier, so there is no toggle.
+  const mode: "once" | "recurring" = isExclusive ? "recurring" : "once";
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
@@ -334,27 +336,6 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
       <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">Support the Village!</h2>
-      {/* Recurring support is offered only to exclusive villagers; everyone else
-          sees just the one-time flow, so the mode toggle is hidden for them. */}
-      {isExclusive && (
-        <div className="grid w-full grid-cols-2 gap-2">
-          {(["once", "recurring"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => { setMode(m); setError(null); }}
-              disabled={loading || chargingSaved}
-              className={`h-11 rounded-xl border text-sm font-medium transition-all font-[family-name:var(--font-domaine)] ${
-                mode === m
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
-              } disabled:opacity-50`}
-            >
-              {m === "once" ? "One-time" : "Recurring"}
-            </button>
-          ))}
-        </div>
-      )}
 
       {mode === "once" && (
       <div className="contents">
@@ -531,7 +512,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
 
         <p className="text-sm text-[var(--color-muted)]">
           {isExclusive
-            ? `Exclusive supporter tier — $${EXCLUSIVE_MIN_DOLLARS}/month minimum. Pay more if you can. Cancel anytime.`
+            ? `Exclusive $${EXCLUSIVE_MIN_DOLLARS}/month, billed monthly. Pay more if you can. Cancel anytime.`
             : `$${STANDARD_WEEKLY_DOLLARS}/week, charged weekly. Cancel anytime.`}
         </p>
 
