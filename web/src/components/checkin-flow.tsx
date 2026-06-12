@@ -12,7 +12,7 @@ interface CheckInFlowProps {
   deviceId: string;
   displayName: string;
   isNewRegistration?: boolean;
-  onCheckInState?: (state: { checkInId: string | null; step: Step }) => void;
+  onCheckInState?: (state: { checkInId: string | null; step: Step; paid: boolean }) => void;
 }
 
 // How often the phone re-checks its check-in status, so a cash payment recorded
@@ -36,11 +36,13 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
     setStep("done");
   }, []);
 
-  // Surface the live check-in id and step so the parent can run history-driven
-  // cleanup (browser Back from the payment stage) without owning this state.
+  // Surface the live check-in id, step, and whether a real payment completed so
+  // the parent can run history-driven cleanup (browser Back) without owning this
+  // state. `paid` lets the parent preserve a completed payment while still
+  // cleaning up auto-bypassed visits (first-time / subscription / skipped).
   useEffect(() => {
-    onCheckInState?.({ checkInId, step });
-  }, [checkInId, step, onCheckInState]);
+    onCheckInState?.({ checkInId, step, paid });
+  }, [checkInId, step, paid, onCheckInState]);
 
   useEffect(() => {
     let cancelled = false;

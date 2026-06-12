@@ -24,6 +24,7 @@ export default function Home() {
   const isNewRegistrationRef = useRef<boolean>(isNewRegistration);
   const checkInIdRef = useRef<string | null>(null);
   const checkInStepRef = useRef<CheckInStep | null>(null);
+  const checkInPaidRef = useRef<boolean>(false);
   const cleanedUpRef = useRef(false);
 
   screenRef.current = screen;
@@ -31,9 +32,18 @@ export default function Home() {
   isNewRegistrationRef.current = isNewRegistration;
 
   const handleCheckInState = useCallback(
-    ({ checkInId, step }: { checkInId: string | null; step: CheckInStep }) => {
+    ({
+      checkInId,
+      step,
+      paid,
+    }: {
+      checkInId: string | null;
+      step: CheckInStep;
+      paid: boolean;
+    }) => {
       checkInIdRef.current = checkInId;
       checkInStepRef.current = step;
+      checkInPaidRef.current = paid;
     },
     []
   );
@@ -84,9 +94,14 @@ export default function Home() {
       // Back to the onboarding entry from the check-in flow.
       if (vcStage !== "checkin" && screenRef.current === "checkin") {
         const step = checkInStepRef.current;
-        // Only the pre-completion stages clean up; a completed/skipped check-in
-        // is left untouched.
-        if (step === "payment" || step === "checking-in") {
+        const paid = checkInPaidRef.current;
+        // Clean up the rows created this session unless a real payment
+        // completed (preserve it) or the check-in already existed today (the
+        // "already" screen reads a prior session's row — never delete that).
+        // This covers visits that auto-bypass payment to "done" (first-time,
+        // active subscription, payments disabled, or an explicit skip), which
+        // would otherwise leave an orphaned villager and block re-registration.
+        if (step !== "already" && !paid) {
           fetch("/api/checkin/cleanup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -100,6 +115,7 @@ export default function Home() {
         }
         checkInIdRef.current = null;
         checkInStepRef.current = null;
+        checkInPaidRef.current = false;
         setScreen("onboarding");
       }
     }
