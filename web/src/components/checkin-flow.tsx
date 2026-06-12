@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
 import type { PaymentMethod } from "@/lib/types";
@@ -222,10 +223,16 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         </h2>
       </Reveal>
       {hasActiveSubscription ? (
-        <Reveal delay={220}>
+        <Reveal delay={220} className="flex flex-col items-center gap-3">
           <p className="text-sm text-green-600 dark:text-green-400">
             You&apos;re an active supporter — thanks for keeping the Village going!
           </p>
+          <Link
+            href="/manage"
+            className="text-sm text-[var(--color-accent)] underline underline-offset-4 transition hover:text-[var(--color-accent-light)]"
+          >
+            Manage your support
+          </Link>
         </Reveal>
       ) : (
         paid && (

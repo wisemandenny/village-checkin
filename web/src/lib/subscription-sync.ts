@@ -304,4 +304,51 @@ export async function syncSubscriptionFromStripe(
   return true;
 }
 
+// Villager row shape needed to manage a subscription (ownership + tier).
+export interface ManageVillagerRow {
+  id: string;
+  stripe_customer_id: string | null;
+  ig_handle: string | null;
+  roles: string[] | null;
+}
+
+// Active subscription row mirrored from Stripe.
+export interface ActiveSubscriptionRow {
+  stripe_subscription_id: string;
+  amount: number;
+  interval: "week" | "month";
+  status: string;
+}
+
+// Resolves a villager from their device_id (the app's bearer identity) with the
+// fields needed to authorize and price a subscription change.
+export async function getVillagerByDevice(
+  supabase: SupabaseClient,
+  deviceId: string
+): Promise<ManageVillagerRow | null> {
+  const { data } = await supabase
+    .from("villagers")
+    .select("id, stripe_customer_id, ig_handle, roles")
+    .eq("device_id", deviceId)
+    .maybeSingle();
+  return (data as ManageVillagerRow) ?? null;
+}
+
+// Returns the villager's current active (or past_due/trialing) subscription, if
+// any. A villager has at most one active pledge (enforced on creation).
+export async function getActiveSubscription(
+  supabase: SupabaseClient,
+  villagerId: string
+): Promise<ActiveSubscriptionRow | null> {
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("stripe_subscription_id, amount, interval, status")
+    .eq("villager_id", villagerId);
+
+  const active = (data ?? []).find((s) =>
+    ACTIVE_STATUSES.has(s.status as string)
+  );
+  return (active as ActiveSubscriptionRow) ?? null;
+}
+
 export { ACTIVE_STATUSES };
