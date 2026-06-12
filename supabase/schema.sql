@@ -26,7 +26,7 @@ create table check_ins (
   villager_id          uuid not null references villagers(id) on delete cascade,
   intent_amount        integer not null default 0,
   payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred', 'subscription')),
-  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped')),
+  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped', 'first-time')),
   created_at           timestamptz not null default now(),
   stripe_transaction_id text
 );

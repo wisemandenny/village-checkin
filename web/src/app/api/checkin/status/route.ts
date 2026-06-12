@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
 import { NextRequest, NextResponse } from "next/server";
 
 // Returns the villager's check-in for today (most recent), so the phone can
@@ -47,5 +48,17 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  return NextResponse.json({ check_in: checkIn ?? null });
+  const { data: subscriptions } = await supabase
+    .from("subscriptions")
+    .select("status")
+    .eq("villager_id", villager.id);
+
+  const hasActiveSubscription = (subscriptions ?? []).some((s) =>
+    ACTIVE_STATUSES.has(s.status as string)
+  );
+
+  return NextResponse.json({
+    check_in: checkIn ?? null,
+    has_active_subscription: hasActiveSubscription,
+  });
 }

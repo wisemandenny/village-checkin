@@ -1,6 +1,19 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+
+function SuccessHeading() {
+  const searchParams = useSearchParams();
+  const isNew = searchParams.get("new") === "1";
+
+  return (
+    <h1 className="text-3xl font-bold">
+      {isNew ? "Welcome to the Village!" : "Welcome back to the Village!"}
+    </h1>
+  );
+}
 
 export default function SuccessPage() {
   return (
@@ -16,7 +29,9 @@ export default function SuccessPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </div>
-      <h1 className="text-3xl font-bold">Welcome to the Village!</h1>
+      <Suspense fallback={<h1 className="text-3xl font-bold">Welcome to the Village!</h1>}>
+        <SuccessHeading />
+      </Suspense>
       <p className="mt-3 text-sm text-green-600 dark:text-green-400">
         Payment complete — thanks for supporting the Village!
       </p>
