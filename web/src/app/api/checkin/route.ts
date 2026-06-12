@@ -54,6 +54,23 @@ export async function POST(req: NextRequest) {
     .update({ last_visited_at: new Date().toISOString() })
     .eq("id", villager.id);
 
+  // Exclusive tier eligibility drives which recurring pricing the client shows,
+  // and excludes a villager from the free first check-in.
+  const isExclusive = await resolveExclusive(supabase, {
+    id: villager.id,
+    ig_handle: villager.ig_handle,
+    roles: villager.roles,
+  });
+
+  // A non-exclusive villager's first-ever check-in is on the house: record it as
+  // "first-time" and let the client skip payment entirely.
+  const { data: prior } = await supabase
+    .from("check_ins")
+    .select("id")
+    .eq("villager_id", villager.id)
+    .limit(1);
+  const isFirstTimeFree = (!prior || prior.length === 0) && !isExclusive;
+
   // Create check-in record
   const { data: checkIn, error: insertErr } = await supabase
     .from("check_ins")
@@ -61,7 +78,11 @@ export async function POST(req: NextRequest) {
       villager_id: villager.id,
       intent_amount,
       payment_method,
-      status: payment_method === "skipped" ? "skipped" : "pending",
+      status: isFirstTimeFree
+        ? "first-time"
+        : payment_method === "skipped"
+          ? "skipped"
+          : "pending",
     })
     .select()
     .single();
@@ -81,18 +102,12 @@ export async function POST(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
-  // Exclusive tier eligibility drives which recurring pricing the client shows.
-  const isExclusive = await resolveExclusive(supabase, {
-    id: villager.id,
-    ig_handle: villager.ig_handle,
-    roles: villager.roles,
-  });
-
   return NextResponse.json(
     {
       check_in: checkIn,
       has_active_subscription: hasActiveSubscription,
       is_exclusive: isExclusive,
+      is_first_time: isFirstTimeFree,
     },
     { status: 201 }
   );
