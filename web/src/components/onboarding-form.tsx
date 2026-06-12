@@ -2,23 +2,16 @@
 
 import { useState } from "react";
 import { setDeviceId } from "@/lib/device-id";
+import { ROLE_ORDER, INSTRUMENT_ORDER } from "@/lib/tag-order";
 
 interface OnboardingFormProps {
   deviceId: string;
   onComplete: (displayName: string, isNewRegistration: boolean) => void;
 }
 
-const ROLES = ["Producer", "Vocalist", "Musician", "Just Vibing"] as const;
+const ROLES = ROLE_ORDER;
 
-const INSTRUMENTS = [
-  "Keys",
-  "Guitar",
-  "Bass",
-  "Percussion",
-  "Saxophone",
-  "Violin",
-  "Other",
-] as const;
+const INSTRUMENTS = INSTRUMENT_ORDER;
 
 export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [mode, setMode] = useState<"register" | "recover">("register");
