@@ -292,16 +292,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
                 {r}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={addCustomInstrument}
-              aria-label="Add another instrument"
-              className="flex h-12 items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/60 hover:text-[var(--color-accent)]"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
-              </svg>
-            </button>
           </div>
         </Reveal>
 
@@ -328,17 +318,44 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
                     {inst}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={addCustomInstrument}
+                  aria-label="Add another instrument"
+                  className="flex h-12 items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/60 hover:text-[var(--color-accent)]"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                  </svg>
+                </button>
               </div>
 
-              <Collapse show={instruments.has("Other")}>
-                <input
-                  type="text"
-                  value={otherInstrument}
-                  onChange={(e) => setOtherInstrument(e.target.value)}
-                  placeholder="What instrument?"
-                  className="h-12 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-                />
-              </Collapse>
+              {customInstruments.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {customInstruments.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={item.value}
+                        onChange={(e) => updateCustomInstrument(item.id, e.target.value)}
+                        placeholder="What instrument?"
+                        autoFocus
+                        className="h-12 flex-1 rounded-xl border border-[var(--color-accent)] bg-[var(--color-accent)]/10 px-4 text-base text-[var(--color-accent)] placeholder:text-[var(--color-accent)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCustomInstrument(item.id)}
+                        aria-label="Remove instrument"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)]"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Collapse>
         </Reveal>
@@ -371,61 +388,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             </span>
           </button>
         </Reveal>
-          {customInstruments.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {customInstruments.map((item) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={item.value}
-                    onChange={(e) => updateCustomInstrument(item.id, e.target.value)}
-                    placeholder="What instrument?"
-                    autoFocus
-                    className="h-12 flex-1 rounded-xl border border-[var(--color-accent)] bg-[var(--color-accent)]/10 px-4 text-base text-[var(--color-accent)] placeholder:text-[var(--color-accent)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeCustomInstrument(item.id)}
-                    aria-label="Remove instrument"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)]"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setMarketingOptIn((v) => !v)}
-        className="flex items-start justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-accent)]/40"
-      >
-        <span className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-[var(--color-foreground)]">
-            Keep me in the loop
-          </span>
-          <span className="text-xs text-[var(--color-muted)]">
-            Get the Village newsletter and updates by email.
-          </span>
-        </span>
-        <span
-          aria-hidden
-          className={`relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
-            marketingOptIn ? "bg-green-500" : "bg-[var(--color-border)]"
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-              marketingOptIn ? "translate-x-5" : "translate-x-1"
-            }`}
-          />
-        </span>
-      </button>
 
         {error && (
           <p className={`text-sm text-red-500 text-center ${animEnabled ? "anim-shake" : ""}`}>{error}</p>
