@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { setDeviceId } from "@/lib/device-id";
 import { ROLE_ORDER, INSTRUMENT_ORDER } from "@/lib/tag-order";
 
@@ -22,7 +22,10 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [igHandle, setIgHandle] = useState("");
   const [roles, setRoles] = useState<Set<string>>(new Set());
   const [instruments, setInstruments] = useState<Set<string>>(new Set());
-  const [customInstruments, setCustomInstruments] = useState<string[]>([]);
+  // Stable ids keep each editable badge's identity across add/remove so inputs
+  // don't lose focus or value when a sibling is removed.
+  const [customInstruments, setCustomInstruments] = useState<{ id: number; value: string }[]>([]);
+  const nextCustomId = useRef(0);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [recoverIg, setRecoverIg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -57,21 +60,21 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   }
 
   function addCustomInstrument() {
-    setCustomInstruments((prev) => [...prev, ""]);
+    setCustomInstruments((prev) => [...prev, { id: nextCustomId.current++, value: "" }]);
   }
 
-  function updateCustomInstrument(index: number, value: string) {
-    setCustomInstruments((prev) => prev.map((v, i) => (i === index ? value : v)));
+  function updateCustomInstrument(id: number, value: string) {
+    setCustomInstruments((prev) => prev.map((item) => (item.id === id ? { ...item, value } : item)));
   }
 
-  function removeCustomInstrument(index: number) {
-    setCustomInstruments((prev) => prev.filter((_, i) => i !== index));
+  function removeCustomInstrument(id: number) {
+    setCustomInstruments((prev) => prev.filter((item) => item.id !== id));
   }
 
   function buildInstrumentsList(): string[] {
     const list: string[] = [...instruments];
     for (const custom of customInstruments) {
-      const trimmed = custom.trim();
+      const trimmed = custom.value.trim();
       if (trimmed) list.push(trimmed);
     }
     return list;
@@ -312,19 +315,19 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
           {customInstruments.length > 0 && (
             <div className="flex flex-col gap-2">
-              {customInstruments.map((value, i) => (
-                <div key={i} className="flex items-center gap-2">
+              {customInstruments.map((item) => (
+                <div key={item.id} className="flex items-center gap-2">
                   <input
                     type="text"
-                    value={value}
-                    onChange={(e) => updateCustomInstrument(i, e.target.value)}
+                    value={item.value}
+                    onChange={(e) => updateCustomInstrument(item.id, e.target.value)}
                     placeholder="What instrument?"
                     autoFocus
                     className="h-12 flex-1 rounded-xl border border-[var(--color-accent)] bg-[var(--color-accent)]/10 px-4 text-base text-[var(--color-accent)] placeholder:text-[var(--color-accent)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
                   />
                   <button
                     type="button"
-                    onClick={() => removeCustomInstrument(i)}
+                    onClick={() => removeCustomInstrument(item.id)}
                     aria-label="Remove instrument"
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)]"
                   >
