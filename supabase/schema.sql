@@ -25,8 +25,8 @@ create table check_ins (
   id                   uuid primary key default gen_random_uuid(),
   villager_id          uuid not null references villagers(id) on delete cascade,
   intent_amount        integer not null default 0,
-  payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred')),
-  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped')),
+  payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred', 'subscription')),
+  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped', 'first-time')),
   created_at           timestamptz not null default now(),
   stripe_transaction_id text
 );
@@ -42,13 +42,19 @@ create table subscriptions (
   status                 text not null,
   amount                 integer not null,
   interval               text not null check (interval in ('week', 'month')),
+  cancel_at_period_end   boolean not null default false,
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now()
 );
 
--- Case-insensitive unique constraint on display_name for identity recovery
-create unique index idx_villagers_display_name_unique
-  on villagers (lower(display_name));
+-- Email and Instagram handle are unique (case-insensitive). Both columns are
+-- nullable, so the unique indexes are partial to allow multiple NULLs.
+-- Duplicate display_names are intentionally allowed.
+create unique index idx_villagers_email_unique
+  on villagers (lower(email)) where email is not null;
+
+create unique index idx_villagers_ig_handle_unique
+  on villagers (lower(ig_handle)) where ig_handle is not null;
 
 -- Index for fast lookups of a villager's subscriptions
 create index idx_subscriptions_villager_id on subscriptions(villager_id);

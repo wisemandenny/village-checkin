@@ -1,4 +1,4 @@
-import { getStripe, getSupporterProductId } from "@/lib/stripe";
+import { getStripe, getSupporterProductId, resolveCustomerId } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
 import { resolveExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
@@ -73,19 +73,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let customerId = villager.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        name: villager.display_name,
-        email: villager.email || undefined,
-        metadata: { villager_id: villager.id, device_id },
-      });
-      customerId = customer.id;
-      await supabase
-        .from("villagers")
-        .update({ stripe_customer_id: customer.id })
-        .eq("id", villager.id);
-    }
+    const customerId = await resolveCustomerId(stripe, supabase, villager, device_id);
 
     const productId = await getSupporterProductId(stripe);
 

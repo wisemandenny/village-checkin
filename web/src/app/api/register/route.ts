@@ -1,6 +1,14 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { syncMarketingOptIn } from "@/lib/kit-sync";
 import { EXCLUSIVE_ROLE, getExclusiveHandles, isHandleExclusive } from "@/lib/exclusive-tier";
+import {
+  EMAIL_TAKEN,
+  IG_TAKEN,
+  findDuplicateField,
+  normalizeEmail,
+  normalizeIgHandle,
+  uniqueViolationMessage,
+} from "@/lib/villager-dedupe";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -19,21 +27,43 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient();
 
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedIg = ig_handle ? normalizeIgHandle(ig_handle) : "";
+
+  // Reject duplicate email / IG handle up front for a clear, field-specific
+  // message. The unique indexes remain the source of truth (see the 23505
+  // handling below) and close the race window between this check and insert.
+  const duplicate = await findDuplicateField(supabase, {
+    email: normalizedEmail,
+    igHandle: normalizedIg || null,
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: duplicate === "email" ? EMAIL_TAKEN : IG_TAKEN },
+      { status: 409 }
+    );
+  }
+
   // Never trust a client-supplied exclusive role — it can only be granted via
   // the admin allowlist (it unlocks cheaper recurring pricing).
   const finalRoles: string[] = Array.isArray(roles)
     ? roles.filter((r: unknown) => typeof r === "string" && r.toLowerCase() !== EXCLUSIVE_ROLE)
     : [];
 
-  if (ig_handle) {
+  if (normalizedIg) {
     const allowlist = await getExclusiveHandles(supabase);
-    if (isHandleExclusive(ig_handle, allowlist)) {
+    if (isHandleExclusive(normalizedIg, allowlist)) {
       finalRoles.push(EXCLUSIVE_ROLE);
     }
   }
 
-  const record: Record<string, unknown> = { device_id, display_name, email, marketing_opt_in };
-  if (ig_handle) record.ig_handle = ig_handle;
+  const record: Record<string, unknown> = {
+    device_id,
+    display_name,
+    email: normalizedEmail,
+    marketing_opt_in,
+  };
+  if (normalizedIg) record.ig_handle = normalizedIg;
   if (finalRoles.length) record.roles = finalRoles;
   if (instruments?.length) record.instruments = instruments;
 
@@ -46,7 +76,7 @@ export async function POST(req: NextRequest) {
   if (error) {
     if (error.code === "23505") {
       return NextResponse.json(
-        { error: "Device already registered" },
+        { error: uniqueViolationMessage(error) },
         { status: 409 }
       );
     }
@@ -56,7 +86,7 @@ export async function POST(req: NextRequest) {
   // Mirror the opt-in choice into Kit. Non-blocking: a Kit failure must not
   // fail registration.
   const { kitSubscriberId } = await syncMarketingOptIn({
-    email,
+    email: normalizedEmail,
     firstName: display_name,
     optIn: marketing_opt_in,
     kitSubscriberId: null,
