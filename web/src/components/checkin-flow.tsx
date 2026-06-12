@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PaymentStep } from "@/components/payment-step";
+import { AnimatedCheck, Reveal } from "@/components/motion";
 import type { PaymentMethod } from "@/lib/types";
 
 interface CheckInFlowProps {
@@ -166,7 +167,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
   if (step === "already") {
     return (
       <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-yellow-500/10">
+        <Reveal className="flex h-20 w-20 items-center justify-center rounded-full bg-yellow-500/10">
           <svg
             className="h-10 w-10 text-yellow-500"
             fill="none"
@@ -180,8 +181,10 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
               d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
             />
           </svg>
-        </div>
-        <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
+        </Reveal>
+        <Reveal delay={120}>
+          <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
+        </Reveal>
       </div>
     );
   }
@@ -205,30 +208,22 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
-        <svg
-          className="h-10 w-10 text-green-500"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-      </div>
-      <h2 className="text-2xl font-bold">
-        {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
-      </h2>
+      <Reveal className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+        <AnimatedCheck className="h-10 w-10 text-green-500" />
+      </Reveal>
+      <Reveal delay={120}>
+        <h2 className="text-2xl font-bold">
+          {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
+        </h2>
+      </Reveal>
       {paid && (
-        <p className="text-sm text-green-600 dark:text-green-400">
-          {paidMethod === "cash"
-            ? "Cash payment received — thanks for supporting the Village!"
-            : "Payment complete — thanks for supporting the Village!"}
-        </p>
+        <Reveal delay={220}>
+          <p className="text-sm text-green-600 dark:text-green-400">
+            {paidMethod === "cash"
+              ? "Cash payment received — thanks for supporting the Village!"
+              : "Payment complete — thanks for supporting the Village!"}
+          </p>
+        </Reveal>
       )}
     </div>
   );
