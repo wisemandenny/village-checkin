@@ -72,6 +72,7 @@ interface PaymentStepProps {
   checkInId: string;
   deviceId: string;
   isExclusive?: boolean;
+  isNewRegistration?: boolean;
   onComplete: (paid?: boolean) => void;
 }
 
@@ -110,7 +111,7 @@ const BRAND_DISPLAY: Record<string, string> = {
 const EXCLUSIVE_MIN_DOLLARS = 10;
 const STANDARD_WEEKLY_DOLLARS = 5;
 
-export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComplete }: PaymentStepProps) {
+export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
   const [mode, setMode] = useState<"once" | "recurring">("once");
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
@@ -289,6 +290,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
             totalCents={recurringCents}
             onComplete={onComplete}
             recurringInterval={recurringInterval}
+            isNewRegistration={isNewRegistration}
           />
         </Elements>
         <button
@@ -316,7 +318,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
           stripe={stripePromise}
           options={{ clientSecret, appearance }}
         >
-          <CheckoutForm checkInId={checkInId} totalCents={amountInCents + calcProcessingFee(amountInCents)} onComplete={onComplete} />
+          <CheckoutForm checkInId={checkInId} totalCents={amountInCents + calcProcessingFee(amountInCents)} onComplete={onComplete} isNewRegistration={isNewRegistration} />
         </Elements>
         <button
           type="button"
@@ -559,11 +561,13 @@ function CheckoutForm({
   totalCents,
   onComplete,
   recurringInterval,
+  isNewRegistration = false,
 }: {
   checkInId: string;
   totalCents: number;
   onComplete: (paid?: boolean) => void;
   recurringInterval?: "week" | "month";
+  isNewRegistration?: boolean;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -586,7 +590,7 @@ function CheckoutForm({
 
     // This form only renders inside the check-in flow, so a 3DS redirect
     // should return to the check-in success page (not the standalone /support).
-    const returnUrl = `${window.location.origin}/success?check_in_id=${checkInId}`;
+    const returnUrl = `${window.location.origin}/success?check_in_id=${checkInId}${isNewRegistration ? "&new=1" : ""}`;
 
     const { error: confirmError } = await stripe.confirmPayment({
       elements,

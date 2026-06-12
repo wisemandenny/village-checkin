@@ -195,6 +195,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         checkInId={checkInId}
         deviceId={deviceId}
         isExclusive={isExclusive}
+        isNewRegistration={isNewRegistration}
         onComplete={(didPay?: boolean) => {
           if (didPay) {
             markPaid(null);
