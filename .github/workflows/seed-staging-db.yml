@@ -21,12 +21,10 @@ jobs:
         env:
           PG_MAJOR: "16"
         run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          # Official PostgreSQL repo setup; -y runs it non-interactively (no tty).
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y "postgresql-client-${PG_MAJOR}"
 
       - name: Seed staging from production
