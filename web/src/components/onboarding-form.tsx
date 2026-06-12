@@ -400,7 +400,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed font-[family-name:var(--font-domaine)]"
           >
             {loading && <Spinner />}
-            {loading ? "Setting up..." : "Register"}
+            {loading ? "Setting up..." : "Enter"}
           </button>
         </Reveal>
 
@@ -410,7 +410,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             onClick={() => { setMode("recover"); setError(null); setDisplayName(""); }}
             className="w-full text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
           >
-            I&apos;ve been here before
+            I&apos;ve already registered
           </button>
         </Reveal>
       </Stagger>

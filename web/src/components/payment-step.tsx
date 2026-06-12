@@ -332,27 +332,27 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, onComple
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
       <h2 className="text-4xl font-bold font-[family-name:var(--font-domaine)]">Support the Village!</h2>
-      <p className="text-sm text-[var(--color-muted)]">
-        Every little bit helps — the Village is for everyone, no matter what.
-      </p>
-
-      <div className="grid w-full grid-cols-2 gap-2">
-        {(["once", "recurring"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => { setMode(m); setError(null); }}
-            disabled={loading || chargingSaved}
-            className={`h-11 rounded-xl border text-sm font-medium transition-all font-[family-name:var(--font-domaine)] ${
-              mode === m
-                ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-                : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
-            } disabled:opacity-50`}
-          >
-            {m === "once" ? "One-time" : "Recurring"}
-          </button>
-        ))}
-      </div>
+      {/* Recurring support is offered only to exclusive villagers; everyone else
+          sees just the one-time flow, so the mode toggle is hidden for them. */}
+      {isExclusive && (
+        <div className="grid w-full grid-cols-2 gap-2">
+          {(["once", "recurring"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => { setMode(m); setError(null); }}
+              disabled={loading || chargingSaved}
+              className={`h-11 rounded-xl border text-sm font-medium transition-all font-[family-name:var(--font-domaine)] ${
+                mode === m
+                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)]/40"
+              } disabled:opacity-50`}
+            >
+              {m === "once" ? "One-time" : "Recurring"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {mode === "once" && (
       <div className="contents">
