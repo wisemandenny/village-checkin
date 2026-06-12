@@ -1,8 +1,39 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, FormEvent } from "react";
-import type { Villager } from "@/lib/types";
+import type { Villager, VillagerSubscriptionSummary } from "@/lib/types";
 import { sortRoles, sortInstruments } from "@/lib/tag-order";
+
+// Mirror of subscription-sync's ACTIVE_STATUSES, kept local so this client
+// component doesn't pull in server-only modules.
+const ACTIVE_SUB_STATUSES = new Set(["active", "trialing", "past_due"]);
+
+const SUB_STATUS_STYLES: Record<string, string> = {
+  active: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  trialing: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  past_due:
+    "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+};
+
+const SUB_STATUS_FALLBACK_STYLE =
+  "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
+
+function formatSubscriptionAmount(sub: VillagerSubscriptionSummary): string {
+  const dollars =
+    sub.amount % 100 === 0
+      ? `$${sub.amount / 100}`
+      : `$${(sub.amount / 100).toFixed(2)}`;
+  return `${dollars}/${sub.interval === "week" ? "wk" : "mo"}`;
+}
+
+// Sort rank: active pledges rank highest, then any other recorded subscription,
+// then villagers with none. Amount breaks ties within a tier.
+function subscriptionSortValue(v: Villager): number {
+  const sub = v.subscription;
+  if (!sub) return 0;
+  const tier = ACTIVE_SUB_STATUSES.has(sub.status) ? 2_000_000 : 1_000_000;
+  return tier + sub.amount;
+}
 
 type SortField = keyof Villager;
 type SortDir = "asc" | "desc";
@@ -123,6 +154,9 @@ export default function VillagersPanel({ token }: { token: string }) {
     const dateFields = new Set(["first_visited_at", "last_visited_at"]);
     const dir = sortDir === "asc" ? 1 : -1;
     return [...villagers].sort((a, b) => {
+      if (sortBy === "subscription") {
+        return (subscriptionSortValue(a) - subscriptionSortValue(b)) * dir;
+      }
       const av = a[sortBy];
       const bv = b[sortBy];
       if (dateFields.has(sortBy as string)) {
@@ -244,6 +278,7 @@ export default function VillagersPanel({ token }: { token: string }) {
     { key: "roles", label: "Roles", hideOnMobile: true },
     { key: "instruments", label: "Instruments", hideOnMobile: true },
     { key: "email", label: "Email", sortable: true, hideOnMobile: true },
+    { key: "subscription", label: "Subscription", sortable: true, hideOnMobile: true },
     { key: "first_visited_at", label: "First Visit", sortable: true },
     { key: "last_visited_at", label: "Last Visit", sortable: true, hideOnMobile: true },
   ];
@@ -379,6 +414,22 @@ export default function VillagersPanel({ token }: { token: string }) {
                   </td>
                   <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                     {v.email || "—"}
+                  </td>
+                  <td className="hidden px-4 py-3 md:table-cell">
+                    {v.subscription ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_STATUS_STYLES[v.subscription.status] ?? SUB_STATUS_FALLBACK_STYLE}`}
+                        >
+                          {v.subscription.status}
+                        </span>
+                        <span className="whitespace-nowrap text-xs text-[var(--color-muted)]">
+                          {formatSubscriptionAmount(v.subscription)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-[var(--color-muted)]">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(v.first_visited_at)}

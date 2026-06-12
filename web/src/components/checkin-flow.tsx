@@ -23,6 +23,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
   const [checkInId, setCheckInId] = useState<string | null>(null);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
 
@@ -58,9 +59,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
             `/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`
           );
           if (cancelled) return;
-          const { check_in } = statusRes.ok
+          const statusData = statusRes.ok
             ? await statusRes.json()
-            : { check_in: null };
+            : { check_in: null, has_active_subscription: false };
+          const check_in = statusData.check_in;
+          setHasActiveSubscription(statusData.has_active_subscription === true);
           if (check_in?.id) setCheckInId(check_in.id);
           if (check_in?.status === "paid") {
             markPaid(check_in.payment_method ?? null);
@@ -74,6 +77,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         const { check_in, has_active_subscription, is_exclusive } = await checkinRes.json();
         setCheckInId(check_in.id);
         setIsExclusive(is_exclusive === true);
+        setHasActiveSubscription(has_active_subscription === true);
 
         if (settings.payments_enabled === true && !has_active_subscription) {
           setStep("payment");
@@ -144,6 +148,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
                     const { check_in, has_active_subscription, is_exclusive } = await res.json();
                     setCheckInId(check_in.id);
                     setIsExclusive(is_exclusive === true);
+                    setHasActiveSubscription(has_active_subscription === true);
                     if (paymentsEnabled && !has_active_subscription) {
                       setStep("payment");
                     } else {
@@ -216,14 +221,22 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
           {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
         </h2>
       </Reveal>
-      {paid && (
+      {hasActiveSubscription ? (
         <Reveal delay={220}>
           <p className="text-sm text-green-600 dark:text-green-400">
-            {paidMethod === "cash"
-              ? "Cash payment received — thanks for supporting the Village!"
-              : "Payment complete — thanks for supporting the Village!"}
+            You&apos;re an active supporter — thanks for keeping the Village going!
           </p>
         </Reveal>
+      ) : (
+        paid && (
+          <Reveal delay={220}>
+            <p className="text-sm text-green-600 dark:text-green-400">
+              {paidMethod === "cash"
+                ? "Cash payment received — thanks for supporting the Village!"
+                : "Payment complete — thanks for supporting the Village!"}
+            </p>
+          </Reveal>
+        )
       )}
     </div>
   );

@@ -2,6 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { syncMarketingOptIn } from "@/lib/kit-sync";
+import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
+
+const VILLAGER_SELECT = "*, subscriptions(status, amount, interval, created_at)";
+
+type JoinedSubscription = {
+  status: string;
+  amount: number;
+  interval: string;
+  created_at: string;
+};
+
+// Reduce a villager's subscription rows to a single at-a-glance summary:
+// prefer an active pledge, otherwise fall back to the most recent row.
+function summarizeSubscription(rows: JoinedSubscription[] | null | undefined) {
+  if (!rows?.length) return null;
+
+  const active = rows.find((s) => ACTIVE_STATUSES.has(s.status));
+  const chosen =
+    active ??
+    [...rows].sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0];
+
+  return {
+    status: chosen.status,
+    amount: chosen.amount,
+    interval: chosen.interval,
+  };
+}
+
+// Drop the raw joined `subscriptions` array and attach the compact summary.
+function withSubscriptionSummary(
+  villager: Record<string, unknown> & { subscriptions?: JoinedSubscription[] }
+) {
+  const { subscriptions, ...rest } = villager;
+  return { ...rest, subscription: summarizeSubscription(subscriptions) };
+}
 
 export async function GET(req: NextRequest) {
   const denied = await verifyAdmin(req);
@@ -13,7 +51,7 @@ export async function GET(req: NextRequest) {
   const sortBy = url.searchParams.get("sort_by") || "first_visited_at";
   const sortDir = url.searchParams.get("sort_dir") === "asc" ? true : false;
 
-  let query = supabase.from("villagers").select("*");
+  let query = supabase.from("villagers").select(VILLAGER_SELECT);
 
   if (search) {
     query = query.or(
@@ -31,7 +69,7 @@ export async function GET(req: NextRequest) {
     const needle = search.toLowerCase();
     const { data: allData } = await supabase
       .from("villagers")
-      .select("*")
+      .select(VILLAGER_SELECT)
       .order(sortBy, { ascending: sortDir });
 
     if (allData) {
@@ -52,7 +90,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ villagers: data });
+  const villagers = (data ?? []).map((v) =>
+    withSubscriptionSummary(v as Record<string, unknown> & { subscriptions?: JoinedSubscription[] })
+  );
+
+  return NextResponse.json({ villagers });
 }
 
 export async function POST(req: NextRequest) {
