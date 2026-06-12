@@ -42,6 +42,7 @@ create table subscriptions (
   status                 text not null,
   amount                 integer not null,
   interval               text not null check (interval in ('week', 'month')),
+  cancel_at_period_end   boolean not null default false,
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now()
 );

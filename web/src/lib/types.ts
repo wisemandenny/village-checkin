@@ -30,6 +30,7 @@ export interface Subscription {
   status: string;
   amount: number;
   interval: SubscriptionInterval;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }

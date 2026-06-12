@@ -11,7 +11,9 @@ type SubscriptionWithVillager = Subscription & {
   } | null;
 };
 
-type Group = "active" | "paused" | "ended";
+type Group = "active" | "ending" | "paused" | "ended";
+
+const GROUP_ORDER: Group[] = ["active", "ending", "paused", "ended"];
 
 const GROUP_FOR_STATUS: Record<string, Group> = {
   active: "active",
@@ -26,19 +28,27 @@ const GROUP_FOR_STATUS: Record<string, Group> = {
 
 const GROUP_LABELS: Record<Group, string> = {
   active: "Active",
+  ending: "Ending",
   paused: "Paused",
   ended: "Ended",
 };
 
 const STATUS_STYLES: Record<Group, string> = {
   active: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  ending:
+    "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
   paused:
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
   ended: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
 };
 
-function groupForStatus(status: string): Group {
-  return GROUP_FOR_STATUS[status] ?? "ended";
+// A pledge still in an active status but set to cancel at period end is winding
+// down: the member keeps access until the period ends, so it's shown apart from
+// fully-active pledges.
+function groupForSubscription(sub: SubscriptionWithVillager): Group {
+  const base = GROUP_FOR_STATUS[sub.status] ?? "ended";
+  if (base === "active" && sub.cancel_at_period_end) return "ending";
+  return base;
 }
 
 function formatCents(cents: number): string {
@@ -126,11 +136,12 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
   const grouped = useMemo(() => {
     const buckets: Record<Group, SubscriptionWithVillager[]> = {
       active: [],
+      ending: [],
       paused: [],
       ended: [],
     };
     for (const sub of subscriptions) {
-      buckets[groupForStatus(sub.status)].push(sub);
+      buckets[groupForSubscription(sub)].push(sub);
     }
     return buckets;
   }, [subscriptions]);
@@ -142,8 +153,8 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
         <div>
           <h2 className="text-xl font-bold">Subscriptions</h2>
           <p className="text-sm text-[var(--color-muted)]">
-            {grouped.active.length} active · {grouped.paused.length} paused ·{" "}
-            {grouped.ended.length} ended
+            {grouped.active.length} active · {grouped.ending.length} ending ·{" "}
+            {grouped.paused.length} paused · {grouped.ended.length} ended
           </p>
         </div>
         <button
@@ -180,7 +191,7 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
       )}
 
       {!loading &&
-        (["active", "paused", "ended"] as const).map((group) => (
+        GROUP_ORDER.map((group) => (
           <SubscriptionGroup
             key={group}
             group={group}
@@ -254,8 +265,13 @@ function SubscriptionGroup({
                 <td className="px-4 py-3 text-[var(--color-muted)]">
                   {sub.interval === "week" ? "Weekly" : "Monthly"}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-[var(--color-muted)]">
-                  {sub.status}
+                <td className="px-4 py-3 text-[var(--color-muted)]">
+                  <span className="font-mono text-xs">{sub.status}</span>
+                  {sub.cancel_at_period_end && (
+                    <span className="mt-0.5 block text-xs text-orange-600 dark:text-orange-400">
+                      cancels at period end
+                    </span>
+                  )}
                 </td>
                 <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
                   {formatDate(sub.updated_at)}
