@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
 import type { PaymentMethod } from "@/lib/types";
@@ -185,6 +186,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
         <Reveal delay={120}>
           <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
         </Reveal>
+        <WhosHereLink />
       </div>
     );
   }
@@ -225,6 +227,20 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
           </p>
         </Reveal>
       )}
+      <WhosHereLink />
     </div>
+  );
+}
+
+// Deliberately understated entry point to the avatar board — small and
+// low-contrast, more of a quiet easter egg than a call to action.
+function WhosHereLink() {
+  return (
+    <Link
+      href="/here"
+      className="mt-2 text-xs text-[var(--color-muted)]/60 underline-offset-4 transition hover:text-[var(--color-muted)] hover:underline"
+    >
+      see who&apos;s here
+    </Link>
   );
 }

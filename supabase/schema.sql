@@ -16,6 +16,10 @@ create table villagers (
   test_account     boolean not null default false,
   stripe_customer_id text,
   kit_subscriber_id  text,
+  -- Pokemon Infinite Fusion avatar: two IF Pokedex IDs (head + body), or NULL
+  -- until the villager picks one on the "who's here" board.
+  avatar_head smallint check (avatar_head between 1 and 1025),
+  avatar_body smallint check (avatar_body between 1 and 1025),
   first_visited_at timestamptz not null default now(),
   last_visited_at  timestamptz
 );

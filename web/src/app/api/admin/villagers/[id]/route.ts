@@ -47,6 +47,8 @@ export async function PUT(
     "email",
     "marketing_opt_in",
     "test_account",
+    "avatar_head",
+    "avatar_body",
     "first_visited_at",
     "last_visited_at",
   ];
