@@ -22,6 +22,8 @@ const ROLES = ROLE_ORDER;
 // filtered out of the preset buttons.
 const INSTRUMENTS = INSTRUMENT_ORDER.filter((inst) => inst !== "Other");
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [mode, setMode] = useState<"register" | "recover">("register");
   const [displayName, setDisplayName] = useState("");
@@ -38,6 +40,8 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const animEnabled = useAnimationEnabled();
+
+  const isEmailValid = EMAIL_RE.test(email.trim());
 
   function toggleRole(role: string) {
     setRoles((prev) => {
@@ -91,6 +95,10 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!displayName.trim()) return;
+    if (!isEmailValid) {
+      setError("Please enter a valid email address.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -269,6 +277,9 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
             required
           />
+          {email.trim() && !isEmailValid && (
+            <p className="text-xs text-red-500">Please enter a valid email address.</p>
+          )}
         </Reveal>
 
         <Reveal className="flex flex-col gap-3">
@@ -396,7 +407,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         <Reveal>
           <button
             type="submit"
-            disabled={!displayName.trim() || !email.trim() || loading}
+            disabled={!displayName.trim() || !isEmailValid || loading}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed font-[family-name:var(--font-domaine)]"
           >
             {loading && <Spinner />}
