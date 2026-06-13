@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getDeviceId } from "@/lib/device-id";
+import { EXCLUSIVE_SUPPORT_CENTS } from "@/lib/fees";
 import type { SubscriptionInterval } from "@/lib/types";
 
 interface ManageSubscriptionData {
@@ -18,8 +19,6 @@ interface SubscriptionResponse {
   is_exclusive: boolean;
   subscription: ManageSubscriptionData | null;
 }
-
-const EXCLUSIVE_MIN_DOLLARS = 10;
 
 function formatDate(unixSeconds: number | null): string | null {
   if (!unixSeconds) return null;
@@ -40,7 +39,6 @@ export function ManageSubscription() {
   const [isExclusive, setIsExclusive] = useState(false);
   const [sub, setSub] = useState<ManageSubscriptionData | null>(null);
 
-  const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -58,9 +56,6 @@ export function ManageSubscription() {
     const data: SubscriptionResponse = await res.json();
     setIsExclusive(data.is_exclusive);
     setSub(data.subscription);
-    if (data.subscription) {
-      setAmount((data.subscription.amount / 100).toFixed(2));
-    }
   }, []);
 
   useEffect(() => {
@@ -94,26 +89,6 @@ export function ManageSubscription() {
     },
     []
   );
-
-  const handleUpdate = useCallback(async () => {
-    const cents = Math.round(parseFloat(amount || "0") * 100);
-    if (cents < EXCLUSIVE_MIN_DOLLARS * 100) {
-      setError(`Minimum amount is $${EXCLUSIVE_MIN_DOLLARS}`);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      await post("/api/subscription/update", { amount: cents });
-      setNotice("Your support amount has been updated.");
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update amount");
-    } finally {
-      setBusy(false);
-    }
-  }, [amount, post, reload]);
 
   const handleCancel = useCallback(async () => {
     setBusy(true);
@@ -171,7 +146,8 @@ export function ManageSubscription() {
 
   const periodEnd = formatDate(sub.current_period_end);
   const pendingCancel = sub.cancel_at_period_end;
-  const amountChanged = Math.round(parseFloat(amount || "0") * 100) !== sub.amount;
+  const feeCents = sub.amount - EXCLUSIVE_SUPPORT_CENTS;
+  const showBreakdown = isExclusive && feeCents > 0;
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
@@ -187,6 +163,11 @@ export function ManageSubscription() {
             / {intervalLabel(sub.interval)}
           </span>
         </p>
+        {showBreakdown && (
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            ${(EXCLUSIVE_SUPPORT_CENTS / 100).toFixed(2)} support + ${(feeCents / 100).toFixed(2)} required processing fee
+          </p>
+        )}
         {pendingCancel ? (
           <p className="mt-3 text-sm text-[var(--color-muted)]">
             Your support ends{periodEnd ? ` on ${periodEnd}` : " at the end of this period"}.
@@ -211,34 +192,6 @@ export function ManageSubscription() {
         </button>
       ) : (
         <>
-          {isExclusive && (
-            <div className="flex w-full flex-col gap-3">
-              <label className="text-sm font-medium text-[var(--color-muted)] text-left">
-                Change your monthly amount (minimum ${EXCLUSIVE_MIN_DOLLARS})
-              </label>
-              <div className="flex w-full items-center gap-2">
-                <span className="text-lg font-medium">$</span>
-                <input
-                  type="number"
-                  min={EXCLUSIVE_MIN_DOLLARS}
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="h-12 flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-4 text-lg outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
-                />
-                <span className="text-sm text-[var(--color-muted)]">/ mo</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleUpdate}
-                disabled={busy || !amountChanged}
-                className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
-              >
-                {busy ? "Updating…" : "Update amount"}
-              </button>
-            </div>
-          )}
-
           {confirmingCancel ? (
             <div className="flex w-full flex-col gap-3">
               <p className="text-sm text-[var(--color-muted)]">
