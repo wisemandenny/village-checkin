@@ -232,15 +232,15 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false }
   );
 }
 
-// Deliberately understated entry point to the avatar board — small and
-// low-contrast, more of a quiet easter egg than a call to action.
+// Entry point to the avatar board, styled as a secondary button so it's clearly
+// visible and tappable from the check-in and paid screens.
 function WhosHereLink() {
   return (
     <Link
       href="/here"
-      className="mt-2 text-xs text-[var(--color-muted)]/60 underline-offset-4 transition hover:text-[var(--color-muted)] hover:underline"
+      className="mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
     >
-      see who&apos;s here
+      See who&apos;s here
     </Link>
   );
 }
