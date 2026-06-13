@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { setDeviceId } from "@/lib/device-id";
 import { ROLE_ORDER, INSTRUMENT_ORDER } from "@/lib/tag-order";
 import {
@@ -37,9 +37,64 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const nextCustomId = useRef(0);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [recoverIg, setRecoverIg] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped per request so a slow, stale response can't overwrite a newer one.
+  const suggestSeq = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const animEnabled = useAnimationEnabled();
+
+  useEffect(() => {
+    return () => {
+      if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    };
+  }, []);
+
+  function clearSuggestions() {
+    if (suggestTimer.current) {
+      clearTimeout(suggestTimer.current);
+      suggestTimer.current = null;
+    }
+    suggestSeq.current++;
+    setSuggestions([]);
+  }
+
+  function onRecoverIgChange(raw: string) {
+    const value = raw.toLowerCase();
+    setRecoverIg(value);
+
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+
+    // Mirror the server's gate: ignore the leading "@" and require 2+ chars.
+    const prefix = value.startsWith("@") ? value.slice(1) : value;
+    if (prefix.length < 2) {
+      suggestSeq.current++;
+      setSuggestions([]);
+      return;
+    }
+
+    const seq = ++suggestSeq.current;
+    suggestTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/recover/suggest?q=${encodeURIComponent(value)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        // Drop the response if a newer request has since started.
+        if (seq !== suggestSeq.current) return;
+        setSuggestions(Array.isArray(data.handles) ? data.handles : []);
+      } catch {
+        // Transient errors just leave the prior suggestions in place.
+      }
+    }, 200);
+  }
+
+  function pickSuggestion(handle: string) {
+    setRecoverIg(handle);
+    clearSuggestions();
+  }
 
   const isEmailValid = EMAIL_RE.test(email.trim());
 
@@ -151,6 +206,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     e.preventDefault();
     if (!recoverIg.trim()) return;
 
+    clearSuggestions();
     setLoading(true);
     setError(null);
 
@@ -187,16 +243,34 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             <label htmlFor="recover-ig" className="text-sm font-medium text-[var(--color-muted)]">
               What&apos;s your IG?
             </label>
-            <input
-              id="recover-ig"
-              type="text"
-              value={recoverIg}
-              onChange={(e) => setRecoverIg(e.target.value.toLowerCase())}
-              placeholder="@champagnepapi"
-              className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-              autoFocus
-              required
-            />
+            <div className="relative">
+              <input
+                id="recover-ig"
+                type="text"
+                value={recoverIg}
+                onChange={(e) => onRecoverIgChange(e.target.value)}
+                placeholder="@champagnepapi"
+                autoComplete="off"
+                className="h-12 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+                autoFocus
+                required
+              />
+              {suggestions.length > 0 && !suggestions.includes(recoverIg) && (
+                <ul className="absolute left-0 right-0 top-full z-10 mt-2 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                  {suggestions.map((handle) => (
+                    <li key={handle}>
+                      <button
+                        type="button"
+                        onClick={() => pickSuggestion(handle)}
+                        className="block w-full px-4 py-3 text-left text-base text-[var(--color-foreground)] transition-colors hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)]"
+                      >
+                        {handle}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -214,7 +288,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
 
           <button
             type="button"
-            onClick={() => { setMode("register"); setError(null); setRecoverIg(""); }}
+            onClick={() => { setMode("register"); setError(null); setRecoverIg(""); clearSuggestions(); }}
             className="text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
           >
             Never mind, I&apos;m new here
