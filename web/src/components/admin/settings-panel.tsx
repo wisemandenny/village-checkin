@@ -445,8 +445,8 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
         <h3 className="text-lg font-semibold">Exclusive tier</h3>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
           One IG handle per line (e.g. <code>@champagnepapi</code>). Handles on this list unlock the
-          $10/month recurring tier. Registered villagers get the exclusive role on save; anyone not
-          registered yet gets it automatically when they sign up.
+          $10/month recurring tier (plus the card processing fee). Registered villagers get the
+          exclusive role on save; anyone not registered yet gets it automatically when they sign up.
         </p>
         <textarea
           value={exclusiveHandles}

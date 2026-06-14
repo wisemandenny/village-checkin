@@ -1,3 +1,11 @@
+export type SubscriptionInterval = "week" | "month";
+
+export interface VillagerSubscriptionSummary {
+  status: string;
+  amount: number;
+  interval: SubscriptionInterval;
+}
+
 export interface Villager {
   id: string;
   device_id: string;
@@ -14,9 +22,8 @@ export interface Villager {
   avatar_body: number | null;
   first_visited_at: string;
   last_visited_at: string | null;
+  subscription?: VillagerSubscriptionSummary | null;
 }
-
-export type SubscriptionInterval = "week" | "month";
 
 export interface Subscription {
   id: string;
@@ -25,6 +32,7 @@ export interface Subscription {
   status: string;
   amount: number;
   interval: SubscriptionInterval;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -39,8 +47,8 @@ export interface CheckIn {
   stripe_transaction_id: string | null;
 }
 
-export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred";
-export type CheckInStatus = "pending" | "paid" | "skipped";
+export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred" | "subscription";
+export type CheckInStatus = "pending" | "paid" | "skipped" | "first-time";
 
 export interface StudioSettings {
   payments_enabled: boolean;

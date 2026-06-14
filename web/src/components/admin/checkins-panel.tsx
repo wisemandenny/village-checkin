@@ -14,8 +14,9 @@ const PAYMENT_METHODS: PaymentMethod[] = [
   "online_fallback",
   "cash",
   "skipped",
+  "subscription",
 ];
-const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped"];
+const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped", "first-time"];
 
 interface CheckInForm {
   villager_id: string;
@@ -69,6 +70,7 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Cash",
   skipped: "Skipped",
   deferred: "Deferred",
+  subscription: "Subscription",
 };
 
 const STATUS_STYLES: Record<CheckInStatus, string> = {
@@ -77,6 +79,8 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
   skipped:
     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+  "first-time":
+    "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
 };
 
 /**
@@ -416,7 +420,11 @@ export default function CheckInsPanel({ token }: { token: string }) {
   const villagerStats = useMemo(() => {
     if (!filterVillagerId || checkins.length === 0) return null;
 
-    const paidCheckins = checkins.filter((c) => c.status === "paid");
+    // Subscription check-ins are "paid" but carry no at-the-desk amount, so
+    // they're excluded from monetary averages to avoid dragging them to $0.
+    const paidCheckins = checkins.filter(
+      (c) => c.status === "paid" && c.payment_method !== "subscription"
+    );
     const totalCheckins = checkins.length;
     const totalContributed = paidCheckins.reduce((sum, c) => sum + c.intent_amount, 0);
     const avgContribution = paidCheckins.length > 0 ? totalContributed / paidCheckins.length : 0;
@@ -433,7 +441,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
     const byVillager = new Map<string, number[]>();
     for (const c of allCheckins) {
-      if (c.status !== "paid") continue;
+      if (c.status !== "paid" || c.payment_method === "subscription") continue;
       const arr = byVillager.get(c.villager_id) ?? [];
       arr.push(c.intent_amount);
       byVillager.set(c.villager_id, arr);
@@ -478,7 +486,9 @@ export default function CheckInsPanel({ token }: { token: string }) {
       return d >= weekStart && d < weekEnd;
     });
 
-    const weekPaid = weekCheckins.filter((c) => c.status === "paid");
+    const weekPaid = weekCheckins.filter(
+      (c) => c.status === "paid" && c.payment_method !== "subscription"
+    );
     const weekTotal = weekPaid.reduce((s, c) => s + c.intent_amount, 0);
     const weekAvgPayment =
       weekPaid.length > 0

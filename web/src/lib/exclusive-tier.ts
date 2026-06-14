@@ -2,7 +2,8 @@ import { createServerClient } from "@/lib/supabase/server";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
 
-// Role granted to villagers eligible for the exclusive ($10/month) tier.
+// Role granted to villagers eligible for the exclusive ($10/month support plus
+// the card processing fee) tier.
 export const EXCLUSIVE_ROLE = "exclusive";
 
 // studio_settings key holding the permanent allowlist of eligible IG handles.

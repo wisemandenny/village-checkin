@@ -2,6 +2,52 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { syncMarketingOptIn } from "@/lib/kit-sync";
+import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
+import {
+  EMAIL_TAKEN,
+  IG_TAKEN,
+  findDuplicateField,
+  normalizeEmail,
+  normalizeIgHandle,
+  uniqueViolationMessage,
+} from "@/lib/villager-dedupe";
+
+const VILLAGER_SELECT = "*, subscriptions(status, amount, interval, created_at)";
+
+type JoinedSubscription = {
+  status: string;
+  amount: number;
+  interval: string;
+  created_at: string;
+};
+
+// Reduce a villager's subscription rows to a single at-a-glance summary:
+// prefer an active pledge, otherwise fall back to the most recent row.
+function summarizeSubscription(rows: JoinedSubscription[] | null | undefined) {
+  if (!rows?.length) return null;
+
+  const active = rows.find((s) => ACTIVE_STATUSES.has(s.status));
+  const chosen =
+    active ??
+    [...rows].sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0];
+
+  return {
+    status: chosen.status,
+    amount: chosen.amount,
+    interval: chosen.interval,
+  };
+}
+
+// Drop the raw joined `subscriptions` array and attach the compact summary.
+function withSubscriptionSummary(
+  villager: Record<string, unknown> & { subscriptions?: JoinedSubscription[] }
+) {
+  const { subscriptions, ...rest } = villager;
+  return { ...rest, subscription: summarizeSubscription(subscriptions) };
+}
 
 export async function GET(req: NextRequest) {
   const denied = await verifyAdmin(req);
@@ -13,7 +59,7 @@ export async function GET(req: NextRequest) {
   const sortBy = url.searchParams.get("sort_by") || "first_visited_at";
   const sortDir = url.searchParams.get("sort_dir") === "asc" ? true : false;
 
-  let query = supabase.from("villagers").select("*");
+  let query = supabase.from("villagers").select(VILLAGER_SELECT);
 
   if (search) {
     query = query.or(
@@ -31,7 +77,7 @@ export async function GET(req: NextRequest) {
     const needle = search.toLowerCase();
     const { data: allData } = await supabase
       .from("villagers")
-      .select("*")
+      .select(VILLAGER_SELECT)
       .order(sortBy, { ascending: sortDir });
 
     if (allData) {
@@ -52,7 +98,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ villagers: data });
+  const villagers = (data ?? []).map((v) =>
+    withSubscriptionSummary(v as Record<string, unknown> & { subscriptions?: JoinedSubscription[] })
+  );
+
+  return NextResponse.json({ villagers });
 }
 
 export async function POST(req: NextRequest) {
@@ -62,15 +112,29 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = createServerClient();
 
+  const normalizedEmail = body.email ? normalizeEmail(body.email) : null;
+  const normalizedIg = body.ig_handle ? normalizeIgHandle(body.ig_handle) : null;
+
+  const duplicate = await findDuplicateField(supabase, {
+    email: normalizedEmail,
+    igHandle: normalizedIg,
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: duplicate === "email" ? EMAIL_TAKEN : IG_TAKEN },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await supabase
     .from("villagers")
     .insert({
       device_id: body.device_id,
       display_name: body.display_name,
-      ig_handle: body.ig_handle || null,
+      ig_handle: normalizedIg,
       roles: body.roles ?? [],
       instruments: body.instruments ?? [],
-      email: body.email || null,
+      email: normalizedEmail,
       marketing_opt_in: body.marketing_opt_in ?? false,
       first_visited_at: body.first_visited_at || new Date().toISOString(),
       last_visited_at: body.last_visited_at || null,
@@ -79,6 +143,12 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: uniqueViolationMessage(error) },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 

@@ -62,8 +62,16 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const paymentsEnabled = paySetting?.value === true;
 
+  // Exclusive tier eligibility drives which recurring pricing the client shows,
+  // and excludes a villager from the free first check-in.
+  const isExclusive = await resolveExclusive(supabase, {
+    id: villager.id,
+    ig_handle: villager.ig_handle,
+    roles: villager.roles,
+  });
+
   // Returning supporters with an active recurring pledge shouldn't be asked
-  // to pay again at check-in.
+  // to pay again at check-in — their visit is already covered by the pledge.
   const { data: subscriptions } = await supabase
     .from("subscriptions")
     .select("status")
@@ -73,12 +81,35 @@ export async function POST(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
-  // A payment is only expected when payments are on and the villager has no
-  // active pledge. In that case the visit starts as `pending` (payment
-  // deferred until they complete it); otherwise nothing is owed, so `skipped`.
-  const paymentExpected = paymentsEnabled && !hasActiveSubscription;
-  const insertMethod = paymentExpected ? "deferred" : "skipped";
-  const insertStatus = paymentExpected ? "pending" : "skipped";
+  // A non-exclusive villager's first-ever check-in is on the house: record it as
+  // "first-time" and let the client skip payment entirely.
+  const { data: prior } = await supabase
+    .from("check_ins")
+    .select("id")
+    .eq("villager_id", villager.id)
+    .limit(1);
+  const isFirstTimeFree = (!prior || prior.length === 0) && !isExclusive;
+
+  // Decide how this visit is recorded:
+  // - active pledge   → covered by the subscription (paid)
+  // - payments off    → nothing owed (skipped)
+  // - first-time free → on the house (first-time)
+  // - otherwise       → payment expected, deferred until they complete it (pending)
+  let insertMethod: string;
+  let insertStatus: string;
+  if (hasActiveSubscription) {
+    insertMethod = "subscription";
+    insertStatus = "paid";
+  } else if (!paymentsEnabled) {
+    insertMethod = "skipped";
+    insertStatus = "skipped";
+  } else if (isFirstTimeFree) {
+    insertMethod = "skipped";
+    insertStatus = "first-time";
+  } else {
+    insertMethod = "deferred";
+    insertStatus = "pending";
+  }
 
   // Create check-in record
   const { data: checkIn, error: insertErr } = await supabase
@@ -96,18 +127,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
 
-  // Exclusive tier eligibility drives which recurring pricing the client shows.
-  const isExclusive = await resolveExclusive(supabase, {
-    id: villager.id,
-    ig_handle: villager.ig_handle,
-    roles: villager.roles,
-  });
-
   return NextResponse.json(
     {
       check_in: checkIn,
       has_active_subscription: hasActiveSubscription,
       is_exclusive: isExclusive,
+      is_first_time: isFirstTimeFree,
     },
     { status: 201 }
   );
