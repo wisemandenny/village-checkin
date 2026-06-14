@@ -203,6 +203,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
         <Reveal delay={120}>
           <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
         </Reveal>
+        <WhosHereLink />
       </div>
     );
   }
@@ -265,6 +266,20 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </p>
         </Reveal>
       )}
+      <WhosHereLink />
     </div>
+  );
+}
+
+// Entry point to the avatar board, styled as a secondary button so it's clearly
+// visible and tappable from the check-in and paid screens.
+function WhosHereLink() {
+  return (
+    <Link
+      href="/here"
+      className="mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
+    >
+      See who&apos;s here
+    </Link>
   );
 }

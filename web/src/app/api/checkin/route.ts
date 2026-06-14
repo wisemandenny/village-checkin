@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, intent_amount = 0, payment_method = "skipped" } = body;
+  const { device_id, intent_amount = 0 } = body;
 
   if (!device_id) {
     return NextResponse.json(
@@ -54,6 +54,14 @@ export async function POST(req: NextRequest) {
     .update({ last_visited_at: new Date().toISOString() })
     .eq("id", villager.id);
 
+  // Whether the studio asks villagers to pay at all.
+  const { data: paySetting } = await supabase
+    .from("studio_settings")
+    .select("value")
+    .eq("key", "payments_enabled")
+    .maybeSingle();
+  const paymentsEnabled = paySetting?.value === true;
+
   // Exclusive tier eligibility drives which recurring pricing the client shows,
   // and excludes a villager from the free first check-in.
   const isExclusive = await resolveExclusive(supabase, {
@@ -82,21 +90,35 @@ export async function POST(req: NextRequest) {
     .limit(1);
   const isFirstTimeFree = (!prior || prior.length === 0) && !isExclusive;
 
-  // Create check-in record. An active subscriber's visit is recorded as paid
-  // via the subscription; otherwise a non-exclusive first visit is free.
+  // Decide how this visit is recorded:
+  // - active pledge   → covered by the subscription (paid)
+  // - payments off    → nothing owed (skipped)
+  // - first-time free → on the house (first-time)
+  // - otherwise       → payment expected, deferred until they complete it (pending)
+  let insertMethod: string;
+  let insertStatus: string;
+  if (hasActiveSubscription) {
+    insertMethod = "subscription";
+    insertStatus = "paid";
+  } else if (!paymentsEnabled) {
+    insertMethod = "skipped";
+    insertStatus = "skipped";
+  } else if (isFirstTimeFree) {
+    insertMethod = "skipped";
+    insertStatus = "first-time";
+  } else {
+    insertMethod = "deferred";
+    insertStatus = "pending";
+  }
+
+  // Create check-in record
   const { data: checkIn, error: insertErr } = await supabase
     .from("check_ins")
     .insert({
       villager_id: villager.id,
       intent_amount,
-      payment_method: hasActiveSubscription ? "subscription" : payment_method,
-      status: hasActiveSubscription
-        ? "paid"
-        : isFirstTimeFree
-          ? "first-time"
-          : payment_method === "skipped"
-            ? "skipped"
-            : "pending",
+      payment_method: insertMethod,
+      status: insertStatus,
     })
     .select()
     .single();
