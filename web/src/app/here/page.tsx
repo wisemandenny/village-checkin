@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getDeviceId } from "@/lib/device-id";
-import { fusionSpriteUrl, pokemonName } from "@/lib/pokemon";
+import { fusedName, fusionSpriteUrl, pokemonName } from "@/lib/pokemon";
 import { AvatarPicker } from "@/components/avatar-picker";
 
 interface BoardVillager {
@@ -145,8 +145,13 @@ export default function HerePage() {
                   {isMe && " (you)"}
                 </span>
                 {revealed && set && (
-                  <span className="text-[10px] leading-tight text-[var(--color-muted)]">
-                    {pokemonName(v.avatar_head!)} × {pokemonName(v.avatar_body!)}
+                  <span className="flex flex-col leading-tight text-[var(--color-muted)]">
+                    <span className="text-[11px] font-semibold text-[var(--color-foreground)]">
+                      {fusedName(v.avatar_head!, v.avatar_body!)}
+                    </span>
+                    <span className="text-[10px]">
+                      {pokemonName(v.avatar_head!)} × {pokemonName(v.avatar_body!)}
+                    </span>
                   </span>
                 )}
               </button>

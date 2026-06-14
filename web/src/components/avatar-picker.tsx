@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import {
   POOL,
+  fusedName,
   fusionSpriteUrl,
   pokemonName,
   pokemonSpriteUrl,
@@ -121,7 +122,7 @@ export function AvatarPicker({
         </p>
 
         {/* Live fused preview */}
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex flex-col items-center gap-2">
           <div className="flex h-40 w-40 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -131,6 +132,9 @@ export function AvatarPicker({
               style={pixelated}
             />
           </div>
+          <span className="text-lg font-bold font-[family-name:var(--font-domaine)]">
+            {fusedName(head, body)}
+          </span>
         </div>
 
         {mode === "gacha" ? (
