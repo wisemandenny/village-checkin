@@ -26,9 +26,10 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [isFirstTime, setIsFirstTime] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
+
+  const firstName = displayName.trim().split(/\s+/)[0] || displayName;
 
   const markPaid = useCallback((method: PaymentMethod | null) => {
     setPaid(true);
@@ -39,7 +40,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   // Surface the live check-in id, step, and whether a real payment completed so
   // the parent can run history-driven cleanup (browser Back) without owning this
   // state. `paid` lets the parent preserve a completed payment while still
-  // cleaning up auto-bypassed visits (first-time / subscription / skipped).
+  // cleaning up auto-bypassed visits (subscription / skipped).
   useEffect(() => {
     onCheckInState?.({ checkInId, step, paid });
   }, [checkInId, step, paid, onCheckInState]);
@@ -85,13 +86,12 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
         }
         if (!checkinRes.ok) throw new Error("Check-in failed");
 
-        const { check_in, has_active_subscription, is_exclusive, is_first_time } = await checkinRes.json();
+        const { check_in, has_active_subscription, is_exclusive } = await checkinRes.json();
         setCheckInId(check_in.id);
         setIsExclusive(is_exclusive === true);
         setHasActiveSubscription(has_active_subscription === true);
-        setIsFirstTime(is_first_time === true);
 
-        if (settings.payments_enabled === true && !has_active_subscription && !is_first_time) {
+        if (settings.payments_enabled === true && !has_active_subscription) {
           setStep("payment");
         } else {
           setStep("done");
@@ -157,12 +157,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
                   .then(async (res) => {
                     if (res.status === 409) { setStep("already"); return; }
                     if (!res.ok) throw new Error("Check-in failed");
-                    const { check_in, has_active_subscription, is_exclusive, is_first_time } = await res.json();
+                    const { check_in, has_active_subscription, is_exclusive } = await res.json();
                     setCheckInId(check_in.id);
                     setIsExclusive(is_exclusive === true);
                     setHasActiveSubscription(has_active_subscription === true);
-                    setIsFirstTime(is_first_time === true);
-                    if (paymentsEnabled && !has_active_subscription && !is_first_time) {
+                    if (paymentsEnabled && !has_active_subscription) {
                       setStep("payment");
                     } else {
                       setStep("done");
@@ -201,7 +200,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </svg>
         </Reveal>
         <Reveal delay={120}>
-          <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {displayName}!</h2>
+          <h2 className="text-2xl font-bold">You&apos;re already checked in for today, {firstName}!</h2>
         </Reveal>
         <WhosHereLink />
       </div>
@@ -233,7 +232,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       </Reveal>
       <Reveal delay={120}>
         <h2 className="text-2xl font-bold">
-          {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {displayName}!
+          {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {firstName}!
         </h2>
       </Reveal>
       {hasActiveSubscription ? (
@@ -258,13 +257,6 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
             </p>
           </Reveal>
         )
-      )}
-      {!paid && isFirstTime && (
-        <Reveal delay={220}>
-          <p className="text-sm text-green-600 dark:text-green-400">
-            Your first session is on us — make it count!
-          </p>
-        </Reveal>
       )}
       <WhosHereLink />
     </div>
