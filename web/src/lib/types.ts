@@ -16,6 +16,7 @@ export interface Villager {
   email: string | null;
   marketing_opt_in: boolean;
   test_account: boolean;
+  exclude_from_new: boolean;
   stripe_customer_id: string | null;
   kit_subscriber_id: string | null;
   avatar_head: number | null;

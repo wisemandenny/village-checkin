@@ -14,6 +14,8 @@ create table villagers (
   email       text,
   marketing_opt_in boolean not null default true,
   test_account     boolean not null default false,
+  -- When true, the villager is excluded from the "New Villagers This Week" stat.
+  exclude_from_new boolean not null default false,
   stripe_customer_id text,
   kit_subscriber_id  text,
   -- Pokemon Infinite Fusion avatar: two IF Pokedex IDs (head + body), or NULL
