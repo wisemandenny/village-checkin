@@ -18,6 +18,8 @@ export interface Villager {
   test_account: boolean;
   stripe_customer_id: string | null;
   kit_subscriber_id: string | null;
+  avatar_head: number | null;
+  avatar_body: number | null;
   first_visited_at: string;
   last_visited_at: string | null;
   subscription?: VillagerSubscriptionSummary | null;
@@ -46,7 +48,7 @@ export interface CheckIn {
 }
 
 export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred" | "subscription";
-export type CheckInStatus = "pending" | "paid" | "skipped" | "first-time";
+export type CheckInStatus = "pending" | "paid" | "skipped";
 
 export interface StudioSettings {
   payments_enabled: boolean;

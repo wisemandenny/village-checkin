@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, intent_amount = 0, payment_method = "skipped" } = body;
+  const { device_id, intent_amount = 0 } = body;
 
   if (!device_id) {
     return NextResponse.json(
@@ -54,8 +54,15 @@ export async function POST(req: NextRequest) {
     .update({ last_visited_at: new Date().toISOString() })
     .eq("id", villager.id);
 
-  // Exclusive tier eligibility drives which recurring pricing the client shows,
-  // and excludes a villager from the free first check-in.
+  // Whether the studio asks villagers to pay at all.
+  const { data: paySetting } = await supabase
+    .from("studio_settings")
+    .select("value")
+    .eq("key", "payments_enabled")
+    .maybeSingle();
+  const paymentsEnabled = paySetting?.value === true;
+
+  // Exclusive tier eligibility drives which recurring pricing the client shows.
   const isExclusive = await resolveExclusive(supabase, {
     id: villager.id,
     ig_handle: villager.ig_handle,
@@ -73,30 +80,31 @@ export async function POST(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
-  // A non-exclusive villager's first-ever check-in is on the house: record it as
-  // "first-time" and let the client skip payment entirely.
-  const { data: prior } = await supabase
-    .from("check_ins")
-    .select("id")
-    .eq("villager_id", villager.id)
-    .limit(1);
-  const isFirstTimeFree = (!prior || prior.length === 0) && !isExclusive;
+  // Decide how this visit is recorded:
+  // - active pledge   → covered by the subscription (paid)
+  // - payments off    → nothing owed (skipped)
+  // - otherwise       → payment expected, deferred until they complete it (pending)
+  let insertMethod: string;
+  let insertStatus: string;
+  if (hasActiveSubscription) {
+    insertMethod = "subscription";
+    insertStatus = "paid";
+  } else if (!paymentsEnabled) {
+    insertMethod = "skipped";
+    insertStatus = "skipped";
+  } else {
+    insertMethod = "deferred";
+    insertStatus = "pending";
+  }
 
-  // Create check-in record. An active subscriber's visit is recorded as paid
-  // via the subscription; otherwise a non-exclusive first visit is free.
+  // Create check-in record
   const { data: checkIn, error: insertErr } = await supabase
     .from("check_ins")
     .insert({
       villager_id: villager.id,
       intent_amount,
-      payment_method: hasActiveSubscription ? "subscription" : payment_method,
-      status: hasActiveSubscription
-        ? "paid"
-        : isFirstTimeFree
-          ? "first-time"
-          : payment_method === "skipped"
-            ? "skipped"
-            : "pending",
+      payment_method: insertMethod,
+      status: insertStatus,
     })
     .select()
     .single();
@@ -110,7 +118,6 @@ export async function POST(req: NextRequest) {
       check_in: checkIn,
       has_active_subscription: hasActiveSubscription,
       is_exclusive: isExclusive,
-      is_first_time: isFirstTimeFree,
     },
     { status: 201 }
   );

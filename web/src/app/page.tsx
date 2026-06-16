@@ -98,9 +98,9 @@ export default function Home() {
         // Clean up the rows created this session unless a real payment
         // completed (preserve it) or the check-in already existed today (the
         // "already" screen reads a prior session's row — never delete that).
-        // This covers visits that auto-bypass payment to "done" (first-time,
-        // active subscription, payments disabled, or an explicit skip), which
-        // would otherwise leave an orphaned villager and block re-registration.
+        // This covers visits that auto-bypass payment to "done" (active
+        // subscription, payments disabled, or an explicit skip), which would
+        // otherwise leave an orphaned villager and block re-registration.
         if (step !== "already" && !paid) {
           fetch("/api/checkin/cleanup", {
             method: "POST",
@@ -154,19 +154,26 @@ export default function Home() {
           />
         )}
 
-        {screen === "onboarding" && (
-          <OnboardingForm
-            deviceId={deviceId}
-            onComplete={(name, isNew) => {
-              setDisplayName(name);
-              setIsNewRegistration(isNew);
-              cleanedUpRef.current = false;
-              // Push a history entry so Back from the check-in flow returns
-              // here to registration rather than leaving the site.
-              window.history.pushState({ vcStage: "checkin" }, "");
-              setScreen("checkin");
-            }}
-          />
+        {/* Keep the form mounted (just hidden) once past loading so its state —
+            including the optional IG handle that grants the exclusive tier —
+            survives the Back navigation from the check-in flow. Unmounting it
+            would reset the IG field and drop an exclusive user to the standard
+            tier on re-submit. */}
+        {screen !== "loading" && (
+          <div className={screen === "onboarding" ? "flex w-full justify-center" : "hidden"}>
+            <OnboardingForm
+              deviceId={deviceId}
+              onComplete={(name, isNew) => {
+                setDisplayName(name);
+                setIsNewRegistration(isNew);
+                cleanedUpRef.current = false;
+                // Push a history entry so Back from the check-in flow returns
+                // here to registration rather than leaving the site.
+                window.history.pushState({ vcStage: "checkin" }, "");
+                setScreen("checkin");
+              }}
+            />
+          </div>
         )}
 
         {screen === "checkin" && (
