@@ -8,7 +8,7 @@ import { CheckInFlow } from "@/components/checkin-flow";
 import { AnimationProvider, Reveal } from "@/components/motion";
 
 type Screen = "loading" | "onboarding" | "checkin";
-type CheckInStep = "checking-in" | "payment" | "done" | "already";
+type CheckInStep = "checking-in" | "payment" | "done";
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("loading");
@@ -25,6 +25,7 @@ export default function Home() {
   const checkInIdRef = useRef<string | null>(null);
   const checkInStepRef = useRef<CheckInStep | null>(null);
   const checkInPaidRef = useRef<boolean>(false);
+  const checkInAlreadyRef = useRef<boolean>(false);
   const cleanedUpRef = useRef(false);
 
   screenRef.current = screen;
@@ -36,14 +37,17 @@ export default function Home() {
       checkInId,
       step,
       paid,
+      alreadyCheckedIn,
     }: {
       checkInId: string | null;
       step: CheckInStep;
       paid: boolean;
+      alreadyCheckedIn: boolean;
     }) => {
       checkInIdRef.current = checkInId;
       checkInStepRef.current = step;
       checkInPaidRef.current = paid;
+      checkInAlreadyRef.current = alreadyCheckedIn;
     },
     []
   );
@@ -93,15 +97,16 @@ export default function Home() {
 
       // Back to the onboarding entry from the check-in flow.
       if (vcStage !== "checkin" && screenRef.current === "checkin") {
-        const step = checkInStepRef.current;
         const paid = checkInPaidRef.current;
+        const alreadyCheckedIn = checkInAlreadyRef.current;
         // Clean up the rows created this session unless a real payment
-        // completed (preserve it) or the check-in already existed today (the
-        // "already" screen reads a prior session's row — never delete that).
-        // This covers visits that auto-bypass payment to "done" (active
-        // subscription, payments disabled, or an explicit skip), which would
-        // otherwise leave an orphaned villager and block re-registration.
-        if (step !== "already" && !paid) {
+        // completed (preserve it) or the check-in already existed today (a
+        // prior session's row — never delete that, even when we now route it
+        // to the payment screen). This covers visits that auto-bypass payment
+        // to "done" (active subscription, payments disabled, or an explicit
+        // skip), which would otherwise leave an orphaned villager and block
+        // re-registration.
+        if (!alreadyCheckedIn && !paid) {
           fetch("/api/checkin/cleanup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -116,6 +121,7 @@ export default function Home() {
         checkInIdRef.current = null;
         checkInStepRef.current = null;
         checkInPaidRef.current = false;
+        checkInAlreadyRef.current = false;
         setScreen("onboarding");
       }
     }
