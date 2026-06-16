@@ -16,7 +16,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
   "skipped",
   "subscription",
 ];
-const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped", "first-time"];
+const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped"];
 
 interface CheckInForm {
   villager_id: string;
@@ -79,8 +79,6 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
   skipped:
     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
-  "first-time":
-    "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
 };
 
 /**
