@@ -48,6 +48,7 @@ type VillagerForm = {
   email: string;
   marketing_opt_in: boolean;
   test_account: boolean;
+  exclude_from_new: boolean;
   first_visited_at: string;
   last_visited_at: string;
 };
@@ -61,6 +62,7 @@ const EMPTY_FORM: VillagerForm = {
   email: "",
   marketing_opt_in: false,
   test_account: false,
+  exclude_from_new: false,
   first_visited_at: "",
   last_visited_at: "",
 };
@@ -194,6 +196,7 @@ export default function VillagersPanel({ token }: { token: string }) {
       email: v.email || "",
       marketing_opt_in: v.marketing_opt_in,
       test_account: v.test_account,
+      exclude_from_new: v.exclude_from_new,
       first_visited_at: v.first_visited_at,
       last_visited_at: v.last_visited_at || "",
     });
@@ -219,6 +222,7 @@ export default function VillagersPanel({ token }: { token: string }) {
       email: form.email || null,
       marketing_opt_in: form.marketing_opt_in,
       test_account: form.test_account,
+      exclude_from_new: form.exclude_from_new,
       first_visited_at: form.first_visited_at || new Date().toISOString(),
       last_visited_at: form.last_visited_at || null,
     };
@@ -264,6 +268,28 @@ export default function VillagersPanel({ token }: { token: string }) {
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  async function toggleExcludeFromNew(v: Villager) {
+    setTogglingId(v.id);
+    setError("");
+    try {
+      const res = await apiFetch(`/api/admin/villagers/${v.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ exclude_from_new: !v.exclude_from_new }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error || "Update failed");
+      }
+      loadVillagers();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -386,6 +412,11 @@ export default function VillagersPanel({ token }: { token: string }) {
                         exclusive
                       </span>
                     )}
+                    {v.exclude_from_new && (
+                      <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                        not new
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {v.ig_handle ? (
@@ -438,6 +469,17 @@ export default function VillagersPanel({ token }: { token: string }) {
                     {formatDate(v.last_visited_at)}
                   </td>
                   <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => toggleExcludeFromNew(v)}
+                      disabled={togglingId === v.id}
+                      className="mr-2 rounded px-2 py-1 text-xs font-medium text-[var(--color-muted)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-foreground)] disabled:opacity-50"
+                    >
+                      {togglingId === v.id
+                        ? "…"
+                        : v.exclude_from_new
+                          ? "Mark new"
+                          : "Mark not new"}
+                    </button>
                     <button
                       onClick={() => openEdit(v)}
                       className="mr-2 rounded px-2 py-1 text-xs font-medium text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/10"
@@ -613,6 +655,26 @@ export default function VillagersPanel({ token }: { token: string }) {
                   <span
                     className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
                       form.test_account ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-[var(--color-muted)]">Exclude from &ldquo;New Villagers&rdquo;</span>
+                  <span className="text-xs text-[var(--color-muted)]">(hides from the weekly stat)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, exclude_from_new: !form.exclude_from_new })}
+                  className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                    form.exclude_from_new ? "bg-green-500" : "bg-[var(--color-border)]"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      form.exclude_from_new ? "translate-x-5" : "translate-x-1"
                     }`}
                   />
                 </button>

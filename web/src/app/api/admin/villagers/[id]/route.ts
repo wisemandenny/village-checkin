@@ -55,6 +55,7 @@ export async function PUT(
     "email",
     "marketing_opt_in",
     "test_account",
+    "exclude_from_new",
     "avatar_head",
     "avatar_body",
     "first_visited_at",

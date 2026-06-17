@@ -562,6 +562,10 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
     const weekVillagerIds = new Set(weekCheckins.map((c) => c.villager_id));
 
+    const excludedIds = new Set(
+      villagers.filter((v) => v.exclude_from_new).map((v) => v.id)
+    );
+
     const checkinsByVillager = new Map<string, CheckInWithVillager[]>();
     for (const c of allCheckins) {
       const arr = checkinsByVillager.get(c.villager_id) ?? [];
@@ -574,7 +578,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
     let newVillagers = 0;
     for (const vid of weekVillagerIds) {
       const vCheckins = checkinsByVillager.get(vid) ?? [];
-      if (vCheckins.length === 1) newVillagers++;
+      if (vCheckins.length === 1 && !excludedIds.has(vid)) newVillagers++;
       const { current } = computeStreaks(vCheckins);
       streakSum += current;
       streakCount++;
@@ -588,7 +592,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       avgStreak,
       newVillagers,
     };
-  }, [filterVillagerId, allCheckins]);
+  }, [filterVillagerId, allCheckins, villagers]);
 
   return (
     <>
