@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     roles: villager.roles,
   });
 
-  const isElder = (villager.roles ?? []).includes(ELDER_ROLE);
+  const isElder = (villager.roles ?? []).some((r: string) => r.toLowerCase() === ELDER_ROLE);
 
   return NextResponse.json({
     check_in: checkIn ?? null,

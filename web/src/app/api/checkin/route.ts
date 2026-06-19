@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
-  const isElder = (villager.roles ?? []).includes(ELDER_ROLE);
+  const isElder = (villager.roles ?? []).some((r: string) => r.toLowerCase() === ELDER_ROLE);
 
   // Decide how this visit is recorded:
   // - elder role      → permanently exempt from payment (paid)
