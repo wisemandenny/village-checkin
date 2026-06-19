@@ -474,7 +474,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
           disabled={loading}
           className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
         >
-          {loading ? "Setting up..." : `Support $${(recurringChargeCents / 100).toFixed(2)}/mo`}
+          {loading ? "Setting up..." : `Support $${Math.round(exclusiveSupportCents / 100)}/mo`}
         </button>
       </div>
       )}
