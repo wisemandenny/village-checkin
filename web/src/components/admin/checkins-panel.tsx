@@ -195,6 +195,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
   const [error, setError] = useState("");
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
+  const [todayOnly, setTodayOnly] = useState(true);
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -415,6 +416,72 @@ export default function CheckInsPanel({ token }: { token: string }) {
     }
   }
 
+  const displayedCheckins = useMemo(() => {
+    if (!todayOnly) return checkins;
+    const now = new Date();
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const startOfNextDay = new Date(startOfDay);
+    startOfNextDay.setDate(startOfNextDay.getDate() + 1);
+    return checkins.filter((c) => {
+      const d = new Date(c.created_at);
+      return d >= startOfDay && d < startOfNextDay;
+    });
+  }, [checkins, todayOnly]);
+
+  const todayStats = useMemo(() => {
+    if (!todayOnly) return null;
+
+    const now = new Date();
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const startOfNextDay = new Date(startOfDay);
+    startOfNextDay.setDate(startOfNextDay.getDate() + 1);
+    const isToday = (iso: string) => {
+      const d = new Date(iso);
+      return d >= startOfDay && d < startOfNextDay;
+    };
+
+    const paid = displayedCheckins.filter(
+      (c) => c.status === "paid" && c.payment_method !== "subscription"
+    );
+    const total = paid.reduce((s, c) => s + c.intent_amount, 0);
+    const avgPayment = paid.length > 0 ? total / paid.length : 0;
+    const uniqueVillagers = new Set(
+      displayedCheckins.map((c) => c.villager_id)
+    ).size;
+
+    // A villager is "new today" when their earliest check-in across all
+    // history falls on today.
+    const firstSeen = new Map<string, number>();
+    for (const c of allCheckins) {
+      const t = new Date(c.created_at).getTime();
+      const prev = firstSeen.get(c.villager_id);
+      if (prev === undefined || t < prev) firstSeen.set(c.villager_id, t);
+    }
+    let newVillagers = 0;
+    for (const vid of new Set(displayedCheckins.map((c) => c.villager_id))) {
+      const first = firstSeen.get(vid);
+      if (first !== undefined && isToday(new Date(first).toISOString())) {
+        newVillagers++;
+      }
+    }
+
+    return {
+      count: displayedCheckins.length,
+      total,
+      avgPayment,
+      uniqueVillagers,
+      newVillagers,
+    };
+  }, [todayOnly, displayedCheckins, allCheckins]);
+
   const villagerStats = useMemo(() => {
     if (!filterVillagerId || checkins.length === 0) return null;
 
@@ -495,6 +562,10 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
     const weekVillagerIds = new Set(weekCheckins.map((c) => c.villager_id));
 
+    const excludedIds = new Set(
+      villagers.filter((v) => v.exclude_from_new).map((v) => v.id)
+    );
+
     const checkinsByVillager = new Map<string, CheckInWithVillager[]>();
     for (const c of allCheckins) {
       const arr = checkinsByVillager.get(c.villager_id) ?? [];
@@ -507,7 +578,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
     let newVillagers = 0;
     for (const vid of weekVillagerIds) {
       const vCheckins = checkinsByVillager.get(vid) ?? [];
-      if (vCheckins.length === 1) newVillagers++;
+      if (vCheckins.length === 1 && !excludedIds.has(vid)) newVillagers++;
       const { current } = computeStreaks(vCheckins);
       streakSum += current;
       streakCount++;
@@ -521,7 +592,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       avgStreak,
       newVillagers,
     };
-  }, [filterVillagerId, allCheckins]);
+  }, [filterVillagerId, allCheckins, villagers]);
 
   return (
     <>
@@ -530,7 +601,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
         <div>
           <h2 className="text-xl font-bold">Check-ins</h2>
           <p className="text-sm text-[var(--color-muted)]">
-            {checkins.length} total
+            {displayedCheckins.length} {todayOnly ? "today" : "total"}
           </p>
         </div>
         <button
@@ -541,8 +612,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
         </button>
       </div>
 
-      {/* Filter by villager */}
-      <div className="mb-4">
+      {/* Filters */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
           value={filterVillagerId}
           onChange={(e) => setFilterVillagerId(e.target.value)}
@@ -555,10 +626,43 @@ export default function CheckInsPanel({ token }: { token: string }) {
             </option>
           ))}
         </select>
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium select-none">
+          <input
+            type="checkbox"
+            checked={todayOnly}
+            onChange={(e) => setTodayOnly(e.target.checked)}
+            className="h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-accent)]"
+          />
+          Today only
+        </label>
       </div>
 
+      {/* Today Stats */}
+      {todayStats && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label="Check-ins Today" value={String(todayStats.count)} />
+          <StatCard label="Total Today" value={formatCents(todayStats.total)} />
+          <StatCard
+            label="Avg Payment Today"
+            value={formatCents(Math.round(todayStats.avgPayment))}
+          />
+          {!filterVillagerId && (
+            <>
+              <StatCard
+                label="Villagers Today"
+                value={String(todayStats.uniqueVillagers)}
+              />
+              <StatCard
+                label="New Villagers Today"
+                value={String(todayStats.newVillagers)}
+              />
+            </>
+          )}
+        </div>
+      )}
+
       {/* Villager Stats */}
-      {villagerStats && (
+      {!todayOnly && villagerStats && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <StatCard label="Total Check-ins" value={String(villagerStats.totalCheckins)} />
           <StatCard
@@ -583,7 +687,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       )}
 
       {/* Global Stats (All Villagers) */}
-      {globalStats && (
+      {!todayOnly && globalStats && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label="This Week's Check-ins" value={String(globalStats.weekCheckins)} />
           <StatCard label="This Week's Total" value={formatCents(globalStats.weekTotal)} />
@@ -645,18 +749,18 @@ export default function CheckInsPanel({ token }: { token: string }) {
                 </td>
               </tr>
             )}
-            {!loading && checkins.length === 0 && (
+            {!loading && displayedCheckins.length === 0 && (
               <tr>
                 <td
                   colSpan={7}
                   className="px-4 py-12 text-center text-[var(--color-muted)]"
                 >
-                  No check-ins found.
+                  {todayOnly ? "No check-ins today." : "No check-ins found."}
                 </td>
               </tr>
             )}
             {!loading &&
-              checkins.map((c) => (
+              displayedCheckins.map((c) => (
                 <tr
                   key={c.id}
                   className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
