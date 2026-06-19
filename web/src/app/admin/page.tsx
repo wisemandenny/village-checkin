@@ -23,7 +23,10 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("villagers");
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("admin_token");
+    // Persist the admin session on the device (localStorage) so admins stay
+    // logged in across tab/browser restarts and don't re-enter the password
+    // every visit.
+    const saved = localStorage.getItem("admin_token");
     if (saved) setToken(saved);
   }, []);
 
@@ -36,7 +39,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${passwordInput}` },
       });
       if (!res.ok) throw new Error("Invalid password");
-      sessionStorage.setItem("admin_token", passwordInput);
+      localStorage.setItem("admin_token", passwordInput);
       setToken(passwordInput);
     } catch {
       setLoginError("Invalid password. Please try again.");
@@ -46,7 +49,7 @@ export default function AdminPage() {
   }
 
   function handleLogout() {
-    sessionStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_token");
     setToken(null);
   }
 
