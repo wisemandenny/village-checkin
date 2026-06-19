@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getDeviceId } from "@/lib/device-id";
 import { fusedName, fusionSpriteUrl, pokemonName } from "@/lib/pokemon";
 import { AvatarPicker } from "@/components/avatar-picker";
+import { SelfieModal } from "@/components/selfie-modal";
 
 interface BoardVillager {
   id: string;
@@ -30,6 +31,7 @@ export default function HerePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [selfieOpen, setSelfieOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<string | null>(null);
 
   const loadBoard = useCallback(async () => {
@@ -62,6 +64,7 @@ export default function HerePage() {
   const deviceId = getDeviceId();
   const isDeveloper = (me?.roles ?? []).includes("developer");
   const hasAvatar = me?.avatar_head != null && me?.avatar_body != null;
+  const hasSelfie = !!me?.selfie_url;
 
   // Always show yourself, even if the board feed excludes you (e.g. a test or
   // dev account, or a check-in that isn't paid/skipped). `me` is also the
@@ -90,6 +93,20 @@ export default function HerePage() {
             ? "Loading…"
             : `${displayVillagers.length} here`}
         </p>
+
+        {me && !hasSelfie && (
+          <button
+            type="button"
+            onClick={() => setSelfieOpen(true)}
+            className="mt-5 flex items-center gap-2 rounded-2xl bg-[var(--color-accent)] px-6 py-3 text-base font-semibold text-white shadow-lg shadow-[var(--color-accent)]/30 transition hover:bg-[var(--color-accent-light)] font-[family-name:var(--font-domaine)]"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.66-.9l.82-1.2A2 2 0 0110.07 4h3.86a2 2 0 011.66.9l.82 1.2a2 2 0 001.66.9H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+            Add your selfie
+          </button>
+        )}
 
         {me && (
           <button
@@ -191,6 +208,18 @@ export default function HerePage() {
             loadBoard();
           }}
           onCancel={() => setPickerOpen(false)}
+        />
+      )}
+
+      {selfieOpen && deviceId && (
+        <SelfieModal
+          deviceId={deviceId}
+          onSaved={(selfieUrl) => {
+            setMe((cur) => (cur ? { ...cur, selfie_url: selfieUrl } : cur));
+            setSelfieOpen(false);
+            loadBoard();
+          }}
+          onCancel={() => setSelfieOpen(false)}
         />
       )}
     </main>
