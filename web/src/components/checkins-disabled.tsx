@@ -155,13 +155,13 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left">
               <h3 className="font-semibold">Support the Village</h3>
               <p className="mt-1 text-sm text-[var(--color-muted)]">
-                Become a monthly supporter — $10/month keeps the Village alive.
+                $10/month keeps the Village alive.
               </p>
               <button
                 onClick={() => setView("subscribe")}
                 className="mt-3 h-11 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-sm font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)]"
               >
-                Set up monthly support
+                Subscribe
               </button>
             </div>
           )}
@@ -192,12 +192,14 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
         </div>
       )}
 
-      <Link
-        href="/manage"
-        className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
-      >
-        Manage your support
-      </Link>
+      {hasActiveSubscription && (
+        <Link
+          href="/manage"
+          className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
+        >
+          Manage your support
+        </Link>
+      )}
     </div>
   );
 }
