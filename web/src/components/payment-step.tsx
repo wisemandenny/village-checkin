@@ -444,7 +444,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
               <div
                 className={`rounded-lg border px-3 py-5 text-2xl font-bold font-[family-name:var(--font-domaine)] ${bill.border} ${bill.bg} ${bill.text} ring-2 ring-[var(--color-accent)]/40`}
               >
-                $ {(recurringChargeCents / 100).toFixed(2)}
+                $ {(exclusiveSupportCents / 100).toFixed(2)}
                 <span className="text-base font-medium"> / mo</span>
               </div>
             </div>
@@ -474,7 +474,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
           disabled={loading}
           className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
         >
-          {loading ? "Setting up..." : `Support $${Math.round(exclusiveSupportCents / 100)}/mo`}
+          {loading ? "Setting up..." : "Subscribe"}
         </button>
       </div>
       )}
