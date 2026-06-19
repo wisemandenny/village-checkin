@@ -30,7 +30,7 @@ export const viewport: Viewport = {
 };
 
 // Runs before React hydrates to apply the saved theme without a flash.
-const themeInitScript = `try{const t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}`;
+const themeInitScript = `try{const t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`;
 
 export default function RootLayout({
   children,
