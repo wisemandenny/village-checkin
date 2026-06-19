@@ -67,6 +67,9 @@ npx expo start
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (browser) |
 | `ADMIN_PASSWORD` | Fallback admin password (if not set in DB) |
 | `STRIPE_SUPPORTER_PRODUCT_ID` | (Recommended) Stripe Product id for recurring support. If unset, one is created on demand. |
+| `AWS_S3_SELFIE_BUCKET` | S3 bucket for villager selfies shown on the "who's here" board. If unset, selfie capture is skipped (registration works as before). |
+| `AWS_REGION` | AWS region for the selfie bucket (default `us-east-1`). |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credentials for an IAM user scoped to `PutObject` on the selfie bucket (server only). |
 | `KIT_API_KEY` | Kit (v4) API key — server only. Enables mailing-list + supporter sync. |
 | `KIT_FORM_ID` | Kit Form id new subscribers are added to (triggers your welcome sequence). |
 | `KIT_TAG_WEEKLY_ID` | Kit Tag id applied to active weekly supporters. |
