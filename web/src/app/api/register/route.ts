@@ -9,7 +9,7 @@ import {
   normalizeIgHandle,
   uniqueViolationMessage,
 } from "@/lib/villager-dedupe";
-import { uploadSelfie } from "@/lib/s3";
+import { uploadSelfie } from "@/lib/r2";
 import { NextRequest, NextResponse } from "next/server";
 
 // Cap the incoming selfie at ~1MB of data-URL text. Captures from the client are
