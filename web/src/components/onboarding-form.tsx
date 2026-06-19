@@ -305,13 +305,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           >
             Never mind, I&apos;m new here
           </button>
-
-          <a
-            href="/admin"
-            className="text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
-          >
-            Admin
-          </a>
         </form>
       </Reveal>
     );

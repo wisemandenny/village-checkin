@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import { AdminButton } from "@/components/admin-button";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geist.variable} ${domaine.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-[family-name:var(--font-geist)]">
+        <AdminButton />
         {children}
       </body>
     </html>
