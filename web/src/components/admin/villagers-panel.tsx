@@ -564,7 +564,7 @@ export default function VillagersPanel({ token }: { token: string }) {
                     onChange={(e) =>
                       setForm({ ...form, roles_text: e.target.value })
                     }
-                    placeholder="Producer, Vocalist, Musician, Founder"
+                    placeholder="Producer, Vocalist, Musician, Elder"
                     className="input"
                   />
                 </Field>
