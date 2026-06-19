@@ -6,3 +6,5 @@ dist/
 .expo/
 *.tsbuildinfo
 web/src/generated/
+.vercel
+.env*
