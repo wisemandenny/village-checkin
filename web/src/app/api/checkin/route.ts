@@ -27,6 +27,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Villager not found" }, { status: 404 });
   }
 
+  // Studio feature flags. Check-ins default ON (a missing row means open) so
+  // existing deployments keep recording visits; payments default OFF.
+  const { data: settingsRows } = await supabase
+    .from("studio_settings")
+    .select("key, value")
+    .in("key", ["payments_enabled", "checkins_enabled"]);
+  const settings = new Map((settingsRows ?? []).map((r) => [r.key, r.value]));
+  const checkinsEnabled = settings.get("checkins_enabled") !== false;
+  const paymentsEnabled = settings.get("payments_enabled") === true;
+
+  // When the studio has check-ins closed, no new visit is recorded. The client
+  // shows the "check-ins closed" landing instead (where villagers can still
+  // register, subscribe, and pay off a past session).
+  if (!checkinsEnabled) {
+    return NextResponse.json({ error: "checkins_disabled" }, { status: 403 });
+  }
+
   // Check for existing check-in today (skip for test accounts)
   if (!villager.test_account) {
     const now = new Date();
@@ -53,14 +70,6 @@ export async function POST(req: NextRequest) {
     .from("villagers")
     .update({ last_visited_at: new Date().toISOString() })
     .eq("id", villager.id);
-
-  // Whether the studio asks villagers to pay at all.
-  const { data: paySetting } = await supabase
-    .from("studio_settings")
-    .select("value")
-    .eq("key", "payments_enabled")
-    .maybeSingle();
-  const paymentsEnabled = paySetting?.value === true;
 
   // Exclusive tier eligibility drives which recurring pricing the client shows.
   const isExclusive = await resolveExclusive(supabase, {
