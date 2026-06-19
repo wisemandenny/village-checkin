@@ -5,9 +5,10 @@ import Image from "next/image";
 import { getOrCreateDeviceId } from "@/lib/device-id";
 import { OnboardingForm } from "@/components/onboarding-form";
 import { CheckInFlow } from "@/components/checkin-flow";
+import { CheckinsDisabled } from "@/components/checkins-disabled";
 import { AnimationProvider, Reveal } from "@/components/motion";
 
-type Screen = "loading" | "onboarding" | "checkin";
+type Screen = "loading" | "onboarding" | "checkin" | "disabled";
 type CheckInStep = "checking-in" | "payment" | "done";
 
 export default function Home() {
@@ -16,6 +17,7 @@ export default function Home() {
   const [displayName, setDisplayName] = useState<string>("");
   const [isNewRegistration, setIsNewRegistration] = useState(false);
   const [animationsEnabled, setAnimationsEnabled] = useState(false);
+  const [checkinsEnabled, setCheckinsEnabled] = useState(true);
 
   // Latest values read inside the popstate handler. Refs avoid stale closures
   // and re-binding the listener on every state change.
@@ -53,32 +55,42 @@ export default function Home() {
   );
 
   useEffect(() => {
-    // Resolve the animations feature flag up front so the whole onboarding
-    // subtree reads one value via context. Defaults to off until it loads.
-    fetch("/api/settings")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setAnimationsEnabled(data?.animations_enabled === true))
-      .catch(() => {});
-
     const { deviceId: id, isNew } = getOrCreateDeviceId();
     setDeviceId(id);
 
-    if (isNew) {
-      setScreen("onboarding");
-      return;
-    }
+    (async () => {
+      // Resolve feature flags up front. `animations_enabled` is read by the
+      // whole onboarding subtree via context; `checkins_enabled` decides
+      // whether a returning villager checks in or sees the closed landing.
+      let checkinsOn = true;
+      try {
+        const res = await fetch("/api/settings");
+        const data = res.ok ? await res.json() : null;
+        setAnimationsEnabled(data?.animations_enabled === true);
+        checkinsOn = data?.checkins_enabled !== false;
+        setCheckinsEnabled(checkinsOn);
+      } catch {
+        // Defaults: animations off, check-ins on.
+      }
 
-    fetch(`/api/villager?device_id=${encodeURIComponent(id)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+      if (isNew) {
+        setScreen("onboarding");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/villager?device_id=${encodeURIComponent(id)}`);
+        const data = res.ok ? await res.json() : null;
         if (data?.villager) {
           setDisplayName(data.villager.display_name);
-          setScreen("checkin");
+          setScreen(checkinsOn ? "checkin" : "disabled");
         } else {
           setScreen("onboarding");
         }
-      })
-      .catch(() => setScreen("onboarding"));
+      } catch {
+        setScreen("onboarding");
+      }
+    })();
   }, []);
 
   // Wire the browser Back button to the in-React navigation. A single history
@@ -172,6 +184,14 @@ export default function Home() {
               onComplete={(name, isNew) => {
                 setDisplayName(name);
                 setIsNewRegistration(isNew);
+                // With check-ins closed, registration still succeeds but no
+                // visit is recorded — drop the villager on the closed landing
+                // instead of the check-in flow. The registration persists, so
+                // there's no history-driven cleanup to wire up here.
+                if (!checkinsEnabled) {
+                  setScreen("disabled");
+                  return;
+                }
                 cleanedUpRef.current = false;
                 // Push a history entry so Back from the check-in flow returns
                 // here to registration rather than leaving the site.
@@ -189,6 +209,16 @@ export default function Home() {
               displayName={displayName}
               isNewRegistration={isNewRegistration}
               onCheckInState={handleCheckInState}
+            />
+          </Reveal>
+        )}
+
+        {screen === "disabled" && (
+          <Reveal className="flex w-full justify-center">
+            <CheckinsDisabled
+              deviceId={deviceId}
+              displayName={displayName}
+              isNewRegistration={isNewRegistration}
             />
           </Reveal>
         )}

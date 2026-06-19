@@ -8,6 +8,10 @@ interface SettingsPanelProps {
 }
 
 export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelProps) {
+  const [checkinsEnabled, setCheckinsEnabled] = useState(true);
+  const [checkinsSaving, setCheckinsSaving] = useState(false);
+  const [checkinsMessage, setCheckinsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +52,7 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       });
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
+      setCheckinsEnabled(data.checkins_enabled !== false);
       setPaymentsEnabled(data.payments_enabled === true);
       setAnimationsEnabled(data.animations_enabled === true);
       setMaintenanceMode(data.maintenance_mode === true);
@@ -79,6 +84,34 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setMessage({ type: "error", text: "Failed to update setting" });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function toggleCheckins() {
+    const newValue = !checkinsEnabled;
+    setCheckinsSaving(true);
+    setCheckinsMessage(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ key: "checkins_enabled", value: newValue }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setCheckinsEnabled(newValue);
+      setCheckinsMessage({
+        type: "success",
+        text: newValue
+          ? "Check-ins open — visits are recorded again."
+          : "Check-ins closed — visitors see the landing page (they can still register, subscribe, and pay off a past session).",
+      });
+    } catch {
+      setCheckinsMessage({ type: "error", text: "Failed to update setting" });
+    } finally {
+      setCheckinsSaving(false);
     }
   }
 
@@ -332,6 +365,48 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
         {maintenanceMessage && (
           <p className={`mt-3 text-sm ${maintenanceMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
             {maintenanceMessage.text}
+          </p>
+        )}
+      </div>
+
+      {/* Check-ins toggle */}
+      <div
+        className={`rounded-xl border bg-[var(--color-surface)] p-6 ${
+          checkinsEnabled ? "border-[var(--color-border)]" : "border-[var(--color-accent)]"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Check-ins</h3>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              When ON, visiting the site records a check-in. Turn OFF on non-studio days so
+              useless check-ins aren&rsquo;t captured — visitors then see a &ldquo;check-ins closed&rdquo;
+              page where they can still register, subscribe, and pay off a past session.
+            </p>
+          </div>
+          <button
+            onClick={toggleCheckins}
+            disabled={checkinsSaving}
+            aria-pressed={checkinsEnabled}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+              checkinsEnabled ? "bg-green-500" : "bg-[var(--color-border)]"
+            } ${checkinsSaving ? "opacity-50" : ""}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                checkinsEnabled ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+        {!checkinsEnabled && (
+          <p className="mt-3 text-sm font-medium text-[var(--color-accent)]">
+            Check-ins are currently closed.
+          </p>
+        )}
+        {checkinsMessage && (
+          <p className={`mt-3 text-sm ${checkinsMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+            {checkinsMessage.text}
           </p>
         )}
       </div>
