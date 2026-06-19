@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { setDeviceId } from "@/lib/device-id";
-import { ROLE_ORDER, INSTRUMENT_ORDER } from "@/lib/tag-order";
+import { ROLE_ORDER, INSTRUMENT_ORDER, Role } from "@/lib/tag-order";
 import {
   Reveal,
   Stagger,
@@ -103,11 +103,20 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
       const next = new Set(prev);
       if (next.has(role)) {
         next.delete(role);
-        if (role === "Musician") {
+        if (role === Role.Musician) {
           setInstruments(new Set());
           setCustomInstruments([]);
         }
+      } else if (role === Role.JustVibing) {
+        // "Just Vibing" is exclusive: selecting it clears every other role
+        // (and any instruments that came with Musician).
+        next.clear();
+        next.add(role);
+        setInstruments(new Set());
+        setCustomInstruments([]);
       } else {
+        // Selecting an active-participation role drops the exclusive "Just Vibing".
+        next.delete(Role.JustVibing);
         next.add(role);
       }
       return next;
@@ -165,7 +174,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     setIgHandle(normalizedIg);
 
     try {
-      const finalInstruments = roles.has("Musician")
+      const finalInstruments = roles.has(Role.Musician)
         ? buildInstrumentsList()
         : [];
 
