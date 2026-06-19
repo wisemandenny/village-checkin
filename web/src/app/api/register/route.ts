@@ -9,25 +9,11 @@ import {
   normalizeIgHandle,
   uniqueViolationMessage,
 } from "@/lib/villager-dedupe";
-import { uploadSelfie } from "@/lib/r2";
 import { NextRequest, NextResponse } from "next/server";
-
-// Cap the incoming selfie at ~1MB of data-URL text. Captures from the client are
-// downscaled well under this; the bound just rejects oversized/abusive payloads
-// before we decode and ship the bytes to S3.
-const MAX_SELFIE_CHARS = 1_000_000;
-
-function isValidSelfie(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^data:image\/(jpeg|png|webp);base64,/.test(value) &&
-    value.length <= MAX_SELFIE_CHARS
-  );
-}
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, display_name, email, ig_handle, roles, instruments, selfie } = body;
+  const { device_id, display_name, email, ig_handle, roles, instruments } = body;
   // Default to opted-in when the flag is omitted (preserves prior behavior).
   const marketing_opt_in =
     body.marketing_opt_in === undefined ? true : Boolean(body.marketing_opt_in);
@@ -95,21 +81,6 @@ export async function POST(req: NextRequest) {
       );
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // Upload the registration selfie to S3 and store its URL. Best-effort: a bad
-  // image or an S3 hiccup must never fail registration. Keyed by villager id so
-  // a later retake overwrites it.
-  if (isValidSelfie(selfie)) {
-    try {
-      const url = await uploadSelfie(selfie, data.id);
-      if (url) {
-        await supabase.from("villagers").update({ selfie_url: url }).eq("id", data.id);
-        data.selfie_url = url;
-      }
-    } catch (err) {
-      console.error("Selfie upload failed", err);
-    }
   }
 
   // Mirror the opt-in choice into Kit. Non-blocking: a Kit failure must not

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { setDeviceId } from "@/lib/device-id";
 import { ROLE_ORDER, INSTRUMENT_ORDER, Role } from "@/lib/tag-order";
-import { SelfieCapture } from "@/components/selfie-capture";
 import {
   Reveal,
   Stagger,
@@ -37,7 +36,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const [customInstruments, setCustomInstruments] = useState<{ id: number; value: string }[]>([]);
   const nextCustomId = useRef(0);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
-  const [selfie, setSelfie] = useState<string | null>(null);
   const [recoverIg, setRecoverIg] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -191,7 +189,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           roles: [...roles],
           instruments: finalInstruments.length ? finalInstruments : undefined,
           marketing_opt_in: marketingOptIn,
-          selfie: selfie || undefined,
         }),
       });
 
@@ -484,10 +481,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
               />
             </span>
           </button>
-        </Reveal>
-
-        <Reveal>
-          <SelfieCapture value={selfie} onChange={setSelfie} />
         </Reveal>
 
         {error && (
