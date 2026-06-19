@@ -404,7 +404,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
                 <span className="text-[var(--color-muted)]">•••• {card.last4}</span>
               </span>
               <span className="font-semibold text-[var(--color-accent)]">
-                {chargingSaved ? "Paying..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
+                {chargingSaved ? "Paying..." : `Pay $${Math.round(selectedAmount / 100)}`}
               </span>
             </button>
           ))}
@@ -429,7 +429,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
           disabled={loading}
           className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
         >
-          {loading ? "Setting up..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
+          {loading ? "Setting up..." : `Pay $${Math.round(selectedAmount / 100)}`}
         </button>
       )}
       </div>
