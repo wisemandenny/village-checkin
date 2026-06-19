@@ -142,11 +142,10 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
       <div className="flex flex-col items-center gap-2">
         <h2 className="text-3xl font-bold font-[family-name:var(--font-domaine)]">
-          {firstName ? `Hey ${firstName}!` : "Welcome!"}
+          {firstName ? `Welcome, ${firstName}!` : "Welcome!"}
         </h2>
         <p className="text-[var(--color-muted)]">
-          Check-ins are closed right now — there&rsquo;s no studio session to check in to today.
-          You&rsquo;re all set; come back when the studio is open.
+          Check-ins are closed right now.
         </p>
       </div>
 
@@ -156,7 +155,7 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left">
               <h3 className="font-semibold">Support the Village</h3>
               <p className="mt-1 text-sm text-[var(--color-muted)]">
-                Become a monthly supporter — your pledge keeps the studio open.
+                Become a monthly supporter — $10/month keeps the Village alive.
               </p>
               <button
                 onClick={() => setView("subscribe")}
