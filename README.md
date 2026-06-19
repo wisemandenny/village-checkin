@@ -67,6 +67,9 @@ npx expo start
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (browser) |
 | `ADMIN_PASSWORD` | Fallback admin password (if not set in DB) |
 | `STRIPE_SUPPORTER_PRODUCT_ID` | (Recommended) Stripe Product id for recurring support. If unset, one is created on demand. |
+| `R2_SELFIE_BUCKET` | Private Cloudflare R2 bucket for villager selfies shown on the "who's here" board. Served back through the app's `/api/selfie` route (no public bucket/domain). If unset, selfie capture is skipped (registration works as before). |
+| `R2_ACCOUNT_ID` | Cloudflare account id — used to build the R2 S3 API endpoint. |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 API token credentials scoped to Object Read & Write on the bucket (server only). |
 | `KIT_API_KEY` | Kit (v4) API key — server only. Enables mailing-list + supporter sync. |
 | `KIT_FORM_ID` | Kit Form id new subscribers are added to (triggers your welcome sequence). |
 | `KIT_TAG_WEEKLY_ID` | Kit Tag id applied to active weekly supporters. |

@@ -21,6 +21,7 @@ export interface Villager {
   kit_subscriber_id: string | null;
   avatar_head: number | null;
   avatar_body: number | null;
+  selfie_url: string | null;
   first_visited_at: string;
   last_visited_at: string | null;
   subscription?: VillagerSubscriptionSummary | null;
