@@ -23,7 +23,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("check_ins")
     .select(
-      "created_at, villagers!inner(id, display_name, avatar_head, avatar_body, selfie_url, test_account)"
+      "created_at, villagers!inner(id, display_name, avatar_head, avatar_body, test_account)"
     )
     .in("status", ["paid", "pending", "skipped"])
     .eq("villagers.test_account", false)
@@ -43,7 +43,6 @@ export async function GET() {
     display_name: string;
     avatar_head: number | null;
     avatar_body: number | null;
-    selfie_url: string | null;
   }[] = [];
 
   for (const row of data ?? []) {
@@ -52,7 +51,6 @@ export async function GET() {
       display_name: string;
       avatar_head: number | null;
       avatar_body: number | null;
-      selfie_url: string | null;
     } | null;
     if (!v || seen.has(v.id)) continue;
     seen.add(v.id);
@@ -61,7 +59,6 @@ export async function GET() {
       display_name: v.display_name,
       avatar_head: v.avatar_head,
       avatar_body: v.avatar_body,
-      selfie_url: v.selfie_url,
     });
   }
 

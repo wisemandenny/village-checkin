@@ -118,7 +118,6 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
   const [error, setError] = useState<string | null>(null);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [chargingSaved, setChargingSaved] = useState(false);
-  const [cashPending, setCashPending] = useState(false);
 
   // Recurring config (exclusive only): a fixed $10/month support base plus the
   // processing fee, billed monthly.
@@ -257,47 +256,6 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
     setSubClientSecret(null);
     setError(null);
   }, []);
-
-  const handleCashSelect = useCallback(async () => {
-    if (!checkInId) return;
-    setError(null);
-    setLoading(true);
-    try {
-      await fetch("/api/checkin/update", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ check_in_id: checkInId, payment_method: "cash" }),
-      });
-    } catch {
-      // Non-critical — still show the waiting screen even if the update fails
-    } finally {
-      setLoading(false);
-    }
-    setCashPending(true);
-  }, [checkInId]);
-
-  if (cashPending) {
-    return (
-      <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 text-4xl">
-          💵
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-3xl font-bold font-[family-name:var(--font-domaine)]">Pay with Cash</h2>
-          <p className="text-[var(--color-muted)]">
-            Go find Corey or Denny. This screen will update automatically once your payment is confirmed.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setCashPending(false)}
-          className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
-        >
-          &larr; Back to payment options
-        </button>
-      </div>
-    );
-  }
 
   if (subClientSecret) {
     return (
@@ -474,20 +432,6 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
           {loading ? "Setting up..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
         </button>
       )}
-
-      <div className="flex w-full items-center gap-3 text-xs text-[var(--color-muted)]">
-        <hr className="flex-1 border-[var(--color-border)]" />
-        or
-        <hr className="flex-1 border-[var(--color-border)]" />
-      </div>
-
-      <button
-        onClick={handleCashSelect}
-        disabled={loading || chargingSaved}
-        className="h-14 w-full rounded-2xl border border-[var(--color-border)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] transition hover:border-[var(--color-foreground)] disabled:opacity-50"
-      >
-        Pay with Cash
-      </button>
       </div>
       )}
 
