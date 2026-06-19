@@ -70,7 +70,10 @@ function buildStripeAppearance(isDark: boolean): Appearance {
 }
 
 interface PaymentStepProps {
-  checkInId: string;
+  // Optional: the recurring (subscribe) flow can run without a check-in, e.g.
+  // an exclusive member subscribing from the "check-ins closed" landing page.
+  // The one-time flow always has one.
+  checkInId?: string | null;
   deviceId: string;
   isExclusive?: boolean;
   isNewRegistration?: boolean;
@@ -103,7 +106,7 @@ const BRAND_DISPLAY: Record<string, string> = {
   discover: "Discover",
 };
 
-export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
+export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
   // Exclusive villagers commit to a recurring pledge only; everyone else gets
   // the one-time flow. The mode is fixed by tier, so there is no toggle.
   const mode: "once" | "recurring" = isExclusive ? "recurring" : "once";
@@ -494,7 +497,7 @@ function CheckoutForm({
   recurringInterval,
   isNewRegistration = false,
 }: {
-  checkInId: string;
+  checkInId?: string | null;
   totalCents: number;
   onComplete: (paid?: boolean) => void;
   recurringInterval?: "week" | "month";
@@ -519,9 +522,14 @@ function CheckoutForm({
       return;
     }
 
-    // This form only renders inside the check-in flow, so a 3DS redirect
-    // should return to the check-in success page.
-    const returnUrl = `${window.location.origin}/success?check_in_id=${checkInId}${isNewRegistration ? "&new=1" : ""}`;
+    // A 3DS redirect should return to the success page. The check-in id is
+    // included when present (the subscribe-without-checkin path has none).
+    const returnUrl = `${window.location.origin}/success?${[
+      checkInId ? `check_in_id=${checkInId}` : null,
+      isNewRegistration ? "new=1" : null,
+    ]
+      .filter(Boolean)
+      .join("&")}`;
 
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
