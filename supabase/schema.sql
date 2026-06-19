@@ -22,6 +22,10 @@ create table villagers (
   -- until the villager picks one on the "who's here" board.
   avatar_head smallint check (avatar_head between 1 and 1025),
   avatar_body smallint check (avatar_body between 1 and 1025),
+  -- Selfie taken at first registration: app path (/api/selfie/<id>.<ext>) for a
+  -- JPEG in a private Cloudflare R2 bucket, shown on the "who's here" board. NULL
+  -- until taken; falls back to the fusion avatar.
+  selfie_url text,
   first_visited_at timestamptz not null default now(),
   last_visited_at  timestamptz
 );
