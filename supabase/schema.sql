@@ -22,6 +22,10 @@ create table villagers (
   -- until the villager picks one on the "who's here" board.
   avatar_head smallint check (avatar_head between 1 and 1025),
   avatar_body smallint check (avatar_body between 1 and 1025),
+  -- Selfie taken at first registration: app path (/api/selfie/<id>.<ext>) for a
+  -- JPEG in a private Cloudflare R2 bucket, shown on the "who's here" board. NULL
+  -- until taken; falls back to the fusion avatar.
+  selfie_url text,
   first_visited_at timestamptz not null default now(),
   last_visited_at  timestamptz
 );
@@ -115,6 +119,10 @@ create table studio_settings (
 );
 
 insert into studio_settings (key, value) values ('payments_enabled', 'false');
+-- Check-ins toggle: when false, visiting the site no longer records a check-in.
+-- Villagers can still register, subscribe, and pay off a past unpaid session.
+-- ON by default so the studio captures visits unless explicitly closed.
+insert into studio_settings (key, value) values ('checkins_enabled', 'true');
 insert into studio_settings (key, value) values ('admin_password', 'null');
 -- Maintenance mode: when true, the whole site is locked down (only the admin
 -- panel and Stripe webhooks stay reachable). OFF by default.

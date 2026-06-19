@@ -70,7 +70,10 @@ function buildStripeAppearance(isDark: boolean): Appearance {
 }
 
 interface PaymentStepProps {
-  checkInId: string;
+  // Optional: the recurring (subscribe) flow can run without a check-in, e.g.
+  // an exclusive member subscribing from the "check-ins closed" landing page.
+  // The one-time flow always has one.
+  checkInId?: string | null;
   deviceId: string;
   isExclusive?: boolean;
   isNewRegistration?: boolean;
@@ -103,7 +106,7 @@ const BRAND_DISPLAY: Record<string, string> = {
   discover: "Discover",
 };
 
-export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
+export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
   // Exclusive villagers commit to a recurring pledge only; everyone else gets
   // the one-time flow. The mode is fixed by tier, so there is no toggle.
   const mode: "once" | "recurring" = isExclusive ? "recurring" : "once";
@@ -115,6 +118,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
   const [error, setError] = useState<string | null>(null);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [chargingSaved, setChargingSaved] = useState(false);
+  const [cashPending, setCashPending] = useState(false);
 
   // Recurring config (exclusive only): a fixed $10/month support base plus the
   // processing fee, billed monthly.
@@ -253,6 +257,47 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
     setSubClientSecret(null);
     setError(null);
   }, []);
+
+  const handleCashSelect = useCallback(async () => {
+    if (!checkInId) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await fetch("/api/checkin/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ check_in_id: checkInId, payment_method: "cash" }),
+      });
+    } catch {
+      // Non-critical — still show the waiting screen even if the update fails
+    } finally {
+      setLoading(false);
+    }
+    setCashPending(true);
+  }, [checkInId]);
+
+  if (cashPending) {
+    return (
+      <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 text-4xl">
+          💵
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-3xl font-bold font-[family-name:var(--font-domaine)]">Pay with Cash</h2>
+          <p className="text-[var(--color-muted)]">
+            Go find Corey or Denny. This screen will update automatically once your payment is confirmed.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCashPending(false)}
+          className="text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
+        >
+          &larr; Back to payment options
+        </button>
+      </div>
+    );
+  }
 
   if (subClientSecret) {
     return (
@@ -429,6 +474,20 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
           {loading ? "Setting up..." : `Pay $${((selectedAmount + calcProcessingFee(selectedAmount)) / 100).toFixed(2)}`}
         </button>
       )}
+
+      <div className="flex w-full items-center gap-3 text-xs text-[var(--color-muted)]">
+        <hr className="flex-1 border-[var(--color-border)]" />
+        or
+        <hr className="flex-1 border-[var(--color-border)]" />
+      </div>
+
+      <button
+        onClick={handleCashSelect}
+        disabled={loading || chargingSaved}
+        className="h-14 w-full rounded-2xl border border-[var(--color-border)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] transition hover:border-[var(--color-foreground)] disabled:opacity-50"
+      >
+        Pay with Cash
+      </button>
       </div>
       )}
 
@@ -441,7 +500,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
               <div
                 className={`rounded-lg border px-3 py-5 text-2xl font-bold font-[family-name:var(--font-domaine)] ${bill.border} ${bill.bg} ${bill.text} ring-2 ring-[var(--color-accent)]/40`}
               >
-                $ {(recurringChargeCents / 100).toFixed(2)}
+                $ {(exclusiveSupportCents / 100).toFixed(2)}
                 <span className="text-base font-medium"> / mo</span>
               </div>
             </div>
@@ -471,7 +530,7 @@ export function PaymentStep({ checkInId, deviceId, isExclusive = false, isNewReg
           disabled={loading}
           className="h-14 w-full rounded-2xl bg-[var(--color-accent)] px-4 text-lg font-semibold font-[family-name:var(--font-domaine)] text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
         >
-          {loading ? "Setting up..." : `Support $${(recurringChargeCents / 100).toFixed(2)}/mo`}
+          {loading ? "Setting up..." : "Subscribe"}
         </button>
       </div>
       )}
@@ -494,7 +553,7 @@ function CheckoutForm({
   recurringInterval,
   isNewRegistration = false,
 }: {
-  checkInId: string;
+  checkInId?: string | null;
   totalCents: number;
   onComplete: (paid?: boolean) => void;
   recurringInterval?: "week" | "month";
@@ -519,9 +578,14 @@ function CheckoutForm({
       return;
     }
 
-    // This form only renders inside the check-in flow, so a 3DS redirect
-    // should return to the check-in success page.
-    const returnUrl = `${window.location.origin}/success?check_in_id=${checkInId}${isNewRegistration ? "&new=1" : ""}`;
+    // A 3DS redirect should return to the success page. The check-in id is
+    // included when present (the subscribe-without-checkin path has none).
+    const returnUrl = `${window.location.origin}/success?${[
+      checkInId ? `check_in_id=${checkInId}` : null,
+      isNewRegistration ? "new=1" : null,
+    ]
+      .filter(Boolean)
+      .join("&")}`;
 
     const { error: confirmError } = await stripe.confirmPayment({
       elements,

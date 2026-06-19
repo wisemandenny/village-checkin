@@ -1,0 +1,35 @@
+name: Keep Supabase active
+
+# Supabase pauses free-tier projects after ~7 days without activity. Run a
+# trivial query every 4 days so production (and staging) stay awake.
+#
+# `*/4` on day-of-month fires on days 1, 5, 9, … 29; the largest gap (day 29 →
+# the 1st of the next month) is at most 3 days, comfortably under the 7-day
+# pause threshold. Also exposed as a manual trigger for ad-hoc pings.
+on:
+  schedule:
+    - cron: "0 12 */4 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      # psql is preinstalled on ubuntu-latest. We only run `SELECT 1`, so the
+      # client major version does not need to match the server (unlike pg_dump).
+      - name: Ping production
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select 1;"
+
+      # Staging may not always be configured; skip rather than fail when its
+      # secret is absent.
+      - name: Ping staging
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "STAGING_DATABASE_URL not set; skipping."
+            exit 0
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select 1;"

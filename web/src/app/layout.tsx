@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-context";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AdminButton } from "@/components/admin-button";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
@@ -44,6 +45,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col font-[family-name:var(--font-geist)]">
         <ThemeProvider>
           <ThemeToggle />
+          <AdminButton />
           {children}
         </ThemeProvider>
       </body>

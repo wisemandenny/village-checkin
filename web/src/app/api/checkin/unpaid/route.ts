@@ -1,18 +1,17 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
-import { resolveExclusive, ELDER_ROLE } from "@/lib/exclusive-tier";
+import { resolveExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
-// Returns the villager's check-in for today (most recent), so the phone can
-// reflect the real payment status — e.g. after an admin records a cash payment.
+// Lists a villager's past check-ins that were never paid for (status not
+// "paid"), so they can settle a session they attended but didn't pay for —
+// notably while check-ins are closed. Also returns the tier/subscription flags
+// the payment screen needs.
 export async function GET(req: NextRequest) {
   const deviceId = req.nextUrl.searchParams.get("device_id");
 
   if (!deviceId) {
-    return NextResponse.json(
-      { error: "device_id is required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "device_id is required" }, { status: 400 });
   }
 
   const supabase = createServerClient();
@@ -27,27 +26,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Villager not found" }, { status: 404 });
   }
 
-  const now = new Date();
-  const todayStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  ).toISOString();
-  const tomorrowStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1
-  ).toISOString();
-
-  const { data: checkIn } = await supabase
+  const { data: checkIns } = await supabase
     .from("check_ins")
     .select("id, status, payment_method, intent_amount, created_at")
     .eq("villager_id", villager.id)
-    .gte("created_at", todayStart)
-    .lt("created_at", tomorrowStart)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .neq("status", "paid")
+    .order("created_at", { ascending: false });
 
   const { data: subscriptions } = await supabase
     .from("subscriptions")
@@ -58,20 +42,15 @@ export async function GET(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
-  // Exclusive tier eligibility drives which recurring pricing the payment
-  // screen shows, so the already-checked-in path can offer payment too.
   const isExclusive = await resolveExclusive(supabase, {
     id: villager.id,
     ig_handle: villager.ig_handle,
     roles: villager.roles,
   });
 
-  const isElder = (villager.roles ?? []).some((r: string) => r.toLowerCase() === ELDER_ROLE);
-
   return NextResponse.json({
-    check_in: checkIn ?? null,
+    check_ins: checkIns ?? [],
     has_active_subscription: hasActiveSubscription,
     is_exclusive: isExclusive,
-    is_elder: isElder,
   });
 }
