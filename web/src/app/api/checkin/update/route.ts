@@ -3,18 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { check_in_id, status, stripe_transaction_id } = body;
+  const { check_in_id, status, payment_method, stripe_transaction_id } = body;
 
-  if (!check_in_id || !status) {
+  if (!check_in_id || (!status && !payment_method)) {
     return NextResponse.json(
-      { error: "check_in_id and status are required" },
+      { error: "check_in_id and at least one of status or payment_method are required" },
       { status: 400 }
     );
   }
 
   const supabase = createServerClient();
 
-  const update: Record<string, string> = { status };
+  const update: Record<string, string> = {};
+  if (status) update.status = status;
+  if (payment_method) update.payment_method = payment_method;
   if (stripe_transaction_id) {
     update.stripe_transaction_id = stripe_transaction_id;
   }
