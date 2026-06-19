@@ -138,6 +138,19 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
 
   const canSubscribe = isExclusive && !hasActiveSubscription;
 
+  // Decide whether to nag about settling a past session.
+  // - One-time payers (non-exclusive): always nag for any unpaid visit.
+  // - Exclusive-tier supporters (subscribers): only nag once an unpaid visit
+  //   has rolled into a prior billing cycle. Visits from the current cycle
+  //   (this calendar month) are still "current"; an unpaid visit from a
+  //   previous cycle (an earlier month) means they owe for a closed period.
+  const startOfCurrentCycle = new Date();
+  startOfCurrentCycle.setDate(1);
+  startOfCurrentCycle.setHours(0, 0, 0, 0);
+  const showUnpaid = isExclusive
+    ? unpaid.some((c) => new Date(c.created_at) < startOfCurrentCycle)
+    : unpaid.length > 0;
+
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
       <div className="flex flex-col items-center gap-2">
@@ -149,7 +162,7 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
         </p>
       </div>
 
-      {!loading && (canSubscribe || unpaid.length > 0) && (
+      {!loading && (canSubscribe || showUnpaid) && (
         <div className="w-full space-y-4">
           {canSubscribe && (
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left">
@@ -166,7 +179,7 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
             </div>
           )}
 
-          {unpaid.length > 0 && (
+          {showUnpaid && (
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left">
               <h3 className="font-semibold">Pay for a past session</h3>
               <p className="mt-1 text-sm text-[var(--color-muted)]">
