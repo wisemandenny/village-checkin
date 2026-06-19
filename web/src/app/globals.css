@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
+/*
+ * Force light mode. Redefining the `dark` variant to key off a `.dark`
+ * ancestor (which we never add) instead of `prefers-color-scheme` means the
+ * `dark:` utilities sprinkled across components stay dormant. The CSS variables
+ * below are light-only for the same reason.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --color-background: #ffffff;
   --color-foreground: #1a1a1a;
   --color-accent: #dc2626;
@@ -8,18 +17,6 @@
   --color-muted: #6b7280;
   --color-surface: #fafafa;
   --color-border: #e5e7eb;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0a0a0a;
-    --color-foreground: #f0f0f0;
-    --color-accent: #ef4444;
-    --color-accent-light: #f87171;
-    --color-muted: #9ca3af;
-    --color-surface: #141414;
-    --color-border: #262626;
-  }
 }
 
 body {
