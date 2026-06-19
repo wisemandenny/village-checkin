@@ -3,7 +3,17 @@
 // order. Values not in the canonical list are appended afterwards, sorted
 // alphabetically, so display stays stable regardless of storage order.
 
-export const ROLE_ORDER = ["Producer", "Vocalist", "Musician", "Just Vibing"] as const;
+// Canonical roles a villager can pick during onboarding. "Just Vibing" is
+// mutually exclusive with the active-participation roles (see the onboarding
+// form): picking it clears the others, and picking any other role clears it.
+export enum Role {
+  Producer = "Producer",
+  Vocalist = "Vocalist",
+  Musician = "Musician",
+  JustVibing = "Just Vibing",
+}
+
+export const ROLE_ORDER = [Role.Producer, Role.Vocalist, Role.Musician, Role.JustVibing] as const;
 
 export const INSTRUMENT_ORDER = [
   "Keys",
