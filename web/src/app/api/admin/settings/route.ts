@@ -25,6 +25,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Check-ins default ON when the row is missing (e.g. a DB that predates the
+  // setting) so the toggle reflects the real behavior.
+  settings.checkins_enabled = settings.checkins_enabled !== false;
+
   // Maintenance mode is stored per-environment; expose the value for THIS
   // environment under the stable logical `maintenance_mode` key the UI uses.
   settings.maintenance_mode = settings[maintenanceKey()] === true;
@@ -43,7 +47,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "key and value are required" }, { status: 400 });
   }
 
-  const allowedKeys = ["payments_enabled", "animations_enabled", "admin_password", "maintenance_mode"];
+  const allowedKeys = ["payments_enabled", "animations_enabled", "checkins_enabled", "admin_password", "maintenance_mode"];
   if (!allowedKeys.includes(key)) {
     return NextResponse.json({ error: "Invalid setting key" }, { status: 400 });
   }
