@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
+/*
+ * Class-based dark mode: the `dark` variant keys off a `.dark` ancestor on
+ * <html>. The ThemeProvider toggler adds/removes that class and persists the
+ * choice in localStorage; an inline script in layout.tsx re-applies it before
+ * React hydrates so there is no flash of the wrong theme.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --color-background: #ffffff;
   --color-foreground: #1a1a1a;
   --color-accent: #dc2626;
@@ -10,16 +19,15 @@
   --color-border: #e5e7eb;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0a0a0a;
-    --color-foreground: #f0f0f0;
-    --color-accent: #ef4444;
-    --color-accent-light: #f87171;
-    --color-muted: #9ca3af;
-    --color-surface: #141414;
-    --color-border: #262626;
-  }
+.dark {
+  color-scheme: dark;
+  --color-background: #111111;
+  --color-foreground: #f0f0f0;
+  --color-accent: #ef4444;
+  --color-accent-light: #f87171;
+  --color-muted: #9ca3af;
+  --color-surface: #1c1c1c;
+  --color-border: #2e2e2e;
 }
 
 body {

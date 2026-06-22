@@ -1,6 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
-import { resolveExclusive } from "@/lib/exclusive-tier";
+import { resolveExclusive, ELDER_ROLE } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -89,13 +89,19 @@ export async function POST(req: NextRequest) {
     ACTIVE_STATUSES.has(s.status as string)
   );
 
+  const isElder = (villager.roles ?? []).some((r: string) => r.toLowerCase() === ELDER_ROLE);
+
   // Decide how this visit is recorded:
+  // - elder role      → permanently exempt from payment (paid)
   // - active pledge   → covered by the subscription (paid)
   // - payments off    → nothing owed (skipped)
   // - otherwise       → payment expected, deferred until they complete it (pending)
   let insertMethod: string;
   let insertStatus: string;
-  if (hasActiveSubscription) {
+  if (isElder) {
+    insertMethod = "elder";
+    insertStatus = "paid";
+  } else if (hasActiveSubscription) {
     insertMethod = "subscription";
     insertStatus = "paid";
   } else if (!paymentsEnabled) {
@@ -127,6 +133,7 @@ export async function POST(req: NextRequest) {
       check_in: checkIn,
       has_active_subscription: hasActiveSubscription,
       is_exclusive: isExclusive,
+      is_elder: isElder,
     },
     { status: 201 }
   );

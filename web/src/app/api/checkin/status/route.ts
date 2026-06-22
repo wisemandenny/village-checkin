@@ -1,6 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
-import { resolveExclusive } from "@/lib/exclusive-tier";
+import { resolveExclusive, ELDER_ROLE } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 // Returns the villager's check-in for today (most recent), so the phone can
@@ -66,9 +66,12 @@ export async function GET(req: NextRequest) {
     roles: villager.roles,
   });
 
+  const isElder = (villager.roles ?? []).some((r: string) => r.toLowerCase() === ELDER_ROLE);
+
   return NextResponse.json({
     check_in: checkIn ?? null,
     has_active_subscription: hasActiveSubscription,
     is_exclusive: isExclusive,
+    is_elder: isElder,
   });
 }

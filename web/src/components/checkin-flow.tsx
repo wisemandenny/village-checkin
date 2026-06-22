@@ -31,6 +31,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [isElder, setIsElder] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
   // True when this visit's check-in row predates this session (the server
@@ -66,12 +67,13 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       if (isCancelled()) return;
       const statusData = statusRes.ok
         ? await statusRes.json()
-        : { check_in: null, has_active_subscription: false, is_exclusive: false };
+        : { check_in: null, has_active_subscription: false, is_exclusive: false, is_elder: false };
       if (isCancelled()) return;
 
       const check_in = statusData.check_in;
       setHasActiveSubscription(statusData.has_active_subscription === true);
       setIsExclusive(statusData.is_exclusive === true);
+      setIsElder(statusData.is_elder === true);
       setAlreadyCheckedIn(true);
       if (check_in?.id) setCheckInId(check_in.id);
 
@@ -80,6 +82,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       } else if (
         paymentsEnabledFlag &&
         statusData.has_active_subscription !== true &&
+        statusData.is_elder !== true &&
         check_in?.id
       ) {
         setStep("payment");
@@ -118,12 +121,13 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
         }
         if (!checkinRes.ok) throw new Error("Check-in failed");
 
-        const { check_in, has_active_subscription, is_exclusive } = await checkinRes.json();
+        const { check_in, has_active_subscription, is_exclusive, is_elder } = await checkinRes.json();
         setCheckInId(check_in.id);
         setIsExclusive(is_exclusive === true);
         setHasActiveSubscription(has_active_subscription === true);
+        setIsElder(is_elder === true);
 
-        if (settings.payments_enabled === true && !has_active_subscription) {
+        if (settings.payments_enabled === true && !has_active_subscription && !is_elder) {
           setStep("payment");
         } else {
           setStep("done");
@@ -192,11 +196,12 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
                       return;
                     }
                     if (!res.ok) throw new Error("Check-in failed");
-                    const { check_in, has_active_subscription, is_exclusive } = await res.json();
+                    const { check_in, has_active_subscription, is_exclusive, is_elder } = await res.json();
                     setCheckInId(check_in.id);
                     setIsExclusive(is_exclusive === true);
                     setHasActiveSubscription(has_active_subscription === true);
-                    if (paymentsEnabled && !has_active_subscription) {
+                    setIsElder(is_elder === true);
+                    if (paymentsEnabled && !has_active_subscription && !is_elder) {
                       setStep("payment");
                     } else {
                       setStep("done");

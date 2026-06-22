@@ -6,6 +6,10 @@ type SupabaseClient = ReturnType<typeof createServerClient>;
 // the card processing fee) tier.
 export const EXCLUSIVE_ROLE = "exclusive";
 
+// Role granted to members who are permanently exempt from payment requirements
+// regardless of whether they hold an active subscription.
+export const ELDER_ROLE = "elder";
+
 // studio_settings key holding the permanent allowlist of eligible IG handles.
 const SETTINGS_KEY = "exclusive_handles";
 
