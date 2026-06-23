@@ -195,7 +195,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
   const [error, setError] = useState("");
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
-  const [todayOnly, setTodayOnly] = useState(true);
+  const [last24hOnly, setLast24hOnly] = useState(true);
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -417,36 +417,16 @@ export default function CheckInsPanel({ token }: { token: string }) {
   }
 
   const displayedCheckins = useMemo(() => {
-    if (!todayOnly) return checkins;
-    const now = new Date();
-    const startOfDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
-    const startOfNextDay = new Date(startOfDay);
-    startOfNextDay.setDate(startOfNextDay.getDate() + 1);
-    return checkins.filter((c) => {
-      const d = new Date(c.created_at);
-      return d >= startOfDay && d < startOfNextDay;
-    });
-  }, [checkins, todayOnly]);
+    if (!last24hOnly) return checkins;
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return checkins.filter((c) => new Date(c.created_at).getTime() >= cutoff);
+  }, [checkins, last24hOnly]);
 
-  const todayStats = useMemo(() => {
-    if (!todayOnly) return null;
+  const last24hStats = useMemo(() => {
+    if (!last24hOnly) return null;
 
-    const now = new Date();
-    const startOfDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
-    const startOfNextDay = new Date(startOfDay);
-    startOfNextDay.setDate(startOfNextDay.getDate() + 1);
-    const isToday = (iso: string) => {
-      const d = new Date(iso);
-      return d >= startOfDay && d < startOfNextDay;
-    };
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const isRecent = (iso: string) => new Date(iso).getTime() >= cutoff;
 
     const paid = displayedCheckins.filter(
       (c) => c.status === "paid" && c.payment_method !== "subscription"
@@ -457,8 +437,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
       displayedCheckins.map((c) => c.villager_id)
     ).size;
 
-    // A villager is "new today" when their earliest check-in across all
-    // history falls on today.
+    // A villager is "new" when their earliest check-in across all
+    // history falls within the past 24 hours.
     const firstSeen = new Map<string, number>();
     for (const c of allCheckins) {
       const t = new Date(c.created_at).getTime();
@@ -468,7 +448,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
     let newVillagers = 0;
     for (const vid of new Set(displayedCheckins.map((c) => c.villager_id))) {
       const first = firstSeen.get(vid);
-      if (first !== undefined && isToday(new Date(first).toISOString())) {
+      if (first !== undefined && isRecent(new Date(first).toISOString())) {
         newVillagers++;
       }
     }
@@ -480,7 +460,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       uniqueVillagers,
       newVillagers,
     };
-  }, [todayOnly, displayedCheckins, allCheckins]);
+  }, [last24hOnly, displayedCheckins, allCheckins]);
 
   const villagerStats = useMemo(() => {
     if (!filterVillagerId || checkins.length === 0) return null;
@@ -601,7 +581,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
         <div>
           <h2 className="text-xl font-bold">Check-ins</h2>
           <p className="text-sm text-[var(--color-muted)]">
-            {displayedCheckins.length} {todayOnly ? "today" : "total"}
+            {displayedCheckins.length} {last24hOnly ? "in the past 24 hours" : "total"}
           </p>
         </div>
         <button
@@ -629,32 +609,32 @@ export default function CheckInsPanel({ token }: { token: string }) {
         <label className="flex cursor-pointer items-center gap-2 text-sm font-medium select-none">
           <input
             type="checkbox"
-            checked={todayOnly}
-            onChange={(e) => setTodayOnly(e.target.checked)}
+            checked={last24hOnly}
+            onChange={(e) => setLast24hOnly(e.target.checked)}
             className="h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-accent)]"
           />
-          Today only
+          Past 24 hours
         </label>
       </div>
 
-      {/* Today Stats */}
-      {todayStats && (
+      {/* Past 24h Stats */}
+      {last24hStats && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Check-ins Today" value={String(todayStats.count)} />
-          <StatCard label="Total Today" value={formatCents(todayStats.total)} />
+          <StatCard label="Check-ins (24h)" value={String(last24hStats.count)} />
+          <StatCard label="Total (24h)" value={formatCents(last24hStats.total)} />
           <StatCard
-            label="Avg Payment Today"
-            value={formatCents(Math.round(todayStats.avgPayment))}
+            label="Avg Payment (24h)"
+            value={formatCents(Math.round(last24hStats.avgPayment))}
           />
           {!filterVillagerId && (
             <>
               <StatCard
-                label="Villagers Today"
-                value={String(todayStats.uniqueVillagers)}
+                label="Villagers (24h)"
+                value={String(last24hStats.uniqueVillagers)}
               />
               <StatCard
-                label="New Villagers Today"
-                value={String(todayStats.newVillagers)}
+                label="New Villagers (24h)"
+                value={String(last24hStats.newVillagers)}
               />
             </>
           )}
@@ -662,7 +642,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       )}
 
       {/* Villager Stats */}
-      {!todayOnly && villagerStats && (
+      {!last24hOnly && villagerStats && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <StatCard label="Total Check-ins" value={String(villagerStats.totalCheckins)} />
           <StatCard
@@ -687,7 +667,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       )}
 
       {/* Global Stats (All Villagers) */}
-      {!todayOnly && globalStats && (
+      {!last24hOnly && globalStats && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label="This Week's Check-ins" value={String(globalStats.weekCheckins)} />
           <StatCard label="This Week's Total" value={formatCents(globalStats.weekTotal)} />
@@ -755,7 +735,9 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   colSpan={7}
                   className="px-4 py-12 text-center text-[var(--color-muted)]"
                 >
-                  {todayOnly ? "No check-ins today." : "No check-ins found."}
+                  {last24hOnly
+                    ? "No check-ins in the past 24 hours."
+                    : "No check-ins found."}
                 </td>
               </tr>
             )}
