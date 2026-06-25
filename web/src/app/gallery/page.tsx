@@ -62,7 +62,7 @@ export default function GalleryPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadGallery = useCallback(async () => {
@@ -101,87 +101,107 @@ export default function GalleryPage() {
 
   const canUpload = configured && me && checkedIn && !uploading;
 
-  async function handleSubmit() {
-    if (!selectedFile || !canUpload) return;
+  async function uploadOne(file: File, deviceId: string) {
+    let blob: Blob;
+    let contentType: string;
+
+    if (file.type.startsWith("image/")) {
+      const encoded = await reencodePhoto(file);
+      blob = encoded.blob;
+      contentType = encoded.contentType;
+      if (blob.size > PHOTO_MAX_BYTES) {
+        throw new Error(`photo exceeds ${formatSize(PHOTO_MAX_BYTES)}`);
+      }
+    } else {
+      blob = file;
+      contentType = file.type;
+      if (blob.size > VIDEO_MAX_BYTES) {
+        throw new Error(`video exceeds ${formatSize(VIDEO_MAX_BYTES)}`);
+      }
+    }
+
+    const presignRes = await fetch("/api/upload/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device_id: deviceId,
+        content_type: contentType,
+        size_bytes: blob.size,
+      }),
+    });
+    if (!presignRes.ok) {
+      const data = await presignRes.json().catch(() => ({}));
+      throw new Error(data.error || "could not start upload");
+    }
+    const { upload_url, object_key, upload_token } = await presignRes.json();
+
+    const putRes = await fetch(upload_url, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: blob,
+    });
+    if (!putRes.ok) {
+      throw new Error("upload to storage failed");
+    }
+
+    const registerRes = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device_id: deviceId,
+        object_key,
+        content_type: contentType,
+        upload_token,
+      }),
+    });
+    if (!registerRes.ok) {
+      const data = await registerRes.json().catch(() => ({}));
+      throw new Error(data.error || "could not register upload");
+    }
+  }
+
+  async function handleUpload() {
+    if (selectedFiles.length === 0 || !canUpload) return;
     const deviceId = getDeviceId();
     if (!deviceId) return;
 
     setUploading(true);
     setError(null);
-    setUploadProgress("Preparing…");
 
-    try {
-      let blob: Blob;
-      let contentType: string;
+    let succeeded = 0;
+    const failures: string[] = [];
 
-      if (selectedFile.type.startsWith("image/")) {
-        const encoded = await reencodePhoto(selectedFile);
-        blob = encoded.blob;
-        contentType = encoded.contentType;
-        if (blob.size > PHOTO_MAX_BYTES) {
-          throw new Error(`Photo must be ${formatSize(PHOTO_MAX_BYTES)} or smaller`);
-        }
-      } else {
-        blob = selectedFile;
-        contentType = selectedFile.type;
-        if (blob.size > VIDEO_MAX_BYTES) {
-          throw new Error(`Video must be ${formatSize(VIDEO_MAX_BYTES)} or smaller`);
-        }
+    // Sequential so we respect the presign rate limit and avoid re-encoding
+    // many large images in parallel.
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      setUploadProgress(
+        selectedFiles.length === 1
+          ? "Uploading…"
+          : `Uploading ${i + 1} of ${selectedFiles.length}…`
+      );
+      try {
+        await uploadOne(file, deviceId);
+        succeeded++;
+      } catch (e) {
+        failures.push(`${file.name} (${e instanceof Error ? e.message : "failed"})`);
       }
+    }
 
-      setUploadProgress("Requesting upload…");
-      const presignRes = await fetch("/api/upload/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          device_id: deviceId,
-          content_type: contentType,
-          size_bytes: blob.size,
-        }),
-      });
-      if (!presignRes.ok) {
-        const data = await presignRes.json().catch(() => ({}));
-        throw new Error(data.error || "Could not start upload");
-      }
-      const { upload_url, object_key, upload_token } = await presignRes.json();
+    if (failures.length > 0) {
+      const prefix =
+        succeeded > 0 ? `Uploaded ${succeeded}, ${failures.length} failed: ` : "Upload failed: ";
+      setError(prefix + failures.join("; "));
+    }
 
-      setUploadProgress("Uploading…");
-      const putRes = await fetch(upload_url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": contentType,
-        },
-        body: blob,
-      });
-      if (!putRes.ok) {
-        throw new Error("Upload to storage failed");
-      }
-
-      setUploadProgress("Finishing…");
-      const registerRes = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          device_id: deviceId,
-          object_key,
-          content_type: contentType,
-          upload_token,
-        }),
-      });
-      if (!registerRes.ok) {
-        const data = await registerRes.json().catch(() => ({}));
-        throw new Error(data.error || "Could not register upload");
-      }
-
-      setSelectedFile(null);
+    if (succeeded > 0) {
+      setSelectedFiles([]);
       if (fileRef.current) fileRef.current.value = "";
       await loadGallery();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setUploading(false);
-      setUploadProgress(null);
     }
+
+    setUploading(false);
+    setUploadProgress(null);
   }
 
   async function handleDelete(id: string) {
@@ -238,10 +258,11 @@ export default function GalleryPage() {
               ref={fileRef}
               type="file"
               accept={ACCEPT}
+              multiple
               disabled={uploading}
               onChange={(e) => {
                 setError(null);
-                setSelectedFile(e.target.files?.[0] ?? null);
+                setSelectedFiles(Array.from(e.target.files ?? []));
               }}
               className="hidden"
             />
@@ -251,15 +272,23 @@ export default function GalleryPage() {
               disabled={uploading}
               className="w-full truncate rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm font-semibold transition hover:border-[var(--color-foreground)] disabled:opacity-40"
             >
-              {selectedFile ? selectedFile.name : "Choose file"}
+              {selectedFiles.length === 0
+                ? "Choose files"
+                : selectedFiles.length === 1
+                  ? selectedFiles[0].name
+                  : `${selectedFiles.length} files selected`}
             </button>
             <button
               type="button"
-              onClick={handleSubmit}
-              disabled={!selectedFile || uploading}
+              onClick={handleUpload}
+              disabled={selectedFiles.length === 0 || uploading}
               className="mt-3 w-full rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-40"
             >
-              {uploading ? uploadProgress ?? "Uploading…" : "Upload"}
+              {uploading
+                ? uploadProgress ?? "Uploading…"
+                : selectedFiles.length > 1
+                  ? `Upload ${selectedFiles.length}`
+                  : "Upload"}
             </button>
             {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
             <p className="mt-2 text-xs text-[var(--color-muted)]">

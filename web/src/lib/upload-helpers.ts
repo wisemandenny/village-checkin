@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const DAILY_UPLOAD_LIMIT = 30;
-export const DAILY_BYTE_BUDGET = 500 * 1024 * 1024; // 500 MB
+export const DAILY_BYTE_BUDGET = 2 * 1024 * 1024 * 1024; // 2 GB
 
 export function todayBounds(): { start: string; end: string } {
   const now = new Date();

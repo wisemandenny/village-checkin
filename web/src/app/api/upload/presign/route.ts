@@ -10,7 +10,6 @@ import {
 import { mintUploadToken } from "@/lib/upload-token";
 import {
   DAILY_BYTE_BUDGET,
-  DAILY_UPLOAD_LIMIT,
   getDailyUploadUsage,
   hasCheckInToday,
 } from "@/lib/upload-helpers";
@@ -55,8 +54,8 @@ export async function POST(req: NextRequest) {
 
   const ip = clientIp(req);
   if (
-    !checkRateLimit(`presign:device:${device_id}`, 10, 60_000) ||
-    !checkRateLimit(`presign:ip:${ip}`, 30, 60_000)
+    !checkRateLimit(`presign:device:${device_id}`, 100, 60_000) ||
+    !checkRateLimit(`presign:ip:${ip}`, 200, 60_000)
   ) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -84,9 +83,6 @@ export async function POST(req: NextRequest) {
   }
 
   const usage = await getDailyUploadUsage(supabase, villager.id);
-  if (usage.count >= DAILY_UPLOAD_LIMIT) {
-    return NextResponse.json({ error: "Daily upload limit reached" }, { status: 429 });
-  }
   if (usage.bytes + size_bytes > DAILY_BYTE_BUDGET) {
     return NextResponse.json({ error: "Daily upload limit reached" }, { status: 429 });
   }
