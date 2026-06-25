@@ -63,7 +63,7 @@ npx expo start
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server only) |
 | `STRIPE_SECRET_KEY` | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `NEXT_PUBLIC_BASE_URL` | Public URL of the web app |
+| `NEXT_PUBLIC_BASE_URL` | Public URL of the web app (production: `https://app.takesavillagemusic.com`) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (browser) |
 | `ADMIN_PASSWORD` | Fallback admin password (if not set in DB) |
 | `STRIPE_SUPPORTER_PRODUCT_ID` | (Recommended) Stripe Product id for recurring support. If unset, one is created on demand. |
@@ -103,11 +103,13 @@ Mailing-list sync and supporter tags work with just `KIT_API_KEY`. Kit's
 logging each charge as a Kit purchase needs a one-time OAuth setup:
 
 1. In Kit, create an **app** with OAuth enabled (Developer / App Store → Build →
-   Authentication). Register the redirect URI `https://YOUR-DOMAIN/api/kit/oauth/callback`
-   and copy the **Client ID** + **Client Secret**.
+   Authentication). Register the redirect URI
+   `https://app.takesavillagemusic.com/api/kit/oauth/callback` (keep
+   `https://village-checkin.vercel.app/api/kit/oauth/callback` until the legacy
+   hostname redirect is live) and copy the **Client ID** + **Client Secret**.
 2. Set `KIT_OAUTH_CLIENT_ID`, `KIT_OAUTH_CLIENT_SECRET`, and a random
    `KIT_OAUTH_SETUP_SECRET` in the environment, then deploy.
-3. Visit `https://YOUR-DOMAIN/api/kit/oauth/start?secret=YOUR_SETUP_SECRET`
+3. Visit `https://app.takesavillagemusic.com/api/kit/oauth/start?secret=YOUR_SETUP_SECRET`
    while logged into the Kit account and approve. Tokens are stored in
    `studio_settings` and auto-refreshed (refresh-token rotation handled), so no
    token ever needs to live in env.

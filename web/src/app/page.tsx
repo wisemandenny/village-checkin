@@ -16,7 +16,6 @@ export default function Home() {
   const [deviceId, setDeviceId] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("");
   const [isNewRegistration, setIsNewRegistration] = useState(false);
-  const [animationsEnabled, setAnimationsEnabled] = useState(false);
   const [checkinsEnabled, setCheckinsEnabled] = useState(true);
 
   // Latest values read inside the popstate handler. Refs avoid stale closures
@@ -59,18 +58,16 @@ export default function Home() {
     setDeviceId(id);
 
     (async () => {
-      // Resolve feature flags up front. `animations_enabled` is read by the
-      // whole onboarding subtree via context; `checkins_enabled` decides
-      // whether a returning villager checks in or sees the closed landing.
+      // Resolve check-ins flag up front — decides whether a returning villager
+      // checks in or sees the closed landing.
       let checkinsOn = true;
       try {
         const res = await fetch("/api/settings");
         const data = res.ok ? await res.json() : null;
-        setAnimationsEnabled(data?.animations_enabled === true);
         checkinsOn = data?.checkins_enabled !== false;
         setCheckinsEnabled(checkinsOn);
       } catch {
-        // Defaults: animations off, check-ins on.
+        // Default: check-ins on.
       }
 
       if (isNew) {
@@ -143,7 +140,7 @@ export default function Home() {
   }, []);
 
   return (
-    <AnimationProvider enabled={animationsEnabled}>
+    <AnimationProvider enabled={true}>
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-10">
         <div className="mb-8 flex flex-col items-center gap-4">
           <Image
