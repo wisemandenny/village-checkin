@@ -31,10 +31,8 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [appEnv, setAppEnv] = useState<string | null>(null);
   const [kitSyncing, setKitSyncing] = useState(false);
   const [subRefreshing, setSubRefreshing] = useState(false);
-  const [kitTokenDeleting, setKitTokenDeleting] = useState(false);
   const [integrationMessage, setIntegrationMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [exclusiveHandles, setExclusiveHandles] = useState("");
@@ -59,7 +57,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setAnimationsEnabled(data.animations_enabled === true);
       setMaintenanceMode(data.maintenance_mode === true);
       setHasDbPassword(data.admin_password === "(set)");
-      setAppEnv(typeof data.app_env === "string" ? data.app_env : null);
     } catch {
       setMessage({ type: "error", text: "Failed to load settings" });
     } finally {
@@ -321,34 +318,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     }
   }
 
-  async function deleteKitToken() {
-    if (
-      !window.confirm(
-        "Delete the stored Kit OAuth token? Kit API calls that require OAuth will fail until you authorize again."
-      )
-    ) {
-      return;
-    }
-    setKitTokenDeleting(true);
-    setIntegrationMessage(null);
-    try {
-      const res = await fetch("/api/admin/kit/oauth/delete", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Delete failed");
-      setIntegrationMessage({
-        type: "success",
-        text: "Stored Kit OAuth token deleted. Re-authorize Kit before using OAuth-dependent features.",
-      });
-    } catch (err) {
-      setIntegrationMessage({ type: "error", text: err instanceof Error ? err.message : "Delete failed" });
-    } finally {
-      setKitTokenDeleting(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -538,25 +507,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
               {subRefreshing ? "Refreshing…" : "Refresh from Stripe"}
             </button>
           </div>
-
-          {appEnv === "staging" && (
-            <div className="flex items-start justify-between gap-4 border-t border-[var(--color-border)] pt-5">
-              <div>
-                <p className="text-sm font-medium">Kit OAuth token</p>
-                <p className="mt-1 text-sm text-[var(--color-muted)]">
-                  Remove the stored refresh/access tokens from the database. Staging only — use when
-                  re-testing the OAuth consent flow.
-                </p>
-              </div>
-              <button
-                onClick={deleteKitToken}
-                disabled={kitTokenDeleting}
-                className="shrink-0 rounded-lg border border-red-500/40 px-4 py-2 text-sm font-medium text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
-              >
-                {kitTokenDeleting ? "Deleting…" : "Delete stored Kit token"}
-              </button>
-            </div>
-          )}
         </div>
         {integrationMessage && (
           <p className={`mt-4 text-sm ${integrationMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>

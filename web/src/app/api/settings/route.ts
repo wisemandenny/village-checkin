@@ -1,3 +1,4 @@
+import { appEnv } from "@/lib/app-env";
 import { createServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -18,11 +19,14 @@ export async function GET() {
     payments_enabled: false,
     animations_enabled: false,
     checkins_enabled: true,
+    app_env: appEnv(),
   };
 
   for (const row of data ?? []) {
     settings[row.key] = row.value;
   }
+
+  settings.app_env = appEnv();
 
   return NextResponse.json(settings);
 }

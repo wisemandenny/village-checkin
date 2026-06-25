@@ -83,16 +83,6 @@ async function writeStoredTokens(tokens: StoredTokens): Promise<void> {
   }
 }
 
-export async function deleteStoredTokens(): Promise<void> {
-  const supabase = createServerClient();
-  const { error } = await supabase.from("studio_settings").delete().eq("key", SETTINGS_KEY);
-  if (error) {
-    console.error("[kit-oauth] failed to delete tokens:", error.message);
-    throw new Error("Failed to delete Kit OAuth tokens");
-  }
-  memoryCache = null;
-}
-
 function toStoredTokens(
   res: KitTokenResponse,
   previousRefreshToken?: string

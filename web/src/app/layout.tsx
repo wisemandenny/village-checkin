@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AdminButton } from "@/components/admin-button";
+import { DeleteTokenButton } from "@/components/delete-token-button";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
@@ -46,6 +47,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ThemeToggle />
           <AdminButton />
+          <DeleteTokenButton />
           {children}
         </ThemeProvider>
       </body>
