@@ -1,24 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { clearDeviceId } from "@/lib/device-id";
 
+// Staging-only dev helper for resetting the per-device identity. The parent
+// layout decides whether to render this (it only mounts on APP_ENV=staging),
+// so this component just renders the button.
 export function DeleteTokenButton() {
-  const [isStaging, setIsStaging] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.app_env === "staging") setIsStaging(true);
-      })
-      .catch(() => {
-        // non-fatal; button stays hidden
-      });
-  }, []);
-
-  if (!isStaging) return null;
 
   function handleClick() {
     if (
@@ -38,7 +27,7 @@ export function DeleteTokenButton() {
       <button
         type="button"
         onClick={handleClick}
-        className="rounded-lg border border-red-500/40 bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-red-500 shadow-sm transition hover:bg-red-500/10"
+        className="rounded-lg border border-red-500 bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-red-500 shadow-sm"
       >
         Delete stored token
       </button>
