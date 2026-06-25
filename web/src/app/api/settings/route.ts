@@ -6,7 +6,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("studio_settings")
     .select("key, value")
-    .in("key", ["payments_enabled", "animations_enabled", "checkins_enabled"]);
+    .in("key", ["payments_enabled", "checkins_enabled"]);
 
   if (error) {
     return NextResponse.json({ error: "Failed to load settings" }, { status: 500 });
@@ -16,7 +16,6 @@ export async function GET() {
   // deployments keep recording visits until an admin explicitly closes them.
   const settings: Record<string, unknown> = {
     payments_enabled: false,
-    animations_enabled: false,
     checkins_enabled: true,
   };
 
