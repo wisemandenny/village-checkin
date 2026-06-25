@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { getDeviceId } from "@/lib/device-id";
 import { fusedName, fusionSpriteUrl, pokemonName } from "@/lib/pokemon";
 import { AvatarPicker } from "@/components/avatar-picker";
@@ -26,7 +27,11 @@ interface Me {
 
 const pixelated = { imageRendering: "pixelated" as const };
 
-export default function HerePage() {
+function HerePageContent() {
+  const searchParams = useSearchParams();
+  const forgeRequested = searchParams.get("forge") === "1";
+  const autoForgeOpened = useRef(false);
+
   const [villagers, setVillagers] = useState<BoardVillager[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +70,12 @@ export default function HerePage() {
   const isDeveloper = (me?.roles ?? []).includes("developer");
   const hasAvatar = me?.avatar_head != null && me?.avatar_body != null;
   const hasSelfie = !!me?.selfie_url;
+
+  useEffect(() => {
+    if (loading || !me || hasAvatar || !forgeRequested || autoForgeOpened.current) return;
+    autoForgeOpened.current = true;
+    setPickerOpen(true);
+  }, [loading, me, hasAvatar, forgeRequested]);
 
   // Always show yourself, even if the board feed excludes you (e.g. a test or
   // dev account, or a check-in that isn't paid/skipped). `me` is also the
@@ -108,13 +119,13 @@ export default function HerePage() {
           </button>
         )}
 
-        {me && (
+        {me && hasAvatar && (
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
             className="mt-4 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)]"
           >
-            {hasAvatar ? "Edit your avatar" : "Forge your avatar"}
+            Edit your avatar
           </button>
         )}
 
@@ -223,6 +234,25 @@ export default function HerePage() {
         />
       )}
     </main>
+  );
+}
+
+export default function HerePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex flex-1 flex-col items-center px-6 py-10">
+          <div className="flex w-full max-w-2xl flex-col items-center">
+            <h1 className="text-center text-2xl font-bold font-[family-name:var(--font-domaine)]">
+              In the Village tonight
+            </h1>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">Loading…</p>
+          </div>
+        </main>
+      }
+    >
+      <HerePageContent />
+    </Suspense>
   );
 }
 

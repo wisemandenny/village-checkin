@@ -282,7 +282,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
 function WhosHereLink() {
   return (
     <Link
-      href="/here"
+      href="/here?forge=1"
       className="mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
     >
       See who&apos;s here
