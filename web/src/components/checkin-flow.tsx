@@ -154,8 +154,10 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           `/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`
         );
         if (cancelled || !res.ok) return;
-        const { check_in } = await res.json();
-        if (check_in?.status === "paid") {
+        const { check_in, is_elder } = await res.json();
+        if (is_elder === true) {
+          markPaid("elder");
+        } else if (check_in?.status === "paid") {
           markPaid(check_in.payment_method ?? null);
         }
       } catch {

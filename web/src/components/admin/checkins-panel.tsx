@@ -71,6 +71,7 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
   skipped: "Skipped",
   deferred: "Deferred",
   subscription: "Subscription",
+  elder: "Elder",
 };
 
 const STATUS_STYLES: Record<CheckInStatus, string> = {
