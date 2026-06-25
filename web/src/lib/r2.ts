@@ -258,6 +258,30 @@ export async function presignDownloadUrl(
   return getSignedUrl(s3, command, { expiresIn: 3600 });
 }
 
+// Stream an uploaded object back through the app (same-origin proxy) so admins
+// can download it without the browser ever touching R2 directly. This avoids
+// any R2 CORS dependency for downloads — it works on localhost, preview, and
+// prod regardless of the bucket's AllowedOrigins.
+export async function getUploadObject(
+  objectKey: string
+): Promise<{ body: ReadableStream; contentType: string; contentLength?: number } | null> {
+  const s3 = getClient();
+  if (!s3 || !UPLOADS_BUCKET || !isValidObjectKey(objectKey)) return null;
+  try {
+    const res = await s3.send(
+      new GetObjectCommand({ Bucket: UPLOADS_BUCKET, Key: objectKey })
+    );
+    if (!res.Body) return null;
+    return {
+      body: (res.Body as { transformToWebStream: () => ReadableStream }).transformToWebStream(),
+      contentType: res.ContentType ?? "application/octet-stream",
+      contentLength: res.ContentLength,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteUploadObject(objectKey: string): Promise<boolean> {
   const s3 = getClient();
   if (!s3 || !UPLOADS_BUCKET || !isValidObjectKey(objectKey)) return false;

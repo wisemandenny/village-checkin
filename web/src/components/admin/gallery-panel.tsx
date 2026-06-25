@@ -129,21 +129,26 @@ export default function GalleryPanel({ token }: { token: string }) {
     setDownloading(true);
     setError("");
     const failures: string[] = [];
-    // Sequential: the URLs are cross-origin presigned R2 links, so we fetch each
-    // as a blob and save it (a cross-origin <a download> would just open it).
+    // Sequential: fetch each through the same-origin admin proxy (with the bearer
+    // token) and save the blob. Going through our own origin avoids any R2 CORS
+    // dependency, so this works on localhost, preview, and prod alike.
     for (const item of targets) {
       try {
-        const res = await fetch(item.url);
+        const res = await apiFetch(`/api/admin/gallery/${item.id}/download`);
         if (!res.ok) throw new Error(String(res.status));
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = objectUrl;
         a.download = downloadFilename(item);
+        a.rel = "noopener";
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(objectUrl);
+        // Defer the revoke: revoking synchronously can cancel/truncate the
+        // download before the browser reads the blob, which is most likely to
+        // happen during rapid multi-file downloads.
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
       } catch {
         failures.push(item.display_name);
       }
