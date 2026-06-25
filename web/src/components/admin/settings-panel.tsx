@@ -17,10 +17,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [animationsEnabled, setAnimationsEnabled] = useState(false);
-  const [animationsSaving, setAnimationsSaving] = useState(false);
-  const [animationsMessage, setAnimationsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -54,7 +50,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       const data = await res.json();
       setCheckinsEnabled(data.checkins_enabled !== false);
       setPaymentsEnabled(data.payments_enabled === true);
-      setAnimationsEnabled(data.animations_enabled === true);
       setMaintenanceMode(data.maintenance_mode === true);
       setHasDbPassword(data.admin_password === "(set)");
     } catch {
@@ -112,29 +107,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setCheckinsMessage({ type: "error", text: "Failed to update setting" });
     } finally {
       setCheckinsSaving(false);
-    }
-  }
-
-  async function toggleAnimations() {
-    const newValue = !animationsEnabled;
-    setAnimationsSaving(true);
-    setAnimationsMessage(null);
-    try {
-      const res = await fetch("/api/admin/settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ key: "animations_enabled", value: newValue }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      setAnimationsEnabled(newValue);
-      setAnimationsMessage({ type: "success", text: `Animations ${newValue ? "enabled" : "disabled"}` });
-    } catch {
-      setAnimationsMessage({ type: "error", text: "Failed to update setting" });
-    } finally {
-      setAnimationsSaving(false);
     }
   }
 
@@ -437,37 +409,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
         {message && (
           <p className={`mt-3 text-sm ${message.type === "success" ? "text-green-500" : "text-red-500"}`}>
             {message.text}
-          </p>
-        )}
-      </div>
-
-      {/* Animations toggle */}
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Animations</h3>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              When enabled, onboarding shows subtle entrance, transition, and success animations. OFF by default.
-            </p>
-          </div>
-          <button
-            onClick={toggleAnimations}
-            disabled={animationsSaving}
-            aria-pressed={animationsEnabled}
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
-              animationsEnabled ? "bg-green-500" : "bg-[var(--color-border)]"
-            } ${animationsSaving ? "opacity-50" : ""}`}
-          >
-            <span
-              className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                animationsEnabled ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
-        </div>
-        {animationsMessage && (
-          <p className={`mt-3 text-sm ${animationsMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
-            {animationsMessage.text}
           </p>
         )}
       </div>
