@@ -54,6 +54,7 @@ export default function GalleryPanel({ token }: { token: string }) {
   const [takingDown, setTakingDown] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
+  const [bulkTakingDown, setBulkTakingDown] = useState(false);
 
   function toggleSelected(id: string) {
     setSelectedIds((cur) => {
@@ -159,6 +160,44 @@ export default function GalleryPanel({ token }: { token: string }) {
     setDownloading(false);
   }
 
+  async function handleTakedownSelected() {
+    const ids = uploads.filter((u) => selectedIds.has(u.id)).map((u) => u.id);
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Permanently remove ${ids.length} upload${ids.length === 1 ? "" : "s"} from storage? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setBulkTakingDown(true);
+    setError("");
+    const removed: string[] = [];
+    let failures = 0;
+    for (const id of ids) {
+      try {
+        const res = await apiFetch(`/api/admin/gallery/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Takedown failed");
+        removed.push(id);
+      } catch {
+        failures++;
+      }
+    }
+    if (removed.length > 0) {
+      const removedSet = new Set(removed);
+      setUploads((cur) => cur.filter((u) => !removedSet.has(u.id)));
+      setSelectedIds((cur) => {
+        const next = new Set(cur);
+        for (const id of removed) next.delete(id);
+        return next;
+      });
+    }
+    if (failures > 0) {
+      setError(`Could not take down ${failures} of ${ids.length} item(s).`);
+    }
+    setBulkTakingDown(false);
+  }
+
   const reported = uploads.filter((u) => u.reported && !u.deleted_at);
   const rest = uploads.filter((u) => !u.reported || u.deleted_at);
   const ordered = [...reported, ...rest];
@@ -170,12 +209,21 @@ export default function GalleryPanel({ token }: { token: string }) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleDownloadSelected}
-            disabled={downloading || selectedIds.size === 0}
+            disabled={downloading || bulkTakingDown || selectedIds.size === 0}
             className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
           >
             {downloading
               ? "Downloading…"
               : `Download${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+          </button>
+          <button
+            onClick={handleTakedownSelected}
+            disabled={bulkTakingDown || downloading || selectedIds.size === 0}
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+          >
+            {bulkTakingDown
+              ? "Removing…"
+              : `Take down${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
           </button>
           <button
             onClick={load}
