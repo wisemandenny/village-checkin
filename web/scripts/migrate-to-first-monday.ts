@@ -1,19 +1,3 @@
-/**
- * One-time migration: wrap every active Stripe subscription in a Subscription
- * Schedule whose billing boundary lands on the first Monday of the month.
- *
- * Stripe's `billing_cycle_anchor` can only lock a fixed calendar day, but the
- * first Monday shifts between the 1st and 7th, so we use Subscription Schedules
- * with phase boundaries anchored to a computed first-Monday date. A companion
- * scheduled cron (`/api/cron/extend-schedules`) keeps each schedule extended one
- * phase ahead.
- *
- * Run against TEST MODE first:
- *   STRIPE_SECRET_KEY=sk_test_... npx tsx scripts/migrate-to-first-monday.ts
- *
- * The script is idempotent: subscriptions already on a schedule or already
- * tagged `first_monday_billing` are skipped, so it is safe to re-run.
- */
 import Stripe from "stripe";
 import {
   nextFirstMondayAnchor,
@@ -21,7 +5,6 @@ import {
   MIGRATION_TAG,
 } from "../src/lib/first-monday";
 
-// Pin the same API version the rest of the app uses (see src/lib/stripe.ts).
 const STRIPE_API_VERSION = "2026-04-22.dahlia";
 
 // No charge for the stub period between now and the first new first-Monday
@@ -35,8 +18,6 @@ function getStripe(): Stripe {
   return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
 }
 
-// Extracts { price, quantity } pairs from a subscription's items for reuse in
-// schedule phases.
 function itemsFromSubscription(
   sub: Stripe.Subscription
 ): Array<{ price: string; quantity: number }> {
