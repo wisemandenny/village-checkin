@@ -277,13 +277,12 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   );
 }
 
-// Entry point to the avatar board, styled as a secondary button so it's clearly
-// visible and tappable from the check-in and paid screens.
+// Entry point to the avatar board — primary CTA so it's easy to spot and tap.
 function WhosHereLink() {
   return (
     <Link
       href="/here"
-      className="mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
+      className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[var(--color-accent)] px-8 text-lg font-semibold text-white transition hover:bg-[var(--color-accent-light)] font-[family-name:var(--font-domaine)]"
     >
       See who&apos;s here
     </Link>
