@@ -6,7 +6,7 @@ import { isMaintenanceMode } from "@/lib/maintenance";
 // - /admin + /api/admin/* so an admin can log in and turn maintenance back off
 // - /api/webhook/* so Stripe (and other) webhooks keep being processed
 // - /maintenance so the lockdown landing page itself can render
-const ALWAYS_ALLOWED = ["/admin", "/api/admin", "/api/webhook", "/maintenance"];
+const ALWAYS_ALLOWED = ["/admin", "/api/admin", "/api/webhook", "/api/cron", "/maintenance", "/book"];
 
 function isAlwaysAllowed(pathname: string): boolean {
   return ALWAYS_ALLOWED.some(

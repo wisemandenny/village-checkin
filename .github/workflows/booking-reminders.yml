@@ -1,0 +1,33 @@
+name: Booking reminders
+
+# Sends reminder emails (with .ics attachments) for studio bookings happening
+# tomorrow. Hits the secret-protected cron route on production and staging.
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - env_name: production
+            base_url: ${{ vars.PROD_BASE_URL }}
+            cron_secret: ${{ secrets.PROD_CRON_SECRET }}
+          - env_name: staging
+            base_url: ${{ vars.STAGING_BASE_URL }}
+            cron_secret: ${{ secrets.STAGING_CRON_SECRET }}
+    steps:
+      - name: Send reminders (${{ matrix.env_name }})
+        env:
+          BASE_URL: ${{ matrix.base_url }}
+          CRON_SECRET: ${{ matrix.cron_secret }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "${{ matrix.env_name }}: BASE_URL or CRON_SECRET not set; skipping."
+            exit 0
+          fi
+          curl -sf -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE_URL/api/cron/booking-reminders"

@@ -15,6 +15,17 @@ import {
 interface OnboardingFormProps {
   deviceId: string;
   onComplete: (displayName: string, isNewRegistration: boolean) => void;
+  /** Pre-fill and optionally lock the email field (booking invites). */
+  initialEmail?: string;
+  lockedEmail?: boolean;
+  /** Roles selected by default (e.g. Producer for booking onboarding). */
+  defaultRoles?: string[];
+  /** Hide the "I've already registered" recovery path. */
+  hideRecover?: boolean;
+  /** Override the registration endpoint (defaults to /api/register). */
+  registerUrl?: string;
+  /** Extra fields merged into the registration POST body. */
+  extraRegisterBody?: Record<string, unknown>;
 }
 
 const ROLES = ROLE_ORDER;
@@ -25,12 +36,27 @@ const INSTRUMENTS = INSTRUMENT_ORDER.filter((inst) => inst !== "Other");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
-  const [mode, setMode] = useState<"choose" | "register" | "recover">("choose");
+export function OnboardingForm({
+  deviceId,
+  onComplete,
+  initialEmail = "",
+  lockedEmail = false,
+  defaultRoles,
+  hideRecover = false,
+  registerUrl = "/api/register",
+  extraRegisterBody,
+}: OnboardingFormProps) {
+  // Booking onboarding hides the recovery path, so skip the "choose" landing
+  // and open the registration form directly.
+  const [mode, setMode] = useState<"choose" | "register" | "recover">(
+    hideRecover ? "register" : "choose"
+  );
   const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [igHandle, setIgHandle] = useState("");
-  const [roles, setRoles] = useState<Set<string>>(new Set());
+  const [roles, setRoles] = useState<Set<string>>(
+    () => new Set(defaultRoles ?? [])
+  );
   const [instruments, setInstruments] = useState<Set<string>>(new Set());
   // Stable ids keep each editable badge's identity across add/remove so inputs
   // don't lose focus or value when a sibling is removed.
@@ -255,7 +281,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         ? buildInstrumentsList()
         : [];
 
-      const res = await fetch("/api/register", {
+      const res = await fetch(registerUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -267,6 +293,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           instruments: finalInstruments.length ? finalInstruments : undefined,
           marketing_opt_in: marketingOptIn,
           selfie: selfie || undefined,
+          ...extraRegisterBody,
         }),
       });
 
@@ -467,7 +494,8 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+            readOnly={lockedEmail}
+            className={`h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all${lockedEmail ? " opacity-70 cursor-not-allowed" : ""}`}
             required
           />
           {email.trim() && !isEmailValid && (
@@ -613,6 +641,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         </Reveal>
 
         <Reveal>
+          {!hideRecover && (
           <button
             type="button"
             onClick={backToChoose}
@@ -620,6 +649,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
           >
             Back
           </button>
+          )}
         </Reveal>
       </Stagger>
     </form>
