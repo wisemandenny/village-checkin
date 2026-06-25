@@ -234,7 +234,6 @@ export default function GalleryPage() {
 
         {configured && me && checkedIn && (
           <div className="mt-6 w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <label className="block text-sm font-medium">Share a photo or video</label>
             <input
               ref={fileRef}
               type="file"
@@ -244,15 +243,23 @@ export default function GalleryPage() {
                 setError(null);
                 setSelectedFile(e.target.files?.[0] ?? null);
               }}
-              className="mt-2 w-full text-sm"
+              className="hidden"
             />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="w-full truncate rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm font-semibold transition hover:border-[var(--color-foreground)] disabled:opacity-40"
+            >
+              {selectedFile ? selectedFile.name : "Choose file"}
+            </button>
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!selectedFile || uploading}
               className="mt-3 w-full rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-40"
             >
-              {uploading ? uploadProgress ?? "Uploading…" : "Submit"}
+              {uploading ? uploadProgress ?? "Uploading…" : "Upload"}
             </button>
             {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
             <p className="mt-2 text-xs text-[var(--color-muted)]">
