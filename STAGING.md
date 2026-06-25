@@ -8,7 +8,7 @@ real subscribers.
 | -------------- | --------------------- | ---------------------------------------- |
 | Vercel project | `village-checkin`     | `village-checkin-staging` (new)          |
 | Deploy branch  | `main`                | `staging`                                |
-| Domain         | (current prod domain) | `*.vercel.app` (free, assigned by Vercel)|
+| Domain         | `app.takesavillage.com` | `*.vercel.app` (free, assigned by Vercel)|
 | Database       | Production Supabase   | Separate **staging** Supabase project    |
 | Payments       | Stripe **live** mode  | Stripe **test** mode                     |
 | Mailing list   | Production Kit        | Separate **staging** Kit account         |

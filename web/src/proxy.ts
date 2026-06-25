@@ -14,8 +14,20 @@ function isAlwaysAllowed(pathname: string): boolean {
   );
 }
 
+const LEGACY_VERCEL_HOST = "village-checkin.vercel.app";
+const CANONICAL_ORIGIN = "https://app.takesavillage.com";
+
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+
+  const host = request.headers.get("host")?.split(":")[0];
+  if (
+    host === LEGACY_VERCEL_HOST &&
+    !pathname.startsWith("/api/webhook")
+  ) {
+    const url = new URL(`${pathname}${search}`, CANONICAL_ORIGIN);
+    return NextResponse.redirect(url, 308);
+  }
 
   if (isAlwaysAllowed(pathname)) {
     return NextResponse.next();
