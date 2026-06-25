@@ -5,7 +5,7 @@
  * Stripe's `billing_cycle_anchor` can only lock a fixed calendar day, but the
  * first Monday shifts between the 1st and 7th, so we use Subscription Schedules
  * with phase boundaries anchored to a computed first-Monday date. A companion
- * Vercel cron (`/api/cron/extend-schedules`) keeps each schedule extended one
+ * scheduled cron (`/api/cron/extend-schedules`) keeps each schedule extended one
  * phase ahead.
  *
  * Run against TEST MODE first:

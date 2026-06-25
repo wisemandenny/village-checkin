@@ -41,19 +41,28 @@ Existing active Stripe subscriptions are migrated to bill on the **first Monday 
 
 > **Scope:** this covers the one-time migration of existing `active` subscriptions plus ongoing maintenance of those schedules. Enrolling brand-new signups at creation time and handling `trialing` / `past_due` subscriptions are intentionally out of scope here (see Pre-launch checks) — re-running the migration also picks up any new `active` subscriptions.
 
-Stripe's `billing_cycle_anchor` can only lock a fixed calendar day, but the first Monday shifts between the 1st and 7th, so it cannot be tracked natively. Instead each subscription is wrapped in a **Subscription Schedule** whose phase boundaries land on a computed first-Monday date, and a **monthly Vercel Cron** keeps every schedule extended one phase ahead so billing never drifts back to same-day-next-month.
+Stripe's `billing_cycle_anchor` can only lock a fixed calendar day, but the first Monday shifts between the 1st and 7th, so it cannot be tracked natively. Instead each subscription is wrapped in a **Subscription Schedule** whose phase boundaries land on a computed first-Monday date, and a **monthly GitHub Actions cron** keeps every schedule extended one phase ahead so billing never drifts back to same-day-next-month.
 
 ### Pieces
 
 - `src/lib/first-monday.ts` — shared UTC date math (`getFirstMondayOfMonth`, `nextFirstMondayAnchor`, `toUnixSeconds`).
 - `scripts/migrate-to-first-monday.ts` — one-time, idempotent migration that wraps every active subscription in a schedule anchored to the next first Monday.
-- `src/app/api/cron/extend-schedules/route.ts` — `GET` cron endpoint that appends the next first-Monday phase to each tagged schedule. Idempotent and auth-protected.
-- `vercel.json` — schedules the cron daily on the 2nd–8th (06:00 UTC) as a safety margin. The endpoint is idempotent, so repeated days never double-charge.
+- `src/app/api/cron/extend-schedules/route.ts` — `GET` endpoint that appends the next first-Monday phase to each tagged schedule. Idempotent and auth-protected (`CRON_SECRET` bearer token).
+- `.github/workflows/extend-first-monday-schedules.yml` — scheduled GitHub Actions workflow that calls the endpoint daily on the 2nd–8th (06:00 UTC) as a safety margin. The endpoint is idempotent, so repeated days never double-charge. The workflow fails (red run + GitHub's failure notifications) on a non-2xx response **or** a non-empty `errors[]`, giving built-in alerting.
 
-### Environment variables
+### Environment variables / secrets
 
-- `STRIPE_SECRET_KEY` — used by both the migration script and the cron (test vs live is inferred from the key prefix).
-- `CRON_SECRET` — long random string set in Vercel project settings. Vercel sends it to the cron as `Authorization: Bearer <CRON_SECRET>`; the endpoint returns `401` without it.
+App runtime (Vercel):
+
+- `STRIPE_SECRET_KEY` — used by the migration script and the cron endpoint (test vs live is inferred from the key prefix).
+- `CRON_SECRET` — long random string. The cron endpoint returns `401` unless the request carries `Authorization: Bearer <CRON_SECRET>`.
+
+GitHub repository secrets (for the scheduled workflow):
+
+- `CRON_SECRET` — same value as the Vercel one; the workflow sends it as the bearer token.
+- `APP_URL` — the deployed app's base URL (e.g. `https://your-app.vercel.app`), no trailing slash required.
+
+> Scheduled workflows only run from the **default branch**, so this cron starts firing once merged to `main`.
 
 ### Test-first workflow
 
@@ -82,5 +91,5 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 - **Timezone**: all math is UTC. If "first Monday" must be local (e.g. `America/Toronto`), adjust `getFirstMondayOfMonth` in `src/lib/first-monday.ts` — that is the single place.
 - **Proration**: the migration's stub period defaults to `proration_behavior: "none"` (no charge for the partial period before the first new cycle). Confirm this is desired before going live.
 - **Webhooks**: schedule-managed subscriptions still emit `customer.subscription.updated` / invoice events, plus `subscription_schedule.*` events. Verify existing handlers behave.
-- **Alerting**: the cron returns an `errors` array — wire a failure alert so a silently failing cron (which would let subscriptions drift) gets noticed.
+- **Alerting**: the workflow already fails the Actions run on a non-2xx response or a non-empty `errors[]`, so GitHub's failure notifications cover this. Make sure those notifications actually reach someone (watch the repo / Actions failure emails), since a silently failing cron would let subscriptions drift.
 - **Non-active states**: the migration only touches `active` subscriptions. Decide whether `trialing` / `past_due` need inclusion.

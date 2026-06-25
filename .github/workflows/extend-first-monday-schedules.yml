@@ -1,0 +1,51 @@
+name: Extend first-Monday billing schedules
+
+# Keeps each Stripe subscription schedule extended one phase ahead so billing
+# stays anchored to the first Monday of the month (see web/README.md). The
+# endpoint is idempotent, so running across the 2nd–8th is just a safety margin —
+# only the first successful run each month does any work.
+#
+# NOTE: scheduled workflows only run from the default branch, and GitHub may
+# delay scheduled runs under load. The multi-day window + idempotency absorb that.
+on:
+  schedule:
+    - cron: "0 6 2,3,4,5,6,7,8 * *"
+  workflow_dispatch:
+
+# Avoid overlapping runs (e.g. a manual trigger during the scheduled window).
+concurrency:
+  group: extend-first-monday-schedules
+  cancel-in-progress: false
+
+jobs:
+  extend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger schedule extension
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "APP_URL and CRON_SECRET repository secrets must be set." >&2
+            exit 1
+          fi
+
+          # -f fails the step on any non-2xx response (e.g. 401). Capture the
+          # body so we can also fail on partial failures reported in errors[].
+          response="$(curl -fsS -X GET \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL%/}/api/cron/extend-schedules")"
+          echo "Response: ${response}"
+
+          # The endpoint returns 200 even when individual schedule updates fail,
+          # so treat a non-empty errors[] as a failed run for alerting visibility.
+          error_count="$(echo "${response}" | jq '.errors | length')"
+          if [ "${error_count}" != "0" ]; then
+            echo "Cron reported ${error_count} error(s); failing the run." >&2
+            exit 1
+          fi
+
+          echo "Extended $(echo "${response}" | jq '.extendedCount') schedule(s)."
