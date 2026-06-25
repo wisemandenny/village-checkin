@@ -31,12 +31,38 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function downloadFilename(item: AdminUpload): string {
+  let ext = "";
+  try {
+    const path = new URL(item.url).pathname;
+    const dot = path.lastIndexOf(".");
+    if (dot !== -1) ext = path.slice(dot);
+  } catch {
+    // fall through to kind-based default
+  }
+  if (!ext) ext = item.kind === "video" ? ".mp4" : ".jpg";
+  const safeName =
+    item.display_name.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "upload";
+  return `${safeName}-${item.id.slice(0, 8)}${ext}`;
+}
+
 export default function GalleryPanel({ token }: { token: string }) {
   const [uploads, setUploads] = useState<AdminUpload[]>([]);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [takingDown, setTakingDown] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState(false);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
@@ -61,6 +87,7 @@ export default function GalleryPanel({ token }: { token: string }) {
       const data = await res.json();
       setConfigured(data.configured !== false);
       setUploads(data.uploads ?? []);
+      setSelectedIds(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -69,7 +96,9 @@ export default function GalleryPanel({ token }: { token: string }) {
   }, [apiFetch]);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   async function handleTakedown(id: string) {
@@ -81,11 +110,48 @@ export default function GalleryPanel({ token }: { token: string }) {
       const res = await apiFetch(`/api/admin/gallery/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Takedown failed");
       setUploads((cur) => cur.filter((u) => u.id !== id));
+      setSelectedIds((cur) => {
+        if (!cur.has(id)) return cur;
+        const next = new Set(cur);
+        next.delete(id);
+        return next;
+      });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Takedown failed");
     } finally {
       setTakingDown(null);
     }
+  }
+
+  async function handleDownloadSelected() {
+    const targets = uploads.filter((u) => selectedIds.has(u.id));
+    if (targets.length === 0) return;
+    setDownloading(true);
+    setError("");
+    const failures: string[] = [];
+    // Sequential: the URLs are cross-origin presigned R2 links, so we fetch each
+    // as a blob and save it (a cross-origin <a download> would just open it).
+    for (const item of targets) {
+      try {
+        const res = await fetch(item.url);
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = downloadFilename(item);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch {
+        failures.push(item.display_name);
+      }
+    }
+    if (failures.length > 0) {
+      setError(`Could not download ${failures.length} of ${targets.length} item(s).`);
+    }
+    setDownloading(false);
   }
 
   const reported = uploads.filter((u) => u.reported && !u.deleted_at);
@@ -96,13 +162,24 @@ export default function GalleryPanel({ token }: { token: string }) {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Gallery moderation</h2>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm transition hover:bg-[var(--color-surface)] disabled:opacity-50"
-        >
-          {loading ? "Loading…" : "Refresh"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadSelected}
+            disabled={downloading || selectedIds.size === 0}
+            className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
+          >
+            {downloading
+              ? "Downloading…"
+              : `Download${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+          </button>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm transition hover:bg-[var(--color-surface)] disabled:opacity-50"
+          >
+            {loading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
@@ -127,6 +204,15 @@ export default function GalleryPanel({ token }: { token: string }) {
                 : "border-[var(--color-border)]"
             }`}
           >
+            <label className="flex shrink-0 items-start pt-1 sm:items-center sm:pt-0">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(item.id)}
+                onChange={() => toggleSelected(item.id)}
+                className="h-5 w-5 cursor-pointer accent-[var(--color-accent)]"
+                aria-label={`Select upload by ${item.display_name}`}
+              />
+            </label>
             <div className="h-32 w-32 shrink-0 overflow-hidden rounded-lg bg-[var(--color-surface)]">
               {item.kind === "photo" ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
