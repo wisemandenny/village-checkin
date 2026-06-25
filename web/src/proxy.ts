@@ -15,7 +15,7 @@ function isAlwaysAllowed(pathname: string): boolean {
 }
 
 const LEGACY_VERCEL_HOST = "village-checkin.vercel.app";
-const CANONICAL_ORIGIN = "https://app.takesavillage.com";
+const CANONICAL_ORIGIN = "https://app.takesavillagemusic.com";
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;

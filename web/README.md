@@ -31,7 +31,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-Production is served at [https://app.takesavillage.com](https://app.takesavillage.com).
+Production is served at [https://app.takesavillagemusic.com](https://app.takesavillagemusic.com).
 The legacy hostname `village-checkin.vercel.app` permanently redirects there
 (except `/api/webhook/*`, so missed webhook deliveries can still reach the old
 host during migration).
