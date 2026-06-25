@@ -1,5 +1,5 @@
 import { verifyAdmin } from "@/lib/admin-auth";
-import { maintenanceKey } from "@/lib/app-env";
+import { appEnv, maintenanceKey } from "@/lib/app-env";
 import { createServerClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
   // Maintenance mode is stored per-environment; expose the value for THIS
   // environment under the stable logical `maintenance_mode` key the UI uses.
   settings.maintenance_mode = settings[maintenanceKey()] === true;
+  settings.app_env = appEnv();
 
   return NextResponse.json(settings);
 }
