@@ -16,6 +16,14 @@ export function nextFirstMondayAnchor(from: Date = new Date()): Date {
   return getFirstMondayOfMonth(from.getUTCFullYear(), from.getUTCMonth() + 1);
 }
 
+// The first Monday of the month AFTER `from`'s month. New subscribers pay in
+// full at signup, then re-anchor to this date — always next month's first
+// Monday, regardless of where in the current month they signed up. (Date.UTC
+// rolls a December +1 over into the following January.)
+export function firstMondayOfNextMonth(from: Date = new Date()): Date {
+  return getFirstMondayOfMonth(from.getUTCFullYear(), from.getUTCMonth() + 1);
+}
+
 export function toUnixSeconds(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }

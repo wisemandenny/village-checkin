@@ -2,6 +2,7 @@ import { getStripe, getSupporterProductId, resolveCustomerId } from "@/lib/strip
 import { createServerClient } from "@/lib/supabase/server";
 import { resolveExclusive } from "@/lib/exclusive-tier";
 import { exclusiveMonthlyTotalCents } from "@/lib/fees";
+import { firstMondayOfNextMonth, toUnixSeconds } from "@/lib/first-monday";
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 
@@ -56,6 +57,17 @@ export async function POST(req: NextRequest) {
 
     const productId = await getSupporterProductId(stripe);
 
+    // New supporters pay in full immediately (the inline Stripe Elements flow
+    // below confirms this first invoice). The recurring cycle is then re-anchored
+    // to the first Monday of next month: we stash that anchor here and the
+    // `invoice.paid` webhook wraps the subscription in a tagged Subscription
+    // Schedule (same mechanism as the migration), which the extend cron keeps
+    // pinned to each shifting first Monday thereafter. Doing the re-anchor after
+    // payment (rather than via `billing_cycle_anchor` at creation) keeps the
+    // immediate charge intact — a future anchor with no proration would suppress
+    // the first invoice entirely and leave nothing to confirm.
+    const anchorUnix = toUnixSeconds(firstMondayOfNextMonth());
+
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [
@@ -74,6 +86,10 @@ export async function POST(req: NextRequest) {
       metadata: {
         villager_id: villager.id,
         device_id,
+        // Read back by the webhook to pin the schedule's first-Monday phase to
+        // the exact anchor computed here (rather than recomputing later).
+        first_monday_anchor: String(anchorUnix),
+        first_monday_pending: "true",
         ...(check_in_id ? { check_in_id } : {}),
       },
     });

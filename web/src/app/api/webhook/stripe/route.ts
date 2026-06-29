@@ -9,6 +9,7 @@ import {
   reconcileSupporterTags,
   syncSubscriptionFromStripe,
 } from "@/lib/subscription-sync";
+import { enrollSubscriptionOnFirstMonday } from "@/lib/first-monday-schedule";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
 
@@ -188,5 +189,34 @@ async function handleInvoicePaid(
       })
       .eq("id", meta.check_in_id);
     if (error) console.error("[check_ins] recurring mark-paid failed", meta.check_in_id, error);
+  }
+
+  // New supporter just paid their signup invoice: wrap the subscription in a
+  // tagged Subscription Schedule re-anchored to next month's first Monday (the
+  // anchor was computed at creation and stashed in metadata). The extend cron
+  // then keeps it pinned to each shifting first Monday. Idempotent — a redelivery
+  // re-runs against the now-tagged subscription and no-ops.
+  if (
+    invoice.billing_reason === "subscription_create" &&
+    meta.first_monday_pending === "true"
+  ) {
+    const subId =
+      typeof subDetails.subscription === "string"
+        ? subDetails.subscription
+        : subDetails.subscription?.id;
+    const anchorUnix = Number(meta.first_monday_anchor);
+
+    if (subId && Number.isFinite(anchorUnix) && anchorUnix > 0) {
+      try {
+        const stripe = getStripe();
+        const sub = await stripe.subscriptions.retrieve(subId);
+        await enrollSubscriptionOnFirstMonday(stripe, sub, anchorUnix);
+      } catch (err) {
+        // Enroll failed: the subscription stays on its default signup-day
+        // monthly cycle (still active and paid, just not yet on the first
+        // Monday). Surface it; re-running the migration recovers the wrap.
+        console.error("[webhook] first-monday enroll failed", subId, err);
+      }
+    }
   }
 }
