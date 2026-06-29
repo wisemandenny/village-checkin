@@ -35,61 +35,69 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
-## First-Monday-of-the-month billing
+## First-of-the-month billing
 
-Existing active Stripe subscriptions are migrated to bill on the **first Monday of each month**, regardless of original signup date.
+Every recurring support subscription bills on the **first day of each month**.
 
-> **Scope:** this covers the one-time migration of existing `active` subscriptions plus ongoing maintenance of those schedules. Enrolling brand-new signups at creation time and handling `trialing` / `past_due` subscriptions are intentionally out of scope here (see Pre-launch checks) — re-running the migration also picks up any new `active` subscriptions.
+Because the 1st is a fixed calendar day, Stripe's native monthly billing keeps each
+cycle pinned to it forever — there is **no cron and no subscription-schedule
+maintenance**.
 
-Stripe's `billing_cycle_anchor` can only lock a fixed calendar day, but the first Monday shifts between the 1st and 7th, so it cannot be tracked natively. Instead each subscription is wrapped in a **Subscription Schedule** whose phase boundaries land on a computed first-Monday date, and a **monthly GitHub Actions cron** keeps every schedule extended one phase ahead so billing never drifts back to same-day-next-month.
+### How it works
 
-### Pieces
+- **New supporters** (`src/app/api/create-subscription/route.ts`): the signup fee is
+  charged immediately as a standalone **PaymentIntent** (confirmed inline with Stripe
+  Elements, which also saves the card). Charging up front guarantees there is an
+  invoice to confirm — a subscription whose first invoice is in the future produces
+  none.
+- On `payment_intent.succeeded` the **webhook** (`src/app/api/webhook/stripe/route.ts`)
+  creates the subscription with `billing_cycle_anchor` set to the first of next month
+  and `proration_behavior: "none"`, so the next charge lands on the 1st and every month
+  after that bills on the 1st natively. Creation is idempotent per signup PaymentIntent.
+- **Existing subscribers** are moved onto the 1st by a one-time migration
+  (`scripts/migrate-to-first-of-month.ts`): it wraps each subscription in a short-lived
+  Subscription Schedule (current period → first of next month, then an open-ended phase
+  anchored to the 1st) with `end_behavior: "release"`, handing the subscription back to
+  native monthly-on-the-1st billing. Re-running is safe (already-migrated subscriptions
+  report `SKIP`).
+- `src/lib/billing-anchor.ts` — shared UTC date math (`firstOfNextMonth`,
+  `toUnixSeconds`) and the migration tag.
 
-- `src/lib/first-monday.ts` — shared UTC date math (`getFirstMondayOfMonth`, `nextFirstMondayAnchor`, `toUnixSeconds`).
-- `scripts/migrate-to-first-monday.ts` — one-time, idempotent migration that wraps every active subscription in a schedule anchored to the next first Monday.
-- `src/app/api/cron/extend-schedules/route.ts` — `GET` endpoint that appends the next first-Monday phase to each tagged schedule. Idempotent and auth-protected (`CRON_SECRET` bearer token).
-- `.github/workflows/extend-first-monday-schedules.yml` — scheduled GitHub Actions workflow that calls the endpoint daily on the 2nd–8th (06:00 UTC) as a safety margin. The endpoint is idempotent, so repeated days never double-charge. The workflow fails (red run + GitHub's failure notifications) on a non-2xx response **or** a non-empty `errors[]`, giving built-in alerting.
+### Environment variables
 
-### Environment variables / secrets
-
-App runtime (Vercel):
-
-- `STRIPE_SECRET_KEY` — used by the migration script and the cron endpoint (test vs live is inferred from the key prefix).
-- `CRON_SECRET` — long random string. The cron endpoint returns `401` unless the request carries `Authorization: Bearer <CRON_SECRET>`.
-
-GitHub repository secrets (for the scheduled workflow):
-
-- `CRON_SECRET` — same value as the Vercel one; the workflow sends it as the bearer token.
-- `APP_URL` — the deployed app's base URL (e.g. `https://your-app.vercel.app`), no trailing slash required.
-
-> Scheduled workflows only run from the **default branch**, so this cron starts firing once merged to `main`.
+- `STRIPE_SECRET_KEY` — used by the app and the migration script (test vs live is
+  inferred from the key prefix).
+- `STRIPE_WEBHOOK_SECRET` — verifies incoming Stripe webhooks (subscription creation
+  depends on `payment_intent.succeeded` being delivered).
 
 ### Test-first workflow
 
 Always validate against **test mode** before touching live data:
 
 ```bash
-# 1. Run the migration against test-mode subscriptions
-STRIPE_SECRET_KEY=sk_test_... npm run migrate:first-monday
+# 1. Verify both billing paths end-to-end against a Stripe test clock: a new
+#    signup (immediate charge + monthly on the 1st) and an existing subscription
+#    migrated onto the 1st. Asserts every recurring charge lands on the 1st.
+STRIPE_SECRET_KEY=sk_test_... npm run verify:first-of-month
 
-# 2. Inspect the resulting schedules in the Stripe Dashboard
-#    (Billing → Subscription schedules): confirm the phase boundary lands on the
-#    correct first Monday and that items/quantities carried over.
+# 2. Migrate existing test-mode subscriptions onto the 1st.
+STRIPE_SECRET_KEY=sk_test_... npm run migrate:first-of-month
 
-# 3. Re-run; every subscription should report SKIP (idempotency)
-STRIPE_SECRET_KEY=sk_test_... npm run migrate:first-monday
-
-# 4. Exercise the cron locally (with the dev server running)
-curl -H "Authorization: Bearer $CRON_SECRET" \
-  http://localhost:3000/api/cron/extend-schedules
-# Invoke again immediately → extendedCount should be 0 (nothing double-extended).
-# Invoke with a wrong/missing token → 401.
+# 3. Re-run; every subscription should report SKIP (idempotency).
+STRIPE_SECRET_KEY=sk_test_... npm run migrate:first-of-month
 ```
 
 ### Pre-launch checks
 
-- **Timezone**: all math is UTC. If "first Monday" must be local (e.g. `America/Toronto`), adjust `getFirstMondayOfMonth` in `src/lib/first-monday.ts` — that is the single place.
-- **Proration**: the migration's stub period defaults to `proration_behavior: "none"` (no charge for the partial period before the first new cycle). Confirm this is desired before going live.
-- **Webhooks**: schedule-managed subscriptions still emit `customer.subscription.updated` / invoice events, plus `subscription_schedule.*` events. Verify existing handlers behave.
-- **Alerting**: the workflow already fails the Actions run on a non-2xx response or a non-empty `errors[]`, so GitHub's failure notifications cover this. Make sure those notifications actually reach someone (watch the repo / Actions failure emails), since a silently failing cron would let subscriptions drift.
-- **Non-active states**: the migration only touches `active` subscriptions. Decide whether `trialing` / `past_due` need inclusion.
+- **Timezone**: all math is UTC, so "the 1st" is the 1st at 00:00 UTC. If billing must
+  fall on the 1st in a local zone, adjust `firstOfNextMonth` in
+  `src/lib/billing-anchor.ts` — that is the single place.
+- **Near-term double charge**: a new supporter pays at signup and again on the next
+  1st, which can be only days apart (e.g. signing up Jun 30 → next charge Jul 1). This
+  is intentional.
+- **Webhook reliability**: the subscription is created when `payment_intent.succeeded`
+  is delivered. If that webhook fails, the signup fee is still collected but no
+  subscription exists; re-running the migration does **not** recover it (there is no
+  subscription yet) — retry via the admin "Refresh from Stripe" action or recreate it.
+- **Non-active states**: the migration only touches `active` subscriptions. Decide
+  whether `trialing` / `past_due` need inclusion.

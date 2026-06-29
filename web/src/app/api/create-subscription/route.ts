@@ -1,14 +1,22 @@
-import { getStripe, getSupporterProductId, resolveCustomerId } from "@/lib/stripe";
+import { getStripe, resolveCustomerId } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
 import { resolveExclusive } from "@/lib/exclusive-tier";
 import { exclusiveMonthlyTotalCents } from "@/lib/fees";
-import { firstMondayOfNextMonth, toUnixSeconds } from "@/lib/first-monday";
+import { firstOfNextMonth, toUnixSeconds } from "@/lib/billing-anchor";
 import { NextRequest, NextResponse } from "next/server";
-import type Stripe from "stripe";
 
-// Creates the exclusive recurring support subscription via Stripe (the only
-// recurring tier). Returns the client_secret used to confirm the first payment
-// inline with Stripe Elements (and save the card for future cycles).
+// Starts the exclusive recurring support pledge (the only recurring tier).
+//
+// Billing model: everyone is billed on the FIRST DAY of the month. A new
+// supporter pays the full amount immediately here (a standalone PaymentIntent,
+// confirmed inline with Stripe Elements, which also saves the card). Once that
+// payment succeeds, the `payment_intent.succeeded` webhook creates the actual
+// subscription anchored to the first of next month — so the next charge lands on
+// the 1st and every month after that, natively (no schedules, no cron).
+//
+// We charge first and create the subscription afterward because a subscription
+// whose first invoice is in the future produces no immediate invoice to confirm,
+// which would break the inline payment.
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { device_id, check_in_id } = body as {
@@ -55,59 +63,37 @@ export async function POST(req: NextRequest) {
 
     const customerId = await resolveCustomerId(stripe, supabase, villager, device_id);
 
-    const productId = await getSupporterProductId(stripe);
+    // The first recurring charge lands on the first of next month. The webhook
+    // reads this back rather than recomputing, so the anchor can't drift if the
+    // payment confirms across a month boundary.
+    const anchorUnix = toUnixSeconds(firstOfNextMonth());
 
-    // New supporters pay in full immediately (the inline Stripe Elements flow
-    // below confirms this first invoice). The recurring cycle is then re-anchored
-    // to the first Monday of next month: we stash that anchor here and the
-    // `invoice.paid` webhook wraps the subscription in a tagged Subscription
-    // Schedule (same mechanism as the migration), which the extend cron keeps
-    // pinned to each shifting first Monday thereafter. Doing the re-anchor after
-    // payment (rather than via `billing_cycle_anchor` at creation) keeps the
-    // immediate charge intact — a future anchor with no proration would suppress
-    // the first invoice entirely and leave nothing to confirm.
-    const anchorUnix = toUnixSeconds(firstMondayOfNextMonth());
-
-    const subscription = await stripe.subscriptions.create({
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: chargeAmount,
+      currency: "cad",
       customer: customerId,
-      items: [
-        {
-          price_data: {
-            currency: "cad",
-            product: productId,
-            unit_amount: chargeAmount,
-            recurring: { interval: "month" },
-          },
-        },
-      ],
-      payment_behavior: "default_incomplete",
-      payment_settings: { save_default_payment_method: "on_subscription" },
-      expand: ["latest_invoice.confirmation_secret"],
+      // Save the card so the webhook-created subscription can charge it on the 1st.
+      setup_future_usage: "off_session",
+      automatic_payment_methods: { enabled: true },
       metadata: {
         villager_id: villager.id,
         device_id,
-        // Read back by the webhook to pin the schedule's first-Monday phase to
-        // the exact anchor computed here (rather than recomputing later).
-        first_monday_anchor: String(anchorUnix),
-        first_monday_pending: "true",
+        // Drives subscription creation in the `payment_intent.succeeded` webhook.
+        subscription_signup: "true",
+        recurring_amount: String(chargeAmount),
+        first_of_month_anchor: String(anchorUnix),
         ...(check_in_id ? { check_in_id } : {}),
       },
     });
 
-    const invoice = subscription.latest_invoice as Stripe.Invoice | null;
-    const clientSecret = invoice?.confirmation_secret?.client_secret;
-
-    if (!clientSecret) {
+    if (!paymentIntent.client_secret) {
       return NextResponse.json(
         { error: "Could not initialize subscription payment" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      client_secret: clientSecret,
-      subscription_id: subscription.id,
-    });
+    return NextResponse.json({ client_secret: paymentIntent.client_secret });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Subscription creation failed";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -9,8 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate:first-monday": "tsx scripts/migrate-to-first-monday.ts",
-    "verify:first-monday": "tsx scripts/verify-first-monday.ts"
+    "migrate:first-of-month": "tsx scripts/migrate-to-first-of-month.ts",
+    "verify:first-of-month": "tsx scripts/verify-first-of-month.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1072.0",
