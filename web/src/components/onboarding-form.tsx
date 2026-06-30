@@ -43,6 +43,12 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped per request so a slow, stale response can't overwrite a newer one.
   const suggestSeq = useRef(0);
+  // The existing handle (e.g. "@drake") a typed IG matches in register mode, so
+  // we can nudge the villager to reconnect before they fill out the whole form
+  // and hit a submit-time 409.
+  const [igTaken, setIgTaken] = useState<string | null>(null);
+  const igCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const igCheckSeq = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const animEnabled = useAnimationEnabled();
@@ -50,6 +56,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   useEffect(() => {
     return () => {
       if (suggestTimer.current) clearTimeout(suggestTimer.current);
+      if (igCheckTimer.current) clearTimeout(igCheckTimer.current);
     };
   }, []);
 
@@ -96,6 +103,56 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   function pickSuggestion(handle: string) {
     setRecoverIg(handle);
     clearSuggestions();
+  }
+
+  // While registering, watch the IG field for a handle that's already taken so
+  // we can surface a "reconnect instead" nudge before the form is submitted.
+  // Reuses the recover suggestion endpoint (prefix match) and looks for an
+  // exact, case-insensitive hit among the returned handles.
+  function onRegisterIgChange(raw: string) {
+    const value = raw.toLowerCase();
+    setIgHandle(value);
+    setIgTaken(null);
+
+    if (igCheckTimer.current) clearTimeout(igCheckTimer.current);
+
+    // Mirror the server's gate: ignore the leading "@" and require 2+ chars.
+    const prefix = value.startsWith("@") ? value.slice(1) : value;
+    if (prefix.length < 2) {
+      igCheckSeq.current++;
+      return;
+    }
+
+    const normalized = `@${prefix}`;
+    const seq = ++igCheckSeq.current;
+    igCheckTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/recover/suggest?q=${encodeURIComponent(normalized)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        // Drop the response if a newer keystroke has since started.
+        if (seq !== igCheckSeq.current) return;
+        const handles: string[] = Array.isArray(data.handles) ? data.handles : [];
+        const match = handles.find((h) => h.toLowerCase() === normalized);
+        if (match) setIgTaken(match);
+      } catch {
+        // Transient errors just leave no notice; submit-time 409 still covers it.
+      }
+    }, 200);
+  }
+
+  // Shared entry into recovery mode, optionally pre-filling the IG handle (used
+  // by the "reconnect" nudge so the villager doesn't have to retype it).
+  function switchToRecover(prefillIg?: string) {
+    if (igCheckTimer.current) clearTimeout(igCheckTimer.current);
+    igCheckSeq.current++;
+    setMode("recover");
+    setError(null);
+    setDisplayName("");
+    setIgTaken(null);
+    if (prefillIg) setRecoverIg(prefillIg);
   }
 
   const isEmailValid = EMAIL_RE.test(email.trim());
@@ -313,6 +370,19 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   return (
     <form onSubmit={handleRegister} className="flex flex-col gap-6 w-full max-w-sm">
       <Stagger step={70}>
+        <Reveal className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+          <span className="text-sm text-[var(--color-muted)]">
+            Been here before?
+          </span>
+          <button
+            type="button"
+            onClick={() => switchToRecover()}
+            className="text-sm font-semibold text-[var(--color-accent)] underline underline-offset-4 hover:text-[var(--color-accent-light)] transition-colors"
+          >
+            Reconnect your account
+          </button>
+        </Reveal>
+
         <Reveal className="flex flex-col gap-2">
           <label htmlFor="name" className="text-sm font-medium text-[var(--color-muted)]">
             What should we call you?
@@ -337,10 +407,24 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             id="ig"
             type="text"
             value={igHandle}
-            onChange={(e) => setIgHandle(e.target.value.toLowerCase())}
+            onChange={(e) => onRegisterIgChange(e.target.value)}
             placeholder="@champagnepapi"
             className="h-12 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-lg placeholder:text-[var(--color-muted)]/50 focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
           />
+          {igTaken && (
+            <div className="flex flex-col items-start gap-2 rounded-xl border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-4 py-3">
+              <p className="text-sm text-[var(--color-foreground)]">
+                Looks like <span className="font-semibold">{igTaken}</span> is already registered.
+              </p>
+              <button
+                type="button"
+                onClick={() => switchToRecover(igTaken)}
+                className="text-sm font-semibold text-[var(--color-accent)] underline underline-offset-4 hover:text-[var(--color-accent-light)] transition-colors"
+              >
+                Reconnect my account
+              </button>
+            </div>
+          )}
         </Reveal>
 
         <Reveal className="flex flex-col gap-2">
@@ -501,10 +585,10 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         <Reveal>
           <button
             type="button"
-            onClick={() => { setMode("recover"); setError(null); setDisplayName(""); }}
+            onClick={() => switchToRecover()}
             className="w-full text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
           >
-            I&apos;ve already registered
+            Already registered on another phone? Reconnect your account
           </button>
         </Reveal>
       </Stagger>
