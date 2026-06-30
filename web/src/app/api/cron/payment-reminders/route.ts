@@ -1,6 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { mintPayToken } from "@/lib/pay-token";
+import { buildReminder } from "@/lib/reminder-email";
 import { NextRequest, NextResponse } from "next/server";
 
 // Scheduled job (hit by a GitHub Actions cron) that nudges villagers who checked
@@ -129,64 +130,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(summary);
-}
-
-function firstNameOf(displayName: string | null): string | null {
-  if (!displayName) return null;
-  return displayName.trim().split(/\s+/)[0] || null;
-}
-
-function buildReminder(
-  kind: "1h" | "24h",
-  displayName: string | null,
-  payUrl: string
-): { subject: string; html: string; text: string } {
-  const first = firstNameOf(displayName);
-  const hi = first ? `Hi ${first},` : "Hi,";
-
-  const subject =
-    kind === "1h"
-      ? "Finish supporting the Village"
-      : "Your Village visit still needs a payment";
-
-  const intro =
-    kind === "1h"
-      ? "Thanks for stopping by the Village! It looks like your payment didn't go through. You can finish in a few seconds:"
-      : "Just a friendly reminder — your recent Village visit still hasn't been paid for. You can take care of it here:";
-
-  const text = `${hi}
-
-${intro}
-
-${payUrl}
-
-Pay what you can — it all goes to supporting the Village. If you already paid or visited on a membership, you can ignore this.
-
-Thank you!
-The Village`;
-
-  const html = `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f6f6f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f6f6;padding:24px 0;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;padding:32px;">
-            <tr><td style="font-size:16px;line-height:1.5;">
-              <p style="margin:0 0 16px;">${hi}</p>
-              <p style="margin:0 0 24px;">${intro}</p>
-              <p style="margin:0 0 28px;text-align:center;">
-                <a href="${payUrl}" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:14px;">Finish paying</a>
-              </p>
-              <p style="margin:0 0 8px;font-size:13px;color:#6b7280;">Pay what you can — it all goes to supporting the Village. If you already paid or visited on a membership, you can ignore this.</p>
-              <p style="margin:24px 0 0;font-size:13px;color:#6b7280;">Thank you!<br/>The Village</p>
-            </td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
-
-  return { subject, html, text };
 }
