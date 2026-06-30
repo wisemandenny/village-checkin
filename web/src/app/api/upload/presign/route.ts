@@ -11,7 +11,6 @@ import { mintUploadToken } from "@/lib/upload-token";
 import {
   DAILY_BYTE_BUDGET,
   getDailyUploadUsage,
-  hasCheckInToday,
 } from "@/lib/upload-helpers";
 import { checkRateLimit, clientIp } from "@/lib/upload-rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -75,12 +74,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (!(await hasCheckInToday(supabase, villager.id))) {
-    return NextResponse.json(
-      { error: "Check in today before uploading" },
-      { status: 403 }
-    );
-  }
+  // Uploading is gated on being a signed-in villager (looked up above); no
+  // same-day check-in is required.
 
   const usage = await getDailyUploadUsage(supabase, villager.id);
   if (usage.bytes + size_bytes > DAILY_BYTE_BUDGET) {

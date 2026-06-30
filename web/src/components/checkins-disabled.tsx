@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck } from "@/components/motion";
+import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
 
 interface PastCheckIn {
   id: string;
@@ -74,6 +75,9 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
         <p className="text-sm text-[var(--color-muted)]">
           Your payment is complete.
         </p>
+        <div className="mt-4 w-full max-w-sm">
+          <GalleryMosaic deviceId={deviceId} />
+        </div>
         <button
           onClick={() => {
             setSelected(null);
@@ -215,6 +219,10 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
           Manage your support
         </Link>
       )}
+
+      <div className="w-full max-w-sm">
+        <GalleryMosaic deviceId={deviceId} />
+      </div>
     </div>
   );
 }
