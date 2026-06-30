@@ -11,12 +11,13 @@ export interface Me {
 export const ACCEPT = "image/jpeg,image/png,image/webp,video/mp4,video/quicktime";
 export const PHOTO_MAX_DIM = 2048;
 export const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
-export const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+export const VIDEO_MAX_BYTES = 4 * 1024 * 1024 * 1024;
 export const JPEG_QUALITY = 0.85;
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 // Re-encode to JPEG via canvas: downsizes and strips EXIF/location metadata.
@@ -45,8 +46,40 @@ export async function reencodePhoto(
   return { blob, contentType: "image/jpeg" };
 }
 
+// PUT the blob to R2 via XHR so we get byte-level upload progress events
+// (fetch can't report upload progress). Reports 0-100 as bytes leave the
+// device.
+function putWithProgress(
+  url: string,
+  blob: Blob,
+  contentType: string,
+  onProgress?: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error("upload to storage failed"));
+    };
+    xhr.onerror = () => reject(new Error("upload to storage failed"));
+    xhr.onabort = () => reject(new Error("upload to storage failed"));
+    xhr.send(blob);
+  });
+}
+
 // One upload: presign -> PUT to R2 -> register. Photos are re-encoded first.
-export async function uploadOne(file: File, deviceId: string): Promise<void> {
+export async function uploadOne(
+  file: File,
+  deviceId: string,
+  onProgress?: (pct: number) => void
+): Promise<void> {
   let blob: Blob;
   let contentType: string;
 
@@ -80,14 +113,7 @@ export async function uploadOne(file: File, deviceId: string): Promise<void> {
   }
   const { upload_url, object_key, upload_token } = await presignRes.json();
 
-  const putRes = await fetch(upload_url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
-  if (!putRes.ok) {
-    throw new Error("upload to storage failed");
-  }
+  await putWithProgress(upload_url, blob, contentType, onProgress);
 
   const registerRes = await fetch("/api/upload", {
     method: "POST",
@@ -116,7 +142,6 @@ export interface UploadResult {
 // upload orchestration (progress/error).
 export function useGalleryUpload(deviceIdOverride?: string | null) {
   const [me, setMe] = useState<Me | null>(null);
-  const [checkedIn, setCheckedIn] = useState(false);
   const [identityLoaded, setIdentityLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
@@ -126,21 +151,15 @@ export function useGalleryUpload(deviceIdOverride?: string | null) {
     const deviceId = deviceIdOverride ?? getDeviceId();
     let cancelled = false;
     (async () => {
+      // Uploading is gated on being a signed-in villager, so identity is the
+      // only thing we need to resolve here.
       if (deviceId) {
-        await Promise.all([
-          fetch(`/api/villager?device_id=${encodeURIComponent(deviceId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              if (!cancelled && data?.villager) setMe(data.villager as Me);
-            })
-            .catch(() => {}),
-          fetch(`/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              if (!cancelled) setCheckedIn(Boolean(data?.check_in));
-            })
-            .catch(() => {}),
-        ]);
+        await fetch(`/api/villager?device_id=${encodeURIComponent(deviceId)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!cancelled && data?.villager) setMe(data.villager as Me);
+          })
+          .catch(() => {});
       }
       if (!cancelled) setIdentityLoaded(true);
     })();
@@ -163,11 +182,13 @@ export function useGalleryUpload(deviceIdOverride?: string | null) {
       // many large images in parallel.
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        setUploadProgress(
-          files.length === 1 ? "Uploading…" : `Uploading ${i + 1} of ${files.length}…`
-        );
+        const label =
+          files.length === 1 ? "Uploading" : `Uploading ${i + 1} of ${files.length}`;
+        setUploadProgress(`${label}…`);
         try {
-          await uploadOne(file, deviceId);
+          await uploadOne(file, deviceId, (pct) => {
+            setUploadProgress(`${label} ${pct}%`);
+          });
           result.succeeded++;
         } catch (e) {
           result.failures.push(`${file.name} (${e instanceof Error ? e.message : "failed"})`);
@@ -191,7 +212,6 @@ export function useGalleryUpload(deviceIdOverride?: string | null) {
 
   return {
     me,
-    checkedIn,
     identityLoaded,
     uploading,
     uploadProgress,

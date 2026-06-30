@@ -3,7 +3,7 @@
 -- than a boolean) makes "newest-promoted wins" overflow ordering fall out for
 -- free when more items are promoted than there are highlight slots.
 
-alter table uploads add column promoted_at timestamptz;
+alter table uploads add column if not exists promoted_at timestamptz;
 
-create index idx_uploads_promoted on uploads (promoted_at desc)
+create index if not exists idx_uploads_promoted on uploads (promoted_at desc)
   where deleted_at is null and not reported;

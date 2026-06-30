@@ -106,7 +106,7 @@ export async function ensureVillager(
     const { data, error } = await supabase
       .from("villagers")
       .insert({
-        device_id: `web-${crypto.randomUUID()}`,
+        device_ids: [`web-${crypto.randomUUID()}`],
         display_name: displayName,
         email: opts.email,
         marketing_opt_in: true,
@@ -330,7 +330,7 @@ export async function getVillagerByDevice(
   const { data } = await supabase
     .from("villagers")
     .select("id, stripe_customer_id, ig_handle, roles")
-    .eq("device_id", deviceId)
+    .contains("device_ids", [deviceId])
     .maybeSingle();
   return (data as ManageVillagerRow) ?? null;
 }

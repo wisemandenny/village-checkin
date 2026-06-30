@@ -7,6 +7,7 @@ import {
   EMAIL_TAKEN,
   IG_TAKEN,
   findDuplicateField,
+  normalizeDeviceIds,
   normalizeEmail,
   normalizeIgHandle,
   uniqueViolationMessage,
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("villagers")
     .insert({
-      device_id: body.device_id,
+      device_ids: normalizeDeviceIds(body.device_ids ?? body.device_id),
       display_name: body.display_name,
       ig_handle: normalizedIg,
       roles: body.roles ?? [],

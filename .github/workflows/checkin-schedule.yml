@@ -1,0 +1,34 @@
+name: Check-in schedule
+
+# Reconciles the check-ins toggle against the admin-configured weekly schedule.
+# The route is edge-triggered (only writes on open/close boundaries) and no-ops
+# when the schedule is disabled, so running often is cheap. Every 15 minutes
+# means check-ins flip within ~15 min of a scheduled boundary. Also exposed as
+# a manual trigger for ad-hoc reconciliation.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reconcile check-ins toggle
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET not set; skipping."
+            exit 0
+          fi
+          response=$(curl -sS -w "\n%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://app.takesavillagemusic.com/api/cron/checkins)
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -n1)
+          echo "HTTP $status: $body"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Cron request failed."
+            exit 1
+          fi

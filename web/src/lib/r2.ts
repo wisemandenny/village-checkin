@@ -68,7 +68,7 @@ export type AllowedUploadType = keyof typeof ALLOWED_UPLOAD_TYPES;
 
 export const UPLOAD_SIZE_CAPS = {
   photo: 15 * 1024 * 1024,
-  video: 100 * 1024 * 1024,
+  video: 4 * 1024 * 1024 * 1024,
 } as const;
 
 export function getUploadKind(contentType: string): "photo" | "video" | null {
@@ -157,7 +157,9 @@ export async function presignUploadUrl({
     ContentLength: sizeBytes,
   });
 
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 120 });
+  // 2 hours: large videos (up to 4GB) on slow connections can take a long
+  // time, and the URL must stay valid for the entire single-PUT upload.
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 7200 });
   return { uploadUrl, objectKey };
 }
 

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   }
 
   const record: Record<string, unknown> = {
-    device_id,
+    device_ids: [device_id],
     display_name,
     email: normalizedEmail,
     marketing_opt_in,

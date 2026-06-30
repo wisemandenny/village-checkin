@@ -6,6 +6,7 @@ import {
   EMAIL_TAKEN,
   IG_TAKEN,
   findDuplicateField,
+  normalizeDeviceIds,
   normalizeEmail,
   normalizeIgHandle,
   uniqueViolationMessage,
@@ -47,7 +48,7 @@ export async function PUT(
 
   const updates: Record<string, unknown> = {};
   const allowedFields = [
-    "device_id",
+    "device_ids",
     "display_name",
     "ig_handle",
     "roles",
@@ -66,6 +67,10 @@ export async function PUT(
     if (field in body) {
       updates[field] = body[field];
     }
+  }
+
+  if ("device_ids" in updates) {
+    updates.device_ids = normalizeDeviceIds(updates.device_ids);
   }
 
   // Normalize the unique fields when present so storage/comparison stay

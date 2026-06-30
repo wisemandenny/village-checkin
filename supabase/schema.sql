@@ -3,10 +3,11 @@
 -- Enable UUID generation
 create extension if not exists "pgcrypto";
 
--- Villagers table: one row per unique device
+-- Villagers table: one row per villager. A villager can sign in from multiple
+-- devices, so device_ids holds every device that resolves to this account.
 create table villagers (
   id          uuid primary key default gen_random_uuid(),
-  device_id   text unique not null,
+  device_ids  text[] not null default '{}',
   display_name text not null,
   ig_handle    text,
   roles        text[] not null default '{}',
@@ -38,7 +39,11 @@ create table check_ins (
   payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred', 'subscription', 'elder')),
   status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped')),
   created_at           timestamptz not null default now(),
-  stripe_transaction_id text
+  stripe_transaction_id text,
+  -- Set when the unpaid-check-in reminder emails are sent (1h and 24h after a
+  -- 'pending' check-in), so the scheduled job never sends the same nudge twice.
+  reminder_1h_sent_at  timestamptz,
+  reminder_24h_sent_at timestamptz
 );
 
 -- Subscriptions table: recurring support pledges processed by Stripe.
@@ -69,8 +74,32 @@ create unique index idx_villagers_ig_handle_unique
 -- Index for fast lookups of a villager's subscriptions
 create index idx_subscriptions_villager_id on subscriptions(villager_id);
 
--- Index for fast lookups by device_id
-create index idx_villagers_device_id on villagers(device_id);
+-- GIN index for fast containment lookups by device_id (device_ids @> '{<id>}').
+create index idx_villagers_device_ids on villagers using gin (device_ids);
+
+-- Global uniqueness: no device id may belong to two villagers. Postgres
+-- exclusion constraints don't support GIN, so a trigger enforces it instead.
+-- Raised with errcode unique_violation (23505) so the app maps it to the
+-- existing "Device already registered" message.
+create or replace function villagers_device_ids_unique()
+returns trigger as $$
+begin
+  if new.device_ids is not null and array_length(new.device_ids, 1) is not null then
+    if exists (
+      select 1 from villagers v
+      where v.id <> new.id and v.device_ids && new.device_ids
+    ) then
+      raise exception 'device_id already registered to another villager'
+        using errcode = 'unique_violation';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_villagers_device_ids_unique
+  before insert or update of device_ids on villagers
+  for each row execute function villagers_device_ids_unique();
 
 -- Index for fast lookups by villager
 create index idx_check_ins_villager_id on check_ins(villager_id);
@@ -134,6 +163,14 @@ insert into studio_settings (key, value) values ('admin_password', 'null');
 -- intentionally do not seed them here.
 -- Permanent allowlist of IG handles eligible for the exclusive ($10/month) tier.
 insert into studio_settings (key, value) values ('exclusive_handles', '[]'::jsonb);
+-- Check-in schedule: a recurring weekly window a cron uses to flip
+-- 'checkins_enabled' automatically. Shipped DISABLED so existing behavior is
+-- unchanged until an admin turns it on; the manual toggle keeps working.
+-- Times are Toronto (America/Toronto) local wall-clock; DST is handled by the
+-- app, so no timezone is stored. day: 0=Sun..6=Sat; the window may wrap past
+-- midnight. The companion 'checkin_schedule_last_state' key is created on
+-- demand by the cron.
+insert into studio_settings (key, value) values ('checkin_schedule', '{"enabled":false,"open":{"day":1,"time":"17:00"},"close":{"day":2,"time":"04:00"}}'::jsonb);
 
 alter table studio_settings enable row level security;
 

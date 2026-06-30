@@ -18,7 +18,7 @@ export async function POST(
   const { data: villager } = await supabase
     .from("villagers")
     .select("id")
-    .eq("device_id", device_id)
+    .contains("device_ids", [device_id])
     .maybeSingle();
 
   if (!villager) {

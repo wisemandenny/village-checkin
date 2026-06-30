@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from("villagers")
     .select("*")
-    .eq("device_id", deviceId)
+    .contains("device_ids", [deviceId])
     .single();
 
   if (error || !data) {

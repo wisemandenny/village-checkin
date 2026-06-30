@@ -66,6 +66,7 @@ npx expo start
 | `NEXT_PUBLIC_BASE_URL` | Public URL of the web app (production: `https://app.takesavillagemusic.com`) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (browser) |
 | `ADMIN_PASSWORD` | Fallback admin password (if not set in DB) |
+| `CRON_SECRET` | Shared bearer secret for the scheduled check-in reconciler (`/api/cron/checkins`). Must match the `CRON_SECRET` GitHub Actions secret. If unset, the schedule is never enforced (the manual check-ins toggle still works). |
 | `STRIPE_SUPPORTER_PRODUCT_ID` | (Recommended) Stripe Product id for recurring support. If unset, one is created on demand. |
 | `R2_SELFIE_BUCKET` | Private Cloudflare R2 bucket for villager selfies shown on the "who's here" board. Served back through the app's `/api/selfie` route (no public bucket/domain). If unset, selfie capture is skipped (registration works as before). |
 | `R2_ACCOUNT_ID` | Cloudflare account id — used to build the R2 S3 API endpoint. |
@@ -76,6 +77,29 @@ npx expo start
 | `KIT_TAG_MONTHLY_ID` | Kit Tag id applied to active monthly supporters. |
 | `KIT_OAUTH_CLIENT_ID` / `KIT_OAUTH_CLIENT_SECRET` | (Optional) Kit OAuth app credentials. Required only for Kit purchase records; the `/v4/purchases` API rejects API-key auth. Without them, purchase tracking is skipped (tags + the subscriptions table remain the source of truth). |
 | `KIT_OAUTH_SETUP_SECRET` | (Optional) Random string that gates the one-time `/api/kit/oauth/start` authorization route. |
+| `RESEND_API_KEY` | [Resend](https://resend.com) API key for transactional email — server only. Enables unpaid-check-in reminder emails. If unset, reminder sending is skipped. |
+| `EMAIL_FROM` | Verified Resend sender for reminder emails, e.g. `The Village <hello@takesavillagemusic.com>`. |
+| `PAY_TOKEN_SECRET` | Random string; HMAC secret for the signed pay links embedded in reminder emails. |
+| `CRON_SECRET` | Random string the reminder cron must send as `Authorization: Bearer <secret>` when calling `/api/cron/payment-reminders`. |
+
+### Unpaid check-in reminders
+
+When a villager checks in but abandons the Stripe payment flow, their check-in
+stays in status `pending` (`payment_method = 'deferred'`). A scheduled job emails
+them a reminder **1 hour** and again **24 hours** after check-in, each containing a
+signed one-tap link to `/pay/<token>` where they settle that specific visit
+(routed through the normal payment intent + Stripe webhook, which flips the row to
+`paid`). Each reminder is recorded on the check-in (`reminder_1h_sent_at`,
+`reminder_24h_sent_at`) so it is never sent twice, and a 3-day safety window keeps
+the first run after deploy from emailing a backlog of old pending rows.
+
+- **Email:** [Resend](https://resend.com) — set `RESEND_API_KEY` + `EMAIL_FROM`.
+- **Pay links:** signed with `PAY_TOKEN_SECRET` (HMAC, 7-day expiry).
+- **Schedule:** the `.github/workflows/payment-reminders.yml` GitHub Action runs
+  every 15 minutes and `POST`s to `/api/cron/payment-reminders` with the
+  `CRON_SECRET` bearer token. Required **GitHub repo secrets**: `PROD_BASE_URL`,
+  `CRON_SECRET` (and optionally `STAGING_BASE_URL`, `STAGING_CRON_SECRET`). The
+  route is idempotent, so running it more or less often only changes timing.
 
 ### Kit integration
 
@@ -116,6 +140,23 @@ logging each charge as a Kit purchase needs a one-time OAuth setup:
 
 If OAuth is not configured, purchase recording simply no-ops; tags and the
 `subscriptions` table remain the source of truth for supporter status.
+
+## Scheduled check-ins
+
+Admins can toggle check-ins on/off manually in **Settings → Check-ins**, or hand
+control to a weekly schedule in **Settings → Check-in schedule** (open day/time,
+close day/time). Schedule times are Toronto (`America/Toronto`) local wall-clock
+time; daylight saving is handled automatically. The schedule lives in
+`studio_settings.checkin_schedule` and is enforced by a GitHub Actions cron
+([.github/workflows/checkin-schedule.yml](.github/workflows/checkin-schedule.yml))
+that runs every 15 minutes and calls `/api/cron/checkins` with the `CRON_SECRET`
+bearer.
+
+The route is **edge-triggered**: it only writes `checkins_enabled` when the
+schedule crosses an open/close boundary, so a manual flip inside a window sticks
+until the next boundary. When the schedule is disabled the cron no-ops and
+check-ins stay under manual control. Set `CRON_SECRET` both as an app env var and
+as a repository **Actions secret** of the same name.
 
 ## Payment Flow
 

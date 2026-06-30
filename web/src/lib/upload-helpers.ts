@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const DAILY_BYTE_BUDGET = 2 * 1024 * 1024 * 1024; // 2 GB
+export const DAILY_BYTE_BUDGET = 20 * 1024 * 1024 * 1024; // 20 GB
 
 export function todayBounds(): { start: string; end: string } {
   const now = new Date();
@@ -15,23 +15,6 @@ export function todayBounds(): { start: string; end: string } {
     now.getDate() + 1
   ).toISOString();
   return { start, end };
-}
-
-export async function hasCheckInToday(
-  supabase: SupabaseClient,
-  villagerId: string
-): Promise<boolean> {
-  const { start, end } = todayBounds();
-  const { data } = await supabase
-    .from("check_ins")
-    .select("id")
-    .eq("villager_id", villagerId)
-    .gte("created_at", start)
-    .lt("created_at", end)
-    .in("status", ["paid", "pending", "skipped"])
-    .limit(1)
-    .maybeSingle();
-  return Boolean(data);
 }
 
 export async function getDailyUploadUsage(

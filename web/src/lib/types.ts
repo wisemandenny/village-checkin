@@ -8,7 +8,7 @@ export interface VillagerSubscriptionSummary {
 
 export interface Villager {
   id: string;
-  device_id: string;
+  device_ids: string[];
   display_name: string;
   ig_handle: string | null;
   roles: string[];

@@ -7,13 +7,15 @@ import SubscriptionsPanel from "@/components/admin/subscriptions-panel";
 import SettingsPanel from "@/components/admin/settings-panel";
 import ChangelogPanel from "@/components/admin/changelog-panel";
 import GalleryPanel from "@/components/admin/gallery-panel";
+import StatisticsPanel from "@/components/admin/statistics-panel";
 
-type Tab = "villagers" | "checkins" | "subscriptions" | "gallery" | "settings" | "changelog";
+type Tab = "villagers" | "checkins" | "subscriptions" | "statistics" | "gallery" | "settings" | "changelog";
 
 const leftTabs: { key: Tab; label: string }[] = [
   { key: "villagers", label: "Villagers" },
   { key: "checkins", label: "Check-ins" },
   { key: "subscriptions", label: "Subscriptions" },
+  { key: "statistics", label: "Statistics" },
   { key: "gallery", label: "Gallery" },
 ];
 
@@ -143,6 +145,7 @@ export default function AdminPage() {
       {activeTab === "villagers" && <VillagersPanel token={token} />}
       {activeTab === "checkins" && <CheckInsPanel token={token} />}
       {activeTab === "subscriptions" && <SubscriptionsPanel token={token} />}
+      {activeTab === "statistics" && <StatisticsPanel token={token} />}
       {activeTab === "gallery" && <GalleryPanel token={token} />}
       {activeTab === "settings" && <SettingsPanel token={token} onShowChangelog={() => setActiveTab("changelog")} />}
       {activeTab === "changelog" && <ChangelogPanel />}
