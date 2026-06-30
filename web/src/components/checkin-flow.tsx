@@ -279,17 +279,20 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   );
 }
 
-// Entry points to community pages, styled as secondary buttons so they're clearly
-// visible and tappable from the check-in and paid screens.
+// Entry points to community pages. "See who's here" is the enlarged primary CTA
+// so it's easy to spot and tap; the gallery link sits below as a secondary button.
 function CommunityLinks() {
-  const linkClass =
+  const secondaryLinkClass =
     "mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]";
   return (
     <div className="flex flex-col items-center gap-2">
-      <Link href="/here" className={linkClass}>
+      <Link
+        href="/here"
+        className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[var(--color-accent)] px-8 text-lg font-semibold text-white transition hover:bg-[var(--color-accent-light)] font-[family-name:var(--font-domaine)]"
+      >
         See who&apos;s here
       </Link>
-      <Link href="/gallery" className={linkClass}>
+      <Link href="/gallery" className={secondaryLinkClass}>
         Village gallery
       </Link>
     </div>
