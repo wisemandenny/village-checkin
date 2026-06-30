@@ -82,7 +82,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
         className="hidden"
       />
 
-      <div className="mx-auto w-full max-w-sm">
+      <div className="mx-auto w-full max-w-3xl">
         {!loading && items.length === 0 ? (
           <button
             type="button"
@@ -94,7 +94,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             <span className="text-sm font-semibold">Be the first to share today</span>
           </button>
         ) : (
-          <div className="grid grid-flow-row-dense grid-cols-4 gap-1.5 [grid-auto-rows:90px]">
+          <div className="grid grid-flow-row-dense grid-cols-8 gap-1.5 [grid-auto-rows:90px]">
             {items.map((item) => {
               const isHighlight = highlightIds.has(item.id);
               const isMine = me?.id === item.villager_id;
