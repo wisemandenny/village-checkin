@@ -9,10 +9,24 @@
 
 alter table villagers add column if not exists device_ids text[];
 
--- Backfill the array from the existing single column.
-update villagers
-  set device_ids = array[device_id]
-  where device_id is not null and (device_ids is null or device_ids = '{}');
+-- Backfill the array from the legacy single column, but only when it still
+-- exists. A fresh or already-migrated database (e.g. a Supabase preview branch
+-- seeded from the current schema) has no `device_id` column, so referencing it
+-- directly would fail to parse; guard with dynamic SQL to stay idempotent.
+do $backfill$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'villagers' and column_name = 'device_id'
+  ) then
+    execute $sql$
+      update villagers
+        set device_ids = array[device_id]
+        where device_id is not null and (device_ids is null or device_ids = '{}')
+    $sql$;
+  end if;
+end
+$backfill$;
 
 alter table villagers alter column device_ids set default '{}';
 update villagers set device_ids = '{}' where device_ids is null;
