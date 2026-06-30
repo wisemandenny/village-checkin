@@ -7,7 +7,6 @@ import {
   Bar,
   LineChart,
   Line,
-  AreaChart,
   Area,
   ComposedChart,
   XAxis,
@@ -126,12 +125,11 @@ function isPaid(c: CheckIn): boolean {
   return c.status === "paid" && c.payment_method !== "subscription";
 }
 
-type RangeKey = "1w" | "1mo" | "3mo" | "6mo" | "1y" | "all";
+type RangeKey = "1mo" | "3mo" | "6mo" | "1y" | "all";
 
 // Each range maps to a number of weekly buckets (or "all" history).
 // Week counts approximate the calendar period: 13w ~= 3mo, 26w ~= 6mo, 52w ~= 1y.
 const RANGE_OPTIONS: { key: RangeKey; label: string; weeks: number | "all" }[] = [
-  { key: "1w", label: "1W", weeks: 1 },
   { key: "1mo", label: "1M", weeks: 4 },
   { key: "3mo", label: "3M", weeks: 13 },
   { key: "6mo", label: "6M", weeks: 26 },
@@ -758,21 +756,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
             {showVillagerCharts && (
               <ChartCard title="Villagers over time">
                 <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={weeks} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                    <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Area type="monotone" dataKey="totalVillagers" name="Villagers" stroke={COLORS.totalVillagers} fill={COLORS.totalVillagers} fillOpacity={0.2} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-
-            {showVillagerCharts && (
-              <ChartCard title="Exclusive vs non-exclusive members over time">
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={weeks} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
+                  <ComposedChart data={weeks} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
@@ -780,7 +764,8 @@ export default function StatisticsPanel({ token }: { token: string }) {
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Area stackId="members" type="monotone" dataKey="nonExclusiveMembers" name="Non-exclusive" stroke={COLORS.nonExclusive} fill={COLORS.nonExclusive} fillOpacity={0.25} strokeWidth={2} />
                     <Area stackId="members" type="monotone" dataKey="exclusiveMembers" name="Exclusive" stroke={COLORS.exclusive} fill={COLORS.exclusive} fillOpacity={0.35} strokeWidth={2} />
-                  </AreaChart>
+                    <Line type="monotone" dataKey="totalVillagers" name="Total" stroke={COLORS.totalVillagers} strokeWidth={2} dot={false} legendType="plainline" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </ChartCard>
             )}
