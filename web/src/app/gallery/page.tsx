@@ -21,7 +21,7 @@ export default function GalleryPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { me, checkedIn, uploading, uploadProgress, error, setError, uploadFiles } =
+  const { me, uploading, uploadProgress, error, setError, uploadFiles } =
     useGalleryUpload();
 
   const loadGallery = useCallback(async () => {
@@ -40,7 +40,8 @@ export default function GalleryPage() {
     })();
   }, [loadGallery]);
 
-  const canUpload = configured && me && checkedIn && !uploading;
+  // Uploading is open to any signed-in villager; no check-in is required.
+  const canUpload = configured && me && !uploading;
 
   async function handleUpload() {
     if (selectedFiles.length === 0 || !canUpload) return;
@@ -100,7 +101,7 @@ export default function GalleryPage() {
           </p>
         )}
 
-        {configured && me && checkedIn && (
+        {configured && me && (
           <div className="mt-6 w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <input
               ref={fileRef}
@@ -145,15 +146,9 @@ export default function GalleryPage() {
           </div>
         )}
 
-        {configured && me && !checkedIn && (
-          <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
-            Check in today to upload.
-          </p>
-        )}
-
         {configured && !me && !loading && (
           <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
-            Register and check in to upload.
+            Register to upload.
           </p>
         )}
 

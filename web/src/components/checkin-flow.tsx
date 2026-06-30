@@ -281,11 +281,10 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   );
 }
 
-// Entry points to community pages. "See who's here" is the enlarged primary CTA
-// so it's easy to spot and tap; the gallery link sits below as a secondary button.
+// Entry points to community pages. "See who's here" is the primary CTA; the
+// gallery is reached inline via the mosaic's "Open full gallery" link, so no
+// separate gallery button is needed here.
 function CommunityLinks() {
-  const secondaryLinkClass =
-    "mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]";
   return (
     <div className="flex flex-col items-center gap-2">
       <Link
@@ -293,9 +292,6 @@ function CommunityLinks() {
         className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[var(--color-accent)] px-8 text-lg font-semibold text-white transition hover:bg-[var(--color-accent-light)] font-[family-name:var(--font-domaine)]"
       >
         See who&apos;s here
-      </Link>
-      <Link href="/gallery" className={secondaryLinkClass}>
-        Village gallery
       </Link>
     </div>
   );

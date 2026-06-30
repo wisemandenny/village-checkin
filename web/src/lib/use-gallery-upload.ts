@@ -116,7 +116,6 @@ export interface UploadResult {
 // upload orchestration (progress/error).
 export function useGalleryUpload(deviceIdOverride?: string | null) {
   const [me, setMe] = useState<Me | null>(null);
-  const [checkedIn, setCheckedIn] = useState(false);
   const [identityLoaded, setIdentityLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
@@ -126,21 +125,15 @@ export function useGalleryUpload(deviceIdOverride?: string | null) {
     const deviceId = deviceIdOverride ?? getDeviceId();
     let cancelled = false;
     (async () => {
+      // Uploading is gated on being a signed-in villager, so identity is the
+      // only thing we need to resolve here.
       if (deviceId) {
-        await Promise.all([
-          fetch(`/api/villager?device_id=${encodeURIComponent(deviceId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              if (!cancelled && data?.villager) setMe(data.villager as Me);
-            })
-            .catch(() => {}),
-          fetch(`/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              if (!cancelled) setCheckedIn(Boolean(data?.check_in));
-            })
-            .catch(() => {}),
-        ]);
+        await fetch(`/api/villager?device_id=${encodeURIComponent(deviceId)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!cancelled && data?.villager) setMe(data.villager as Me);
+          })
+          .catch(() => {});
       }
       if (!cancelled) setIdentityLoaded(true);
     })();
@@ -191,7 +184,6 @@ export function useGalleryUpload(deviceIdOverride?: string | null) {
 
   return {
     me,
-    checkedIn,
     identityLoaded,
     uploading,
     uploadProgress,

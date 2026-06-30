@@ -26,7 +26,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [loading, setLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { me, checkedIn, uploading, uploadProgress, error, setError, uploadFiles } =
+  const { me, uploading, uploadProgress, error, setError, uploadFiles } =
     useGalleryUpload(deviceId);
 
   const loadMosaic = useCallback(async () => {
@@ -45,7 +45,8 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
     })();
   }, [loadMosaic]);
 
-  const canUpload = Boolean(configured && me && checkedIn && !uploading);
+  // Uploading is open to any signed-in villager; no check-in is required.
+  const canUpload = Boolean(configured && me && !uploading);
 
   async function handleFiles(files: File[]) {
     if (files.length === 0 || !canUpload) return;
