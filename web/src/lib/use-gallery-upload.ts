@@ -11,12 +11,13 @@ export interface Me {
 export const ACCEPT = "image/jpeg,image/png,image/webp,video/mp4,video/quicktime";
 export const PHOTO_MAX_DIM = 2048;
 export const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
-export const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+export const VIDEO_MAX_BYTES = 4 * 1024 * 1024 * 1024;
 export const JPEG_QUALITY = 0.85;
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 // Re-encode to JPEG via canvas: downsizes and strips EXIF/location metadata.
