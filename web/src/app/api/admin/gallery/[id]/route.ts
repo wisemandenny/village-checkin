@@ -36,3 +36,31 @@ export async function DELETE(
 
   return NextResponse.json({ success: true });
 }
+
+// Promote / unpromote an upload into the highlighted mosaic tiles. Promotion is
+// stored as a timestamp so "newest-promoted wins" ordering falls out naturally.
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = await verifyAdmin(req);
+  if (denied) return denied;
+
+  const { id } = await params;
+  const body = await req.json().catch(() => ({}));
+  if (typeof body.promoted !== "boolean") {
+    return NextResponse.json({ error: "promoted (boolean) required" }, { status: 400 });
+  }
+
+  const supabase = createServerClient();
+  const { error } = await supabase
+    .from("uploads")
+    .update({ promoted_at: body.promoted ? new Date().toISOString() : null })
+    .eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ success: true, promoted: body.promoted });
+}

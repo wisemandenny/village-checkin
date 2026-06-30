@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from("uploads")
     .select(
-      "id, kind, content_type, object_key, size_bytes, reported, created_at, deleted_at, deleted_by, villager_id, villagers!inner(display_name)"
+      "id, kind, content_type, object_key, size_bytes, reported, promoted_at, created_at, deleted_at, deleted_by, villager_id, villagers!inner(display_name)"
     )
     .order("reported", { ascending: false })
     .order("created_at", { ascending: false });
@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
           villager_id: row.villager_id,
           size_bytes: row.size_bytes,
           reported: row.reported,
+          promoted_at: row.promoted_at,
           created_at: row.created_at,
           deleted_at: row.deleted_at,
           deleted_by: row.deleted_by,

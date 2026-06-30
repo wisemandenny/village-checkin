@@ -10,6 +10,7 @@ interface AdminUpload {
   villager_id: string;
   size_bytes: number;
   reported: boolean;
+  promoted_at: string | null;
   created_at: string;
   deleted_at: string | null;
   deleted_by: string | null;
@@ -52,6 +53,7 @@ export default function GalleryPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [takingDown, setTakingDown] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [bulkTakingDown, setBulkTakingDown] = useState(false);
@@ -121,6 +123,28 @@ export default function GalleryPanel({ token }: { token: string }) {
       alert(e instanceof Error ? e.message : "Takedown failed");
     } finally {
       setTakingDown(null);
+    }
+  }
+
+  async function handlePromote(id: string, next: boolean) {
+    setPromoting(id);
+    try {
+      const res = await apiFetch(`/api/admin/gallery/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ promoted: next }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      setUploads((cur) =>
+        cur.map((u) =>
+          u.id === id
+            ? { ...u, promoted_at: next ? new Date().toISOString() : null }
+            : u
+        )
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setPromoting(null);
     }
   }
 
@@ -299,15 +323,36 @@ export default function GalleryPanel({ token }: { token: string }) {
                     Hidden by villager
                   </span>
                 )}
+                {item.promoted_at && !item.deleted_at && (
+                  <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                    Highlighted
+                  </span>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => handleTakedown(item.id)}
-                disabled={takingDown === item.id}
-                className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
-              >
-                {takingDown === item.id ? "Removing…" : "Take down"}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {!item.deleted_at && (
+                  <button
+                    type="button"
+                    onClick={() => handlePromote(item.id, !item.promoted_at)}
+                    disabled={promoting === item.id}
+                    className="rounded-lg border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 transition hover:bg-amber-50 disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-950/30"
+                  >
+                    {promoting === item.id
+                      ? "Saving…"
+                      : item.promoted_at
+                        ? "Unhighlight"
+                        : "Highlight"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleTakedown(item.id)}
+                  disabled={takingDown === item.id}
+                  className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
+                >
+                  {takingDown === item.id ? "Removing…" : "Take down"}
+                </button>
+              </div>
             </div>
           </div>
         ))}
