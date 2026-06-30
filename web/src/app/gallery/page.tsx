@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getDeviceId } from "@/lib/device-id";
+import { ACCEPT, useGalleryUpload } from "@/lib/use-gallery-upload";
 
 interface GalleryItem {
   id: string;
@@ -13,57 +14,15 @@ interface GalleryItem {
   created_at: string;
 }
 
-interface Me {
-  id: string;
-  display_name: string;
-}
-
-const ACCEPT =
-  "image/jpeg,image/png,image/webp,video/mp4,video/quicktime";
-const PHOTO_MAX_DIM = 2048;
-const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
-const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
-const JPEG_QUALITY = 0.85;
-
-async function reencodePhoto(file: File): Promise<{ blob: Blob; contentType: "image/jpeg" }> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, PHOTO_MAX_DIM / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not process image");
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("Could not encode image"))),
-      "image/jpeg",
-      JPEG_QUALITY
-    );
-  });
-  return { blob, contentType: "image/jpeg" };
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export default function GalleryPage() {
   const [items, setItems] = useState<GalleryItem[]>([]);
-  const [me, setMe] = useState<Me | null>(null);
-  const [checkedIn, setCheckedIn] = useState(false);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const { me, checkedIn, uploading, uploadProgress, error, setError, uploadFiles } =
+    useGalleryUpload();
 
   const loadGallery = useCallback(async () => {
     const res = await fetch("/api/gallery");
@@ -75,133 +34,22 @@ export default function GalleryPage() {
   }, []);
 
   useEffect(() => {
-    const deviceId = getDeviceId();
     (async () => {
-      const tasks: Promise<unknown>[] = [loadGallery()];
-      if (deviceId) {
-        tasks.push(
-          fetch(`/api/villager?device_id=${encodeURIComponent(deviceId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              if (data?.villager) setMe(data.villager as Me);
-            })
-            .catch(() => {}),
-          fetch(`/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              setCheckedIn(Boolean(data?.check_in));
-            })
-            .catch(() => {})
-        );
-      }
-      await Promise.all(tasks);
+      await loadGallery();
       setLoading(false);
     })();
   }, [loadGallery]);
 
   const canUpload = configured && me && checkedIn && !uploading;
 
-  async function uploadOne(file: File, deviceId: string) {
-    let blob: Blob;
-    let contentType: string;
-
-    if (file.type.startsWith("image/")) {
-      const encoded = await reencodePhoto(file);
-      blob = encoded.blob;
-      contentType = encoded.contentType;
-      if (blob.size > PHOTO_MAX_BYTES) {
-        throw new Error(`photo exceeds ${formatSize(PHOTO_MAX_BYTES)}`);
-      }
-    } else {
-      blob = file;
-      contentType = file.type;
-      if (blob.size > VIDEO_MAX_BYTES) {
-        throw new Error(`video exceeds ${formatSize(VIDEO_MAX_BYTES)}`);
-      }
-    }
-
-    const presignRes = await fetch("/api/upload/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        device_id: deviceId,
-        content_type: contentType,
-        size_bytes: blob.size,
-      }),
-    });
-    if (!presignRes.ok) {
-      const data = await presignRes.json().catch(() => ({}));
-      throw new Error(data.error || "could not start upload");
-    }
-    const { upload_url, object_key, upload_token } = await presignRes.json();
-
-    const putRes = await fetch(upload_url, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: blob,
-    });
-    if (!putRes.ok) {
-      throw new Error("upload to storage failed");
-    }
-
-    const registerRes = await fetch("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        device_id: deviceId,
-        object_key,
-        content_type: contentType,
-        upload_token,
-      }),
-    });
-    if (!registerRes.ok) {
-      const data = await registerRes.json().catch(() => ({}));
-      throw new Error(data.error || "could not register upload");
-    }
-  }
-
   async function handleUpload() {
     if (selectedFiles.length === 0 || !canUpload) return;
-    const deviceId = getDeviceId();
-    if (!deviceId) return;
-
-    setUploading(true);
-    setError(null);
-
-    let succeeded = 0;
-    const failures: string[] = [];
-
-    // Sequential so we respect the presign rate limit and avoid re-encoding
-    // many large images in parallel.
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const file = selectedFiles[i];
-      setUploadProgress(
-        selectedFiles.length === 1
-          ? "Uploading…"
-          : `Uploading ${i + 1} of ${selectedFiles.length}…`
-      );
-      try {
-        await uploadOne(file, deviceId);
-        succeeded++;
-      } catch (e) {
-        failures.push(`${file.name} (${e instanceof Error ? e.message : "failed"})`);
-      }
-    }
-
-    if (failures.length > 0) {
-      const prefix =
-        succeeded > 0 ? `Uploaded ${succeeded}, ${failures.length} failed: ` : "Upload failed: ";
-      setError(prefix + failures.join("; "));
-    }
-
+    const { succeeded } = await uploadFiles(selectedFiles);
     if (succeeded > 0) {
       setSelectedFiles([]);
       if (fileRef.current) fileRef.current.value = "";
       await loadGallery();
     }
-
-    setUploading(false);
-    setUploadProgress(null);
   }
 
   async function handleDelete(id: string) {
