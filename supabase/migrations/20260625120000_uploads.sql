@@ -1,6 +1,7 @@
 -- Community gallery uploads (photos and short videos in private R2 bucket).
+-- Incremental, idempotent migration for an existing database.
 
-create table uploads (
+create table if not exists uploads (
   id           uuid primary key default gen_random_uuid(),
   villager_id  uuid not null references villagers(id) on delete cascade,
   object_key   text not null,
@@ -13,8 +14,8 @@ create table uploads (
   deleted_by   text check (deleted_by in ('owner','admin'))
 );
 
-create index idx_uploads_created_at on uploads (created_at desc) where deleted_at is null;
-create index idx_uploads_villager_created on uploads (villager_id, created_at desc);
+create index if not exists idx_uploads_created_at on uploads (created_at desc) where deleted_at is null;
+create index if not exists idx_uploads_villager_created on uploads (villager_id, created_at desc);
 
 alter table uploads enable row level security;
 
