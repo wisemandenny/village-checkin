@@ -198,12 +198,32 @@ export default function GalleryPage() {
                       />
                     </button>
                   ) : (
-                    <video
-                      src={item.url}
-                      controls
-                      preload="metadata"
-                      className="h-full w-full object-cover"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setPreview(item)}
+                      className="group h-full w-full cursor-zoom-in"
+                      aria-label={`Open video by ${item.display_name}`}
+                    >
+                      <video
+                        src={item.url}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white transition group-hover:bg-black/70">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="ml-0.5 h-6 w-6"
+                            aria-hidden="true"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </span>
+                      </span>
+                    </button>
                   )}
                 </div>
                 <div className="flex items-center justify-between gap-2 px-2 py-2">
@@ -256,7 +276,7 @@ export default function GalleryPage() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={`Photo by ${preview.display_name}`}
+          aria-label={`${preview.kind === "photo" ? "Photo" : "Video"} by ${preview.display_name}`}
           onClick={() => setPreview(null)}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
         >
@@ -268,13 +288,24 @@ export default function GalleryPage() {
           >
             ×
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview.url}
-            alt={`Photo by ${preview.display_name}`}
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
-          />
+          {preview.kind === "photo" ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={preview.url}
+              alt={`Photo by ${preview.display_name}`}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+            />
+          ) : (
+            <video
+              src={preview.url}
+              controls
+              autoPlay
+              playsInline
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+            />
+          )}
         </div>
       )}
     </main>
