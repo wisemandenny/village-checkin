@@ -81,14 +81,6 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
       />
 
       <div className="mx-auto w-full max-w-sm">
-        <p className="mb-2 text-center text-sm text-[var(--color-muted)]">
-          {loading
-            ? "Loading the Village…"
-            : items.length === 0
-              ? "The Village today"
-              : `The Village today · ${items.length} shared`}
-        </p>
-
         {!loading && items.length === 0 ? (
           <button
             type="button"
@@ -100,7 +92,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             <span className="text-sm font-semibold">Be the first to share today</span>
           </button>
         ) : (
-          <div className="grid grid-flow-row-dense grid-cols-4 gap-1.5 [grid-auto-rows:62px]">
+          <div className="grid grid-flow-row-dense grid-cols-4 gap-1.5 [grid-auto-rows:90px]">
             {items.map((item) => {
               const isHighlight = highlightIds.has(item.id);
               const isMine = me?.id === item.villager_id;
@@ -108,7 +100,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                 <div
                   key={item.id}
                   className={`relative overflow-hidden rounded-lg bg-[var(--color-surface)] ${
-                    isHighlight ? "col-span-2 row-span-2" : "col-span-1 row-span-1"
+                    isHighlight ? "col-span-4 row-span-4" : "col-span-2 row-span-2"
                   }`}
                 >
                   {item.kind === "photo" ? (
@@ -139,11 +131,11 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="col-span-1 row-span-1 flex flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-[var(--color-accent)] bg-[var(--color-accent)]/[0.06] text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/[0.1] disabled:opacity-40"
+                className="col-span-2 row-span-2 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--color-accent)] bg-[var(--color-accent)]/[0.06] text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/[0.1] disabled:opacity-40"
                 aria-label="Add your photo"
               >
-                <span className="text-lg leading-none">+</span>
-                <span className="text-[9px] font-semibold leading-tight">Add yours</span>
+                <span className="text-2xl leading-none">+</span>
+                <span className="text-xs font-semibold leading-tight">Add yours</span>
               </button>
             )}
           </div>
@@ -154,7 +146,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] disabled:opacity-40 font-[family-name:var(--font-domaine)]"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--color-accent)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-40 font-[family-name:var(--font-domaine)]"
           >
             {uploading ? uploadProgress ?? "Uploading…" : "Add your photo"}
           </button>
