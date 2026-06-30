@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const TOKEN_TTL_SEC = 300;
+// 2 hours: the token is minted at presign time and verified only after the
+// upload finishes, so it must outlive a large (up to 4GB) upload.
+const TOKEN_TTL_SEC = 7200;
 
 function getSecret(): string | null {
   return process.env.UPLOAD_TOKEN_SECRET ?? null;

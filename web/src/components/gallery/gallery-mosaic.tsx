@@ -26,7 +26,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [loading, setLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { me, checkedIn, uploading, uploadProgress, error, setError, uploadFiles } =
+  const { me, checkedIn, uploading, uploadProgress, uploadPct, error, setError, uploadFiles } =
     useGalleryUpload(deviceId);
 
   const loadMosaic = useCallback(async () => {
@@ -155,8 +155,27 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             disabled={uploading}
             className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] disabled:opacity-40 font-[family-name:var(--font-domaine)]"
           >
-            {uploading ? uploadProgress ?? "Uploading…" : "Add your photo"}
+            {uploading
+              ? `${uploadProgress ?? "Uploading"}${
+                  uploadPct != null ? ` ${uploadPct}%` : "…"
+                }`
+              : "Add your photo"}
           </button>
+        )}
+
+        {uploading && uploadPct != null && (
+          <div
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]"
+            role="progressbar"
+            aria-valuenow={uploadPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-150"
+              style={{ width: `${uploadPct}%` }}
+            />
+          </div>
         )}
 
         {error && <p className="mt-2 text-center text-sm text-red-500">{error}</p>}

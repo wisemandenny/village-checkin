@@ -21,7 +21,7 @@ export default function GalleryPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { me, checkedIn, uploading, uploadProgress, error, setError, uploadFiles } =
+  const { me, checkedIn, uploading, uploadProgress, uploadPct, error, setError, uploadFiles } =
     useGalleryUpload();
 
   const loadGallery = useCallback(async () => {
@@ -133,11 +133,27 @@ export default function GalleryPage() {
               className="mt-3 w-full rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-40"
             >
               {uploading
-                ? uploadProgress ?? "Uploading…"
+                ? `${uploadProgress ?? "Uploading"}${
+                    uploadPct != null ? ` ${uploadPct}%` : "…"
+                  }`
                 : selectedFiles.length > 1
                   ? `Upload ${selectedFiles.length}`
                   : "Upload"}
             </button>
+            {uploading && uploadPct != null && (
+              <div
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]"
+                role="progressbar"
+                aria-valuenow={uploadPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-150"
+                  style={{ width: `${uploadPct}%` }}
+                />
+              </div>
+            )}
             {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
             <p className="mt-2 text-xs text-[var(--color-muted)]">
               Photos are resized and stripped of location data. Videos keep their metadata.
