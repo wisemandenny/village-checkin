@@ -7,6 +7,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   ComposedChart,
   XAxis,
   YAxis,
@@ -15,6 +17,8 @@ import {
   Legend,
 } from "recharts";
 import type { CheckIn, Villager } from "@/lib/types";
+import { Role } from "@/lib/tag-order";
+import { EXCLUSIVE_ROLE } from "@/lib/exclusive-tier";
 
 type CheckInWithVillager = CheckIn & {
   villagers: { display_name: string } | null;
@@ -31,7 +35,23 @@ const COLORS = {
   newVillagers: "#8b5cf6",
   unpaidCount: "#f59e0b",
   unpaidOwed: "#dc2626",
+  producers: "#6366f1",
+  vocalists: "#ec4899",
+  instrumentalists: "#14b8a6",
+  justVibing: "#f59e0b",
+  totalVillagers: "#6366f1",
+  exclusive: "#eab308",
+  nonExclusive: "#64748b",
 };
+
+// Roles offered in the multiselect filter. Values are lower-cased to match the
+// normalized role lists stored per villager.
+const ROLE_FILTERS: { value: string; label: string }[] = [
+  { value: Role.Producer.toLowerCase(), label: "Producers" },
+  { value: Role.Vocalist.toLowerCase(), label: "Vocalists" },
+  { value: Role.Musician.toLowerCase(), label: "Instrumentalists" },
+  { value: Role.JustVibing.toLowerCase(), label: "Just Vibing" },
+];
 
 function formatCents(cents: number): string {
   if (cents === 0) return "$0";
@@ -73,7 +93,18 @@ function isPaid(c: CheckIn): boolean {
   return c.status === "paid" && c.payment_method !== "subscription";
 }
 
-type WeekRange = 8 | 12 | 26 | "all";
+type RangeKey = "1w" | "1mo" | "3mo" | "6mo" | "1y" | "all";
+
+// Each range maps to a number of weekly buckets (or "all" history).
+// Week counts approximate the calendar period: 13w ~= 3mo, 26w ~= 6mo, 52w ~= 1y.
+const RANGE_OPTIONS: { key: RangeKey; label: string; weeks: number | "all" }[] = [
+  { key: "1w", label: "1W", weeks: 1 },
+  { key: "1mo", label: "1M", weeks: 4 },
+  { key: "3mo", label: "3M", weeks: 13 },
+  { key: "6mo", label: "6M", weeks: 26 },
+  { key: "1y", label: "1Y", weeks: 52 },
+  { key: "all", label: "All", weeks: "all" },
+];
 
 interface WeekBucket {
   week: string; // M/D label for the x-axis
@@ -87,6 +118,17 @@ interface WeekBucket {
   unpaidCount: number; // pending check-ins
   unpaidOwed: number; // dollars still owed (pending intent_amount)
   unpaidOwedCents: number;
+  // Role breakdown of unique villagers active that week. A multi-role villager
+  // counts toward each role they hold, so these can sum above `unique`.
+  producers: number;
+  vocalists: number;
+  instrumentalists: number;
+  justVibing: number;
+  // Cumulative villager population as of the end of this week (registrations
+  // by first_visited_at). Exclusive split uses the villager's current role.
+  totalVillagers: number;
+  exclusiveMembers: number;
+  nonExclusiveMembers: number;
 }
 
 export default function StatisticsPanel({ token }: { token: string }) {
@@ -97,7 +139,18 @@ export default function StatisticsPanel({ token }: { token: string }) {
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
   const [newVillagersOnly, setNewVillagersOnly] = useState(false);
-  const [range, setRange] = useState<WeekRange>(12);
+  const [range, setRange] = useState<RangeKey>("3mo");
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
+  const [rolesOpen, setRolesOpen] = useState(false);
+
+  const toggleRole = useCallback((value: string) => {
+    setSelectedRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }, []);
 
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
@@ -159,6 +212,39 @@ export default function StatisticsPanel({ token }: { token: string }) {
     [villagers]
   );
 
+  // Lower-cased role list per villager, for the weekly role breakdown.
+  const rolesByVillager = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const v of villagers) {
+      m.set(v.id, (v.roles ?? []).map((r) => r.toLowerCase()));
+    }
+    return m;
+  }, [villagers]);
+
+  // True when a villager has at least one of the selected filter roles (or no
+  // role filter is active).
+  const matchesRoleFilter = useCallback(
+    (vid: string) => {
+      if (selectedRoles.size === 0) return true;
+      const roles = rolesByVillager.get(vid) ?? [];
+      return roles.some((r) => selectedRoles.has(r));
+    },
+    [selectedRoles, rolesByVillager]
+  );
+
+  // Villager population used by the "over time" charts: registration time and
+  // current exclusive status, filtered by the active role multiselect.
+  const populationVillagers = useMemo(() => {
+    return villagers
+      .filter((v) => matchesRoleFilter(v.id))
+      .map((v) => ({
+        firstVisited: new Date(v.first_visited_at).getTime(),
+        isExclusive: (v.roles ?? []).some(
+          (r) => r.toLowerCase() === EXCLUSIVE_ROLE
+        ),
+      }));
+  }, [villagers, matchesRoleFilter]);
+
   const weeks = useMemo<WeekBucket[]>(() => {
     if (allCheckins.length === 0) return [];
 
@@ -166,8 +252,10 @@ export default function StatisticsPanel({ token }: { token: string }) {
     const endMonday = mondayDate(thisMondayKey);
 
     // Determine the first week to display.
+    const weeksCount =
+      RANGE_OPTIONS.find((o) => o.key === range)?.weeks ?? "all";
     let startMonday: Date;
-    if (range === "all") {
+    if (weeksCount === "all") {
       let earliest = Infinity;
       for (const c of allCheckins) {
         const k = mondayDate(toMondayOfWeek(c.created_at)).getTime();
@@ -175,7 +263,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       }
       startMonday = earliest === Infinity ? endMonday : new Date(earliest);
     } else {
-      startMonday = new Date(endMonday.getTime() - (range - 1) * WEEK_MS);
+      startMonday = new Date(endMonday.getTime() - (weeksCount - 1) * WEEK_MS);
     }
 
     // Build a continuous list of week keys so empty weeks still render as gaps.
@@ -208,6 +296,9 @@ export default function StatisticsPanel({ token }: { token: string }) {
     if (newVillagersOnly) {
       source = source.filter((c) => newInRange(c.villager_id));
     }
+    if (selectedRoles.size > 0) {
+      source = source.filter((c) => matchesRoleFilter(c.villager_id));
+    }
 
     const byWeek = new Map<string, CheckInWithVillager[]>();
     for (const c of source) {
@@ -222,11 +313,17 @@ export default function StatisticsPanel({ token }: { token: string }) {
       const paid = rows.filter(isPaid);
       const revenueCents = paid.reduce((s, c) => s + c.intent_amount, 0);
       const avgCents = paid.length > 0 ? revenueCents / paid.length : 0;
-      const unique = new Set(rows.map((c) => c.villager_id)).size;
+      const uniqueIds = new Set(rows.map((c) => c.villager_id));
+      const unique = uniqueIds.size;
 
-      // Villagers whose first-ever visit lands in this week (and not excluded).
+      // Villagers whose first-ever visit lands in this week (and not excluded),
+      // plus the role breakdown of everyone active that week.
       let newVillagers = 0;
-      for (const vid of new Set(rows.map((c) => c.villager_id))) {
+      let producers = 0;
+      let vocalists = 0;
+      let instrumentalists = 0;
+      let justVibing = 0;
+      for (const vid of uniqueIds) {
         const first = firstSeen.get(vid);
         if (
           first !== undefined &&
@@ -235,10 +332,26 @@ export default function StatisticsPanel({ token }: { token: string }) {
         ) {
           newVillagers++;
         }
+        const roles = rolesByVillager.get(vid) ?? [];
+        if (roles.includes(Role.Producer.toLowerCase())) producers++;
+        if (roles.includes(Role.Vocalist.toLowerCase())) vocalists++;
+        if (roles.includes(Role.Musician.toLowerCase())) instrumentalists++;
+        if (roles.includes(Role.JustVibing.toLowerCase())) justVibing++;
       }
 
       const pending = rows.filter((c) => c.status === "pending");
       const unpaidOwedCents = pending.reduce((s, c) => s + c.intent_amount, 0);
+
+      // Cumulative villager population registered as of the end of this week.
+      const weekEndMs = mondayDate(key).getTime() + WEEK_MS;
+      let totalVillagers = 0;
+      let exclusiveMembers = 0;
+      for (const pv of populationVillagers) {
+        if (pv.firstVisited < weekEndMs) {
+          totalVillagers++;
+          if (pv.isExclusive) exclusiveMembers++;
+        }
+      }
 
       return {
         week: formatMD(key),
@@ -252,9 +365,16 @@ export default function StatisticsPanel({ token }: { token: string }) {
         unpaidCount: pending.length,
         unpaidOwed: unpaidOwedCents / 100,
         unpaidOwedCents,
+        producers,
+        vocalists,
+        instrumentalists,
+        justVibing,
+        totalVillagers,
+        exclusiveMembers,
+        nonExclusiveMembers: totalVillagers - exclusiveMembers,
       };
     });
-  }, [allCheckins, range, filterVillagerId, newVillagersOnly, firstSeen, excludedIds]);
+  }, [allCheckins, range, filterVillagerId, newVillagersOnly, selectedRoles, matchesRoleFilter, firstSeen, excludedIds, rolesByVillager, populationVillagers]);
 
   const totals = useMemo(() => {
     return weeks.reduce(
@@ -291,6 +411,8 @@ export default function StatisticsPanel({ token }: { token: string }) {
     );
     if (filterVillagerId)
       source = source.filter((c) => c.villager_id === filterVillagerId);
+    if (selectedRoles.size > 0)
+      source = source.filter((c) => matchesRoleFilter(c.villager_id));
     for (const c of source) {
       if (isPaid(c)) {
         total += c.intent_amount;
@@ -298,7 +420,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       }
     }
     return paid > 0 ? total / paid : 0;
-  }, [weeks, allCheckins, filterVillagerId]);
+  }, [weeks, allCheckins, filterVillagerId, selectedRoles, matchesRoleFilter]);
 
   const tooltipStyle = {
     background: "var(--color-surface)",
@@ -336,18 +458,71 @@ export default function StatisticsPanel({ token }: { token: string }) {
           ))}
         </select>
 
+        {/* Roles multiselect — filters every chart to villagers with any of
+            the selected roles. */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setRolesOpen((o) => !o)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+          >
+            {selectedRoles.size === 0
+              ? "All roles"
+              : `${selectedRoles.size} role${selectedRoles.size > 1 ? "s" : ""}`}
+            <svg className="h-4 w-4 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {rolesOpen && (
+            <>
+              <button
+                type="button"
+                aria-hidden
+                tabIndex={-1}
+                onClick={() => setRolesOpen(false)}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              <div className="absolute left-0 z-20 mt-1 w-56 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] p-2 shadow-lg">
+                {ROLE_FILTERS.map((r) => (
+                  <label
+                    key={r.value}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition hover:bg-[var(--color-surface)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRoles.has(r.value)}
+                      onChange={() => toggleRole(r.value)}
+                      className="h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-accent)]"
+                    />
+                    {r.label}
+                  </label>
+                ))}
+                {selectedRoles.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRoles(new Set())}
+                    className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--color-accent)] transition hover:bg-[var(--color-surface)]"
+                  >
+                    Clear roles
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
-          {([8, 12, 26, "all"] as WeekRange[]).map((r) => (
+          {RANGE_OPTIONS.map((opt) => (
             <button
-              key={String(r)}
-              onClick={() => setRange(r)}
+              key={opt.key}
+              onClick={() => setRange(opt.key)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                range === r
+                range === opt.key
                   ? "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-sm"
                   : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"
               }`}
             >
-              {r === "all" ? "All" : `${r}w`}
+              {opt.label}
             </button>
           ))}
         </div>
@@ -468,6 +643,54 @@ export default function StatisticsPanel({ token }: { token: string }) {
                     <Bar dataKey="unique" name="Active" fill={COLORS.unique} radius={[4, 4, 0, 0]} />
                     <Bar dataKey="newVillagers" name="New" fill={COLORS.newVillagers} radius={[4, 4, 0, 0]} />
                   </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+
+            {showVillagerCharts && (
+              <ChartCard title="Roles per week">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={weeks} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--color-border)", opacity: 0.3 }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar stackId="roles" dataKey="producers" name="Producers" fill={COLORS.producers} />
+                    <Bar stackId="roles" dataKey="vocalists" name="Vocalists" fill={COLORS.vocalists} />
+                    <Bar stackId="roles" dataKey="instrumentalists" name="Instrumentalists" fill={COLORS.instrumentalists} />
+                    <Bar stackId="roles" dataKey="justVibing" name="Just Vibing" fill={COLORS.justVibing} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+
+            {showVillagerCharts && (
+              <ChartCard title="Villagers over time">
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={weeks} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Area type="monotone" dataKey="totalVillagers" name="Villagers" stroke={COLORS.totalVillagers} fill={COLORS.totalVillagers} fillOpacity={0.2} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+
+            {showVillagerCharts && (
+              <ChartCard title="Exclusive vs non-exclusive members over time">
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={weeks} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Area stackId="members" type="monotone" dataKey="nonExclusiveMembers" name="Non-exclusive" stroke={COLORS.nonExclusive} fill={COLORS.nonExclusive} fillOpacity={0.25} strokeWidth={2} />
+                    <Area stackId="members" type="monotone" dataKey="exclusiveMembers" name="Exclusive" stroke={COLORS.exclusive} fill={COLORS.exclusive} fillOpacity={0.35} strokeWidth={2} />
+                  </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
             )}
