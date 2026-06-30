@@ -17,10 +17,7 @@ export function buildReminder(
   const first = firstNameOf(displayName);
   const hi = first ? `Hi ${first},` : "Hi,";
 
-  const subject =
-    kind === "1h"
-      ? "Finish supporting the Village"
-      : "Your Village visit still needs a payment";
+  const subject = "Your Potluck Sessions payment is incomplete";
 
   const intro =
     kind === "1h"
