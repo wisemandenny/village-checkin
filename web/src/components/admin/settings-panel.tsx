@@ -1,6 +1,31 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
+import {
+  CheckinSchedule,
+  DEFAULT_CHECKIN_SCHEDULE,
+} from "@/lib/checkin-schedule";
+
+const DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+// A short, curated timezone list covers the studio's needs; admins running
+// elsewhere can still store any IANA name via the DB.
+const TIMEZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "UTC",
+];
 
 interface SettingsPanelProps {
   token: string;
@@ -11,6 +36,10 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [checkinsEnabled, setCheckinsEnabled] = useState(true);
   const [checkinsSaving, setCheckinsSaving] = useState(false);
   const [checkinsMessage, setCheckinsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [schedule, setSchedule] = useState<CheckinSchedule>(DEFAULT_CHECKIN_SCHEDULE);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleMessage, setScheduleMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -52,6 +81,9 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setPaymentsEnabled(data.payments_enabled === true);
       setMaintenanceMode(data.maintenance_mode === true);
       setHasDbPassword(data.admin_password === "(set)");
+      if (data.checkin_schedule) {
+        setSchedule(data.checkin_schedule as CheckinSchedule);
+      }
     } catch {
       setMessage({ type: "error", text: "Failed to load settings" });
     } finally {
@@ -107,6 +139,32 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
       setCheckinsMessage({ type: "error", text: "Failed to update setting" });
     } finally {
       setCheckinsSaving(false);
+    }
+  }
+
+  async function saveSchedule() {
+    setScheduleSaving(true);
+    setScheduleMessage(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ key: "checkin_schedule", value: schedule }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setScheduleMessage({
+        type: "success",
+        text: schedule.enabled
+          ? "Schedule saved — check-ins will follow it automatically (applied within ~15 minutes)."
+          : "Schedule saved (disabled) — check-ins stay under manual control.",
+      });
+    } catch {
+      setScheduleMessage({ type: "error", text: "Failed to save schedule" });
+    } finally {
+      setScheduleSaving(false);
     }
   }
 
@@ -381,6 +439,138 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
             {checkinsMessage.text}
           </p>
         )}
+      </div>
+
+      {/* Check-in schedule */}
+      <div
+        className={`rounded-xl border bg-[var(--color-surface)] p-6 ${
+          schedule.enabled ? "border-[var(--color-accent)]" : "border-[var(--color-border)]"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Check-in schedule</h3>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              When ON, a scheduled job opens and closes check-ins automatically each week.
+              The manual toggle above still works for ad-hoc changes; the schedule re-asserts
+              itself at the next open or close time.
+            </p>
+          </div>
+          <button
+            onClick={() => setSchedule({ ...schedule, enabled: !schedule.enabled })}
+            aria-pressed={schedule.enabled}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+              schedule.enabled ? "bg-green-500" : "bg-[var(--color-border)]"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                schedule.enabled ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block font-medium text-[var(--color-muted)]">Timezone</span>
+            <select
+              value={schedule.timezone}
+              onChange={(e) => setSchedule({ ...schedule, timezone: e.target.value })}
+              className="w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+            >
+              {(TIMEZONES.includes(schedule.timezone)
+                ? TIMEZONES
+                : [schedule.timezone, ...TIMEZONES]
+              ).map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="rounded-lg border border-[var(--color-border)] p-4">
+            <p className="mb-3 text-sm font-medium">Opens</p>
+            <div className="flex gap-3">
+              <select
+                value={schedule.open.day}
+                onChange={(e) =>
+                  setSchedule({
+                    ...schedule,
+                    open: { ...schedule.open, day: Number(e.target.value) },
+                  })
+                }
+                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+              >
+                {DAY_NAMES.map((name, i) => (
+                  <option key={name} value={i}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={schedule.open.time}
+                onChange={(e) =>
+                  setSchedule({
+                    ...schedule,
+                    open: { ...schedule.open, time: e.target.value },
+                  })
+                }
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[var(--color-border)] p-4">
+            <p className="mb-3 text-sm font-medium">Closes</p>
+            <div className="flex gap-3">
+              <select
+                value={schedule.close.day}
+                onChange={(e) =>
+                  setSchedule({
+                    ...schedule,
+                    close: { ...schedule.close, day: Number(e.target.value) },
+                  })
+                }
+                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+              >
+                {DAY_NAMES.map((name, i) => (
+                  <option key={name} value={i}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={schedule.close.time}
+                onChange={(e) =>
+                  setSchedule({
+                    ...schedule,
+                    close: { ...schedule.close, time: e.target.value },
+                  })
+                }
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={saveSchedule}
+            disabled={scheduleSaving}
+            className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+          >
+            {scheduleSaving ? "Saving…" : "Save schedule"}
+          </button>
+          {scheduleMessage && (
+            <p className={`text-sm ${scheduleMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+              {scheduleMessage.text}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Payments toggle */}

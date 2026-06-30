@@ -66,6 +66,7 @@ npx expo start
 | `NEXT_PUBLIC_BASE_URL` | Public URL of the web app (production: `https://app.takesavillagemusic.com`) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (browser) |
 | `ADMIN_PASSWORD` | Fallback admin password (if not set in DB) |
+| `CRON_SECRET` | Shared bearer secret for the scheduled check-in reconciler (`/api/cron/checkins`). Must match the `CRON_SECRET` GitHub Actions secret. If unset, the schedule is never enforced (the manual check-ins toggle still works). |
 | `STRIPE_SUPPORTER_PRODUCT_ID` | (Recommended) Stripe Product id for recurring support. If unset, one is created on demand. |
 | `R2_SELFIE_BUCKET` | Private Cloudflare R2 bucket for villager selfies shown on the "who's here" board. Served back through the app's `/api/selfie` route (no public bucket/domain). If unset, selfie capture is skipped (registration works as before). |
 | `R2_ACCOUNT_ID` | Cloudflare account id — used to build the R2 S3 API endpoint. |
@@ -116,6 +117,21 @@ logging each charge as a Kit purchase needs a one-time OAuth setup:
 
 If OAuth is not configured, purchase recording simply no-ops; tags and the
 `subscriptions` table remain the source of truth for supporter status.
+
+## Scheduled check-ins
+
+Admins can toggle check-ins on/off manually in **Settings → Check-ins**, or hand
+control to a weekly schedule in **Settings → Check-in schedule** (timezone, open
+day/time, close day/time). The schedule lives in `studio_settings.checkin_schedule`
+and is enforced by a GitHub Actions cron ([.github/workflows/checkin-schedule.yml](.github/workflows/checkin-schedule.yml))
+that runs every 15 minutes and calls `/api/cron/checkins` with the `CRON_SECRET`
+bearer.
+
+The route is **edge-triggered**: it only writes `checkins_enabled` when the
+schedule crosses an open/close boundary, so a manual flip inside a window sticks
+until the next boundary. When the schedule is disabled the cron no-ops and
+check-ins stay under manual control. Set `CRON_SECRET` both as an app env var and
+as a repository **Actions secret** of the same name.
 
 ## Payment Flow
 
