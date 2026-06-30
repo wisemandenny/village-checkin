@@ -80,11 +80,8 @@ export function uniqueViolationMessage(error: {
   const detail = error.message ?? "";
   if (detail.includes("idx_villagers_email_unique")) return EMAIL_TAKEN;
   if (detail.includes("idx_villagers_ig_handle_unique")) return IG_TAKEN;
-  if (
-    detail.includes("villagers_device_ids_no_overlap") ||
-    detail.includes("device_id")
-  )
-    return DEVICE_TAKEN;
+  // The device-uniqueness trigger raises "device_id already registered ...".
+  if (detail.includes("device_id")) return DEVICE_TAKEN;
   return "That record already exists.";
 }
 

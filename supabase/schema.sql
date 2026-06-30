@@ -70,11 +70,32 @@ create unique index idx_villagers_ig_handle_unique
 -- Index for fast lookups of a villager's subscriptions
 create index idx_subscriptions_villager_id on subscriptions(villager_id);
 
--- Global uniqueness: no device id may belong to two villagers. The GIN
--- exclusion index also accelerates containment (@>) lookups by device_id.
-alter table villagers
-  add constraint villagers_device_ids_no_overlap
-  exclude using gin (device_ids with &&);
+-- GIN index for fast containment lookups by device_id (device_ids @> '{<id>}').
+create index idx_villagers_device_ids on villagers using gin (device_ids);
+
+-- Global uniqueness: no device id may belong to two villagers. Postgres
+-- exclusion constraints don't support GIN, so a trigger enforces it instead.
+-- Raised with errcode unique_violation (23505) so the app maps it to the
+-- existing "Device already registered" message.
+create or replace function villagers_device_ids_unique()
+returns trigger as $$
+begin
+  if new.device_ids is not null and array_length(new.device_ids, 1) is not null then
+    if exists (
+      select 1 from villagers v
+      where v.id <> new.id and v.device_ids && new.device_ids
+    ) then
+      raise exception 'device_id already registered to another villager'
+        using errcode = 'unique_violation';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_villagers_device_ids_unique
+  before insert or update of device_ids on villagers
+  for each row execute function villagers_device_ids_unique();
 
 -- Index for fast lookups by villager
 create index idx_check_ins_villager_id on check_ins(villager_id);
