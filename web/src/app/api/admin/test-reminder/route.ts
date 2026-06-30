@@ -58,13 +58,14 @@ export async function POST(req: NextRequest) {
   // shows "expired") so the test works even for villagers with no check-ins.
   const { data: latestCheckIn } = await supabase
     .from("check_ins")
-    .select("id")
+    .select("id, created_at")
     .eq("villager_id", villager.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   const checkInId = latestCheckIn?.id ?? randomUUID();
+  const visitDate = latestCheckIn?.created_at ?? null;
   const token = mintPayToken(checkInId);
   if (!token) {
     return NextResponse.json(
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
   // Send sequentially: 1h first, then 24h, mirroring the real reminder order.
   const results: { kind: "1h" | "24h"; ok: boolean }[] = [];
   for (const kind of ["1h", "24h"] as const) {
-    const message = buildReminder(kind, villager.display_name, payUrl);
+    const message = buildReminder(kind, villager.display_name, payUrl, visitDate);
     const ok = await sendEmail({ to: villager.email, ...message });
     results.push({ kind, ok });
   }

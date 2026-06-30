@@ -9,20 +9,40 @@ export function firstNameOf(displayName: string | null): string | null {
   return displayName.trim().split(/\s+/)[0] || null;
 }
 
+// Formats a check-in timestamp as the studio-local visit date (the studio runs
+// on Eastern time). Returns null for missing/unparseable input so the body
+// gracefully omits the date.
+export function formatVisitDate(visitDate: string | Date | null | undefined): string | null {
+  if (!visitDate) return null;
+  const d = visitDate instanceof Date ? visitDate : new Date(visitDate);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Toronto",
+  }).format(d);
+}
+
 export function buildReminder(
   kind: ReminderKind,
   displayName: string | null,
-  payUrl: string
+  payUrl: string,
+  visitDate?: string | Date | null
 ): { subject: string; html: string; text: string } {
   const first = firstNameOf(displayName);
   const hi = first ? `Hi ${first},` : "Hi,";
 
   const subject = "Your Potluck Sessions payment is incomplete";
 
+  const dateStr = formatVisitDate(visitDate);
+  const on = dateStr ? ` on ${dateStr}` : "";
+
   const intro =
     kind === "1h"
-      ? "Thanks for coming to Potluck Sessions. It looks like your payment didn't go through. You can take care of it here:"
-      : "Your recent Potluck Sessions visit still hasn't been paid for. You can take care of it here:";
+      ? `Thanks for coming to Potluck Sessions${on}. It looks like your payment didn't go through. You can take care of it here:`
+      : `Your Potluck Sessions visit${on} still hasn't been paid for. You can take care of it here:`;
 
   const footerNote =
     "If you already paid or visited on a membership, you can ignore this.";

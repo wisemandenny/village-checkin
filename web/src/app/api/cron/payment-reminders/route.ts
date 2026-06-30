@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payUrl = `${baseUrl.replace(/\/$/, "")}/pay/${token}`;
-    const message = buildReminder(kind, row.villagers?.display_name ?? null, payUrl);
+    const message = buildReminder(kind, row.villagers?.display_name ?? null, payUrl, row.created_at);
 
     const ok = await sendEmail({ to: email, ...message });
     if (ok) {
