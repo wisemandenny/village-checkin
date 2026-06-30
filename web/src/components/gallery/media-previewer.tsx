@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export interface PreviewItem {
   kind: "photo" | "video";
@@ -37,9 +38,13 @@ export function MediaPreviewer({
     };
   }, [item, onClose]);
 
-  if (!item) return null;
+  // `item` only becomes non-null via a client-side interaction, so the DOM is
+  // always available here; the guard keeps SSR/typecheck happy.
+  if (!item || typeof document === "undefined") return null;
 
-  return (
+  // Render to <body> so the fixed overlay is relative to the viewport and not
+  // trapped inside a transformed ancestor (e.g. the mosaic's reveal animation).
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -73,7 +78,8 @@ export function MediaPreviewer({
           className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
         />
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
