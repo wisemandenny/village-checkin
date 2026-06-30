@@ -47,7 +47,10 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   }, [loadMosaic]);
 
   // Uploading is open to any signed-in villager; no check-in is required.
-  const canUpload = Boolean(configured && me && !uploading);
+  // `eligible` is kept separate from the in-flight `uploading` flag so the
+  // upload UI stays visible (and shows progress) while an upload runs.
+  const eligible = Boolean(configured && me);
+  const canUpload = eligible && !uploading;
 
   async function handleFiles(files: File[]) {
     if (files.length === 0 || !canUpload) return;
@@ -60,8 +63,9 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
 
   // Nothing to show and no way to contribute: render nothing rather than an
   // empty shell (e.g. uploads unconfigured, or /success with no device id).
+  // Use `eligible` (not `canUpload`) so an in-flight upload doesn't hide the UI.
   if (!loading && !configured) return null;
-  if (!loading && items.length === 0 && !canUpload) return null;
+  if (!loading && items.length === 0 && !eligible) return null;
 
   const highlights = items.slice(0, HIGHLIGHT_SLOTS);
   const highlightIds = new Set(highlights.map((i) => i.id));
@@ -90,7 +94,9 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             className="flex w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-[var(--color-accent)] bg-[var(--color-accent)]/[0.06] px-6 py-8 text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/[0.1] disabled:opacity-40"
           >
             <span className="text-2xl leading-none">+</span>
-            <span className="text-sm font-semibold">Be the first to share today</span>
+            <span className="text-sm font-semibold">
+              {uploading ? uploadProgress ?? "Uploading…" : "Be the first to share today"}
+            </span>
           </button>
         ) : (
           <div className="max-h-[70vh] overflow-y-auto pr-1">
@@ -143,7 +149,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
           </div>
         )}
 
-        {canUpload && items.length > 0 && (
+        {eligible && items.length > 0 && (
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
