@@ -38,6 +38,7 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
   const [unpaid, setUnpaid] = useState<PastCheckIn[]>([]);
   const [isExclusive, setIsExclusive] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [isElder, setIsElder] = useState(false);
   const [selected, setSelected] = useState<PastCheckIn | null>(null);
 
   const firstName = displayName.trim().split(/\s+/)[0] || displayName;
@@ -52,6 +53,7 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
         setUnpaid(data.check_ins ?? []);
         setIsExclusive(data.is_exclusive === true);
         setHasActiveSubscription(data.has_active_subscription === true);
+        setIsElder(data.is_elder === true);
       })
       .catch(() => {})
       .finally(() => {
@@ -136,7 +138,7 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
     );
   }
 
-  const canSubscribe = isExclusive && !hasActiveSubscription;
+  const canSubscribe = isExclusive && !hasActiveSubscription && !isElder;
 
   // Decide whether to nag about settling a past session.
   // - One-time payers (non-exclusive): always nag for any unpaid visit.
@@ -147,9 +149,9 @@ export function CheckinsDisabled({ deviceId, displayName, isNewRegistration = fa
   const startOfCurrentCycle = new Date();
   startOfCurrentCycle.setDate(1);
   startOfCurrentCycle.setHours(0, 0, 0, 0);
-  const showUnpaid = isExclusive
+  const showUnpaid = !isElder && (isExclusive
     ? unpaid.some((c) => new Date(c.created_at) < startOfCurrentCycle)
-    : unpaid.length > 0;
+    : unpaid.length > 0);
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">

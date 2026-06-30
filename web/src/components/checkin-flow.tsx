@@ -154,8 +154,10 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           `/api/checkin/status?device_id=${encodeURIComponent(deviceId)}`
         );
         if (cancelled || !res.ok) return;
-        const { check_in } = await res.json();
-        if (check_in?.status === "paid") {
+        const { check_in, is_elder } = await res.json();
+        if (is_elder === true) {
+          markPaid("elder");
+        } else if (check_in?.status === "paid") {
           markPaid(check_in.payment_method ?? null);
         }
       } catch {
@@ -272,20 +274,27 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </Reveal>
         )
       )}
-      <WhosHereLink />
+      <CommunityLinks />
     </div>
   );
 }
 
-// Entry point to the avatar board, styled as a secondary button so it's clearly
-// visible and tappable from the check-in and paid screens.
-function WhosHereLink() {
+// Entry points to community pages. "See who's here" is the enlarged primary CTA
+// so it's easy to spot and tap; the gallery link sits below as a secondary button.
+function CommunityLinks() {
+  const secondaryLinkClass =
+    "mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]";
   return (
-    <Link
-      href="/here"
-      className="mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
-    >
-      See who&apos;s here
-    </Link>
+    <div className="flex flex-col items-center gap-2">
+      <Link
+        href="/here"
+        className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[var(--color-accent)] px-8 text-lg font-semibold text-white transition hover:bg-[var(--color-accent-light)] font-[family-name:var(--font-domaine)]"
+      >
+        See who&apos;s here
+      </Link>
+      <Link href="/gallery" className={secondaryLinkClass}>
+        Village gallery
+      </Link>
+    </div>
   );
 }

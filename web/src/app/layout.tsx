@@ -5,6 +5,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AdminButton } from "@/components/admin-button";
+import { DeleteTokenButton } from "@/components/delete-token-button";
+import { appEnv } from "@/lib/app-env";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
@@ -46,6 +48,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ThemeToggle />
           <AdminButton />
+          {appEnv() === "staging" && <DeleteTokenButton />}
           {children}
         </ThemeProvider>
       </body>

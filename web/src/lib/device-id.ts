@@ -9,6 +9,11 @@ export function setDeviceId(id: string): void {
   localStorage.setItem(STORAGE_KEY, id);
 }
 
+export function clearDeviceId(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
+}
+
 export function getOrCreateDeviceId(): { deviceId: string; isNew: boolean } {
   const existing = getDeviceId();
   if (existing) return { deviceId: existing, isNew: false };

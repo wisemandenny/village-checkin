@@ -186,6 +186,47 @@ PROD_DATABASE_URL='...' STAGING_DATABASE_URL='...' bash scripts/seed-staging-db.
 - When happy, merge `staging` → `main` (PR) → auto-deploys to production.
 - Refresh staging data anytime via the seed Action (step 6).
 
+## 8. Gallery uploads (R2)
+
+The `/gallery` feature stores photos and short videos in a **separate private R2
+bucket** (`R2_UPLOADS_BUCKET`), distinct from the selfie bucket. Set these env
+vars on the staging Vercel project:
+
+- `R2_UPLOADS_BUCKET` — name of the private uploads bucket (create one per env).
+- `UPLOAD_TOKEN_SECRET` — random string used to sign short-lived upload tokens.
+- Reuse the same `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`
+  as selfies (or dedicated keys scoped to both buckets).
+
+Apply the `uploads` table migration from [`supabase/migrations/`](supabase/migrations/)
+to the staging Supabase project (SQL Editor or migration tooling).
+
+### R2 CORS (uploads bucket)
+
+Configure CORS on the **uploads bucket only** so browsers can PUT directly from
+the app origin. Example (adjust origins to your staging/production domains):
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://village-checkin-staging.vercel.app",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": ["PUT", "HEAD"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Keep the bucket **private** (no public access or r2.dev URL). Do not use wildcard
+origins. Reads are served via short-lived presigned GET URLs minted by the API,
+not via public bucket access.
+
+Leave `R2_UPLOADS_BUCKET` unset to disable uploads gracefully (the gallery page
+shows a notice; selfies and check-in are unaffected).
+
 ## Quick checklist
 
 - [ ] `staging` branch pushed
@@ -196,3 +237,5 @@ PROD_DATABASE_URL='...' STAGING_DATABASE_URL='...' bash scripts/seed-staging-db.
 - [ ] All `web/.env.staging.example` vars set in the staging project
 - [ ] `PROD_DATABASE_URL` + `STAGING_DATABASE_URL` GitHub secrets added
 - [ ] Seed Action run once to populate staging
+- [ ] Uploads R2 bucket created + CORS configured; `R2_UPLOADS_BUCKET` + `UPLOAD_TOKEN_SECRET` set
+- [ ] `uploads` table migration applied to staging Supabase
