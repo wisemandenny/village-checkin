@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
 
 function SuccessHeading() {
   const searchParams = useSearchParams();
@@ -35,6 +36,9 @@ export default function SuccessPage() {
       <p className="mt-3 text-sm text-green-600 dark:text-green-400">
         Payment complete — thanks for supporting the Village!
       </p>
+      <div className="mt-8 w-full max-w-sm">
+        <GalleryMosaic />
+      </div>
       <Link
         href="/"
         className="mt-8 inline-flex h-12 items-center rounded-2xl bg-[var(--color-accent)] px-8 text-white font-semibold transition-all hover:bg-[var(--color-accent-light)]"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
+import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
 import type { PaymentMethod } from "@/lib/types";
 
 type Step = "checking-in" | "payment" | "done";
@@ -274,6 +275,7 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </Reveal>
         )
       )}
+      <GalleryMosaic deviceId={deviceId} />
       <CommunityLinks />
     </div>
   );
