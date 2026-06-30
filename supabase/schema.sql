@@ -38,7 +38,11 @@ create table check_ins (
   payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred', 'subscription', 'elder')),
   status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped')),
   created_at           timestamptz not null default now(),
-  stripe_transaction_id text
+  stripe_transaction_id text,
+  -- Set when the unpaid-check-in reminder emails are sent (1h and 24h after a
+  -- 'pending' check-in), so the scheduled job never sends the same nudge twice.
+  reminder_1h_sent_at  timestamptz,
+  reminder_24h_sent_at timestamptz
 );
 
 -- Subscriptions table: recurring support pledges processed by Stripe.

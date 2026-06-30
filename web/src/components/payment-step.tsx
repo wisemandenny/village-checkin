@@ -77,6 +77,9 @@ interface PaymentStepProps {
   deviceId: string;
   isExclusive?: boolean;
   isNewRegistration?: boolean;
+  // Pay-with-cash only makes sense in the studio. Remote contexts (e.g. settling
+  // an unpaid check-in from an emailed link) hide it.
+  allowCash?: boolean;
   onComplete: (paid?: boolean) => void;
 }
 
@@ -106,7 +109,7 @@ const BRAND_DISPLAY: Record<string, string> = {
   discover: "Discover",
 };
 
-export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, isNewRegistration = false, onComplete }: PaymentStepProps) {
+export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, isNewRegistration = false, allowCash = true, onComplete }: PaymentStepProps) {
   // Exclusive villagers commit to a recurring pledge only; everyone else gets
   // the one-time flow. The mode is fixed by tier, so there is no toggle.
   const mode: "once" | "recurring" = isExclusive ? "recurring" : "once";
@@ -475,6 +478,8 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
         </button>
       )}
 
+      {allowCash && (
+      <div className="contents">
       <div className="flex w-full items-center gap-3 text-xs text-[var(--color-muted)]">
         <hr className="flex-1 border-[var(--color-border)]" />
         or
@@ -488,6 +493,8 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
       >
         Pay with Cash
       </button>
+      </div>
+      )}
       </div>
       )}
 

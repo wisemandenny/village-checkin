@@ -1,0 +1,40 @@
+name: Unpaid check-in reminders
+
+# Villagers who check in but abandon the Stripe payment flow leave a check-in in
+# status 'pending'. This pings the app every 15 minutes so it can email a 1h and
+# a 24h reminder (the route is idempotent — it records what it has sent). Also
+# exposed as a manual trigger for ad-hoc runs.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger production reminders
+        env:
+          BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "PROD_BASE_URL or CRON_SECRET not set; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$BASE_URL/api/cron/payment-reminders" \
+            -H "Authorization: Bearer $CRON_SECRET"
+
+      # Staging may not always be configured; skip rather than fail when its
+      # secrets are absent.
+      - name: Trigger staging reminders
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          CRON_SECRET: ${{ secrets.STAGING_CRON_SECRET }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "STAGING_BASE_URL or STAGING_CRON_SECRET not set; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$BASE_URL/api/cron/payment-reminders" \
+            -H "Authorization: Bearer $CRON_SECRET"

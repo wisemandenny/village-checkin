@@ -76,6 +76,29 @@ npx expo start
 | `KIT_TAG_MONTHLY_ID` | Kit Tag id applied to active monthly supporters. |
 | `KIT_OAUTH_CLIENT_ID` / `KIT_OAUTH_CLIENT_SECRET` | (Optional) Kit OAuth app credentials. Required only for Kit purchase records; the `/v4/purchases` API rejects API-key auth. Without them, purchase tracking is skipped (tags + the subscriptions table remain the source of truth). |
 | `KIT_OAUTH_SETUP_SECRET` | (Optional) Random string that gates the one-time `/api/kit/oauth/start` authorization route. |
+| `RESEND_API_KEY` | [Resend](https://resend.com) API key for transactional email — server only. Enables unpaid-check-in reminder emails. If unset, reminder sending is skipped. |
+| `EMAIL_FROM` | Verified Resend sender for reminder emails, e.g. `The Village <hello@takesavillagemusic.com>`. |
+| `PAY_TOKEN_SECRET` | Random string; HMAC secret for the signed pay links embedded in reminder emails. |
+| `CRON_SECRET` | Random string the reminder cron must send as `Authorization: Bearer <secret>` when calling `/api/cron/payment-reminders`. |
+
+### Unpaid check-in reminders
+
+When a villager checks in but abandons the Stripe payment flow, their check-in
+stays in status `pending` (`payment_method = 'deferred'`). A scheduled job emails
+them a reminder **1 hour** and again **24 hours** after check-in, each containing a
+signed one-tap link to `/pay/<token>` where they settle that specific visit
+(routed through the normal payment intent + Stripe webhook, which flips the row to
+`paid`). Each reminder is recorded on the check-in (`reminder_1h_sent_at`,
+`reminder_24h_sent_at`) so it is never sent twice, and a 3-day safety window keeps
+the first run after deploy from emailing a backlog of old pending rows.
+
+- **Email:** [Resend](https://resend.com) — set `RESEND_API_KEY` + `EMAIL_FROM`.
+- **Pay links:** signed with `PAY_TOKEN_SECRET` (HMAC, 7-day expiry).
+- **Schedule:** the `.github/workflows/payment-reminders.yml` GitHub Action runs
+  every 15 minutes and `POST`s to `/api/cron/payment-reminders` with the
+  `CRON_SECRET` bearer token. Required **GitHub repo secrets**: `PROD_BASE_URL`,
+  `CRON_SECRET` (and optionally `STAGING_BASE_URL`, `STAGING_CRON_SECRET`). The
+  route is idempotent, so running it more or less often only changes timing.
 
 ### Kit integration
 
