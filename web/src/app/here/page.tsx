@@ -190,12 +190,6 @@ export default function HerePage() {
 
         <div className="mt-10 flex flex-col items-center gap-2">
           <Link
-            href="/gallery"
-            className="text-xs text-[var(--color-muted)] underline-offset-4 transition hover:text-[var(--color-foreground)] hover:underline"
-          >
-            Village gallery →
-          </Link>
-          <Link
             href="/"
             className="text-xs text-[var(--color-muted)] underline-offset-4 transition hover:text-[var(--color-foreground)] hover:underline"
           >

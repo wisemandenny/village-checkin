@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Reveal } from "@/components/motion";
 import { ACCEPT, useGalleryUpload } from "@/lib/use-gallery-upload";
+import { MediaPreviewer, PlayBadge } from "@/components/gallery/media-previewer";
 
 interface MosaicItem {
   id: string;
@@ -24,6 +24,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [items, setItems] = useState<MosaicItem[]>([]);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [preview, setPreview] = useState<MosaicItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { me, uploading, uploadProgress, error, setError, uploadFiles } =
@@ -80,7 +81,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
         className="hidden"
       />
 
-      <div className="mx-auto w-full max-w-sm">
+      <div className="mx-auto w-full max-w-3xl">
         {!loading && items.length === 0 ? (
           <button
             type="button"
@@ -92,7 +93,8 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             <span className="text-sm font-semibold">Be the first to share today</span>
           </button>
         ) : (
-          <div className="grid grid-flow-row-dense grid-cols-4 gap-1.5 [grid-auto-rows:90px]">
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid grid-flow-row-dense grid-cols-8 gap-1.5 [grid-auto-rows:90px]">
             {items.map((item) => {
               const isHighlight = highlightIds.has(item.id);
               const isMine = me?.id === item.villager_id;
@@ -103,21 +105,33 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                     isHighlight ? "col-span-4 row-span-4" : "col-span-2 row-span-2"
                   }`}
                 >
-                  {item.kind === "photo" ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={item.url}
-                      alt={`Photo by ${item.display_name}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <video
-                      src={item.url}
-                      preload="metadata"
-                      className="h-full w-full object-cover"
-                    />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPreview(item)}
+                    className="group h-full w-full cursor-zoom-in"
+                    aria-label={`Open ${item.kind} by ${item.display_name}`}
+                  >
+                    {item.kind === "photo" ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={item.url}
+                        alt={`Photo by ${item.display_name}`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <>
+                        <video
+                          src={item.url}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                        <PlayBadge size={isHighlight ? "md" : "sm"} />
+                      </>
+                    )}
+                  </button>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-[10px] font-medium text-white">
                     {item.display_name}
                     {isMine && " (you)"}
@@ -125,19 +139,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                 </div>
               );
             })}
-
-            {canUpload && (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="col-span-2 row-span-2 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--color-accent)] bg-[var(--color-accent)]/[0.06] text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/[0.1] disabled:opacity-40"
-                aria-label="Add your photo"
-              >
-                <span className="text-2xl leading-none">+</span>
-                <span className="text-xs font-semibold leading-tight">Add yours</span>
-              </button>
-            )}
+            </div>
           </div>
         )}
 
@@ -148,23 +150,14 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             disabled={uploading}
             className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--color-accent)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-40 font-[family-name:var(--font-domaine)]"
           >
-            {uploading ? uploadProgress ?? "Uploading…" : "Add your photo"}
+            {uploading ? uploadProgress ?? "Uploading…" : "Upload files"}
           </button>
         )}
 
         {error && <p className="mt-2 text-center text-sm text-red-500">{error}</p>}
-
-        {items.length > 0 && (
-          <div className="mt-2 text-center">
-            <Link
-              href="/gallery"
-              className="text-xs text-[var(--color-muted)] underline-offset-4 transition hover:text-[var(--color-foreground)] hover:underline"
-            >
-              Open full gallery →
-            </Link>
-          </div>
-        )}
       </div>
+
+      <MediaPreviewer item={preview} onClose={() => setPreview(null)} />
     </Reveal>
   );
 }
