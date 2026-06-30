@@ -16,7 +16,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import type { CheckIn, Villager } from "@/lib/types";
+import type { CheckIn, Villager, Subscription } from "@/lib/types";
 import { Role } from "@/lib/tag-order";
 import { EXCLUSIVE_ROLE } from "@/lib/exclusive-tier";
 
@@ -25,6 +25,37 @@ type CheckInWithVillager = CheckIn & {
 };
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Subscription statuses that count as a live, revenue-generating pledge.
+// Mirrors the Subscriptions tab's notion of "active".
+const ACTIVE_SUB_STATUSES = new Set(["active", "trialing", "past_due"]);
+
+// Normalize a pledge amount (cents) to a monthly figure for MRR. Weekly
+// pledges bill ~52/12 times per month.
+function toMonthlyCents(amount: number, interval: string): number {
+  return interval === "week" ? (amount * 52) / 12 : amount;
+}
+
+// Least-squares linear regression, returning the fitted y for each index.
+function linearTrend(ys: number[]): number[] {
+  const n = ys.length;
+  if (n === 0) return [];
+  if (n === 1) return [ys[0]];
+  let sx = 0,
+    sy = 0,
+    sxy = 0,
+    sxx = 0;
+  for (let i = 0; i < n; i++) {
+    sx += i;
+    sy += ys[i];
+    sxy += i * ys[i];
+    sxx += i * i;
+  }
+  const denom = n * sxx - sx * sx;
+  const slope = denom === 0 ? 0 : (n * sxy - sx * sy) / denom;
+  const intercept = (sy - slope * sx) / n;
+  return ys.map((_, i) => intercept + slope * i);
+}
 
 // Chart palette — explicit colors that read well in both light and dark themes.
 const COLORS = {
@@ -42,6 +73,8 @@ const COLORS = {
   totalVillagers: "#6366f1",
   exclusive: "#eab308",
   nonExclusive: "#64748b",
+  trend: "#dc2626",
+  mrr: "#16a34a",
 };
 
 // Roles offered in the multiselect filter. Values are lower-cased to match the
@@ -129,11 +162,17 @@ interface WeekBucket {
   totalVillagers: number;
   exclusiveMembers: number;
   nonExclusiveMembers: number;
+  // Linear best-fit value for unique villagers per week.
+  uniqueTrend: number;
+  // Monthly Recurring Revenue (subscriptions) as of this week.
+  mrr: number; // dollars
+  mrrCents: number;
 }
 
 export default function StatisticsPanel({ token }: { token: string }) {
   const [allCheckins, setAllCheckins] = useState<CheckInWithVillager[]>([]);
   const [villagers, setVillagers] = useState<Villager[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -170,9 +209,10 @@ export default function StatisticsPanel({ token }: { token: string }) {
     setLoading(true);
     setError("");
     try {
-      const [checkinsRes, villagersRes] = await Promise.all([
+      const [checkinsRes, villagersRes, subscriptionsRes] = await Promise.all([
         apiFetch("/api/admin/checkins"),
         apiFetch("/api/admin/villagers?sort_by=display_name&sort_dir=asc"),
+        apiFetch("/api/admin/subscriptions"),
       ]);
       if (!checkinsRes.ok) {
         const body = await checkinsRes.json();
@@ -183,6 +223,10 @@ export default function StatisticsPanel({ token }: { token: string }) {
       if (villagersRes.ok) {
         const { villagers } = await villagersRes.json();
         setVillagers(villagers);
+      }
+      if (subscriptionsRes.ok) {
+        const { subscriptions } = await subscriptionsRes.json();
+        setSubscriptions(subscriptions);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load statistics");
@@ -244,6 +288,21 @@ export default function StatisticsPanel({ token }: { token: string }) {
         ),
       }));
   }, [villagers, matchesRoleFilter]);
+
+  // Active pledges contributing to MRR, normalized to a monthly amount and
+  // tagged with when they started. Respects the villager and role filters.
+  // Note: Stripe only gives us the current status, so a sub counts toward MRR
+  // from its creation onward (cancelled pledges are excluded entirely).
+  const mrrSubs = useMemo(() => {
+    return subscriptions
+      .filter((s) => ACTIVE_SUB_STATUSES.has(s.status))
+      .filter((s) => !filterVillagerId || s.villager_id === filterVillagerId)
+      .filter((s) => matchesRoleFilter(s.villager_id))
+      .map((s) => ({
+        createdAt: new Date(s.created_at).getTime(),
+        monthlyCents: toMonthlyCents(s.amount, s.interval),
+      }));
+  }, [subscriptions, filterVillagerId, matchesRoleFilter]);
 
   const weeks = useMemo<WeekBucket[]>(() => {
     if (allCheckins.length === 0) return [];
@@ -308,7 +367,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       byWeek.set(k, arr);
     }
 
-    return weekKeys.map((key) => {
+    const buckets = weekKeys.map((key) => {
       const rows = byWeek.get(key) ?? [];
       const paid = rows.filter(isPaid);
       const revenueCents = paid.reduce((s, c) => s + c.intent_amount, 0);
@@ -353,6 +412,13 @@ export default function StatisticsPanel({ token }: { token: string }) {
         }
       }
 
+      // MRR as of this week: sum of monthly-normalized active pledges that had
+      // started by the end of the week.
+      let mrrCents = 0;
+      for (const s of mrrSubs) {
+        if (s.createdAt < weekEndMs) mrrCents += s.monthlyCents;
+      }
+
       return {
         week: formatMD(key),
         key,
@@ -372,9 +438,20 @@ export default function StatisticsPanel({ token }: { token: string }) {
         totalVillagers,
         exclusiveMembers,
         nonExclusiveMembers: totalVillagers - exclusiveMembers,
+        uniqueTrend: 0,
+        mrr: mrrCents / 100,
+        mrrCents,
       };
     });
-  }, [allCheckins, range, filterVillagerId, newVillagersOnly, selectedRoles, matchesRoleFilter, firstSeen, excludedIds, rolesByVillager, populationVillagers]);
+
+    // Overlay a best-fit line for unique villagers per week.
+    const trend = linearTrend(buckets.map((b) => b.unique));
+    buckets.forEach((b, i) => {
+      b.uniqueTrend = Math.max(0, Math.round(trend[i] * 10) / 10);
+    });
+
+    return buckets;
+  }, [allCheckins, range, filterVillagerId, newVillagersOnly, selectedRoles, matchesRoleFilter, firstSeen, excludedIds, rolesByVillager, populationVillagers, mrrSubs]);
 
   const totals = useMemo(() => {
     return weeks.reduce(
@@ -631,10 +708,22 @@ export default function StatisticsPanel({ token }: { token: string }) {
               </ResponsiveContainer>
             </ChartCard>
 
+            <ChartCard title="Monthly Recurring Revenue (MRR)">
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={weeks} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="var(--color-muted)" tickFormatter={(v) => `$${v}`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`$${Number(v ?? 0).toFixed(2)}`, "MRR"]} />
+                  <Line type="monotone" dataKey="mrr" name="MRR" stroke={COLORS.mrr} strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
             {showVillagerCharts && (
               <ChartCard title="Villagers per week">
                 <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={weeks} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                  <ComposedChart data={weeks} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
@@ -642,7 +731,8 @@ export default function StatisticsPanel({ token }: { token: string }) {
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="unique" name="Active" fill={COLORS.unique} radius={[4, 4, 0, 0]} />
                     <Bar dataKey="newVillagers" name="New" fill={COLORS.newVillagers} radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Line type="linear" dataKey="uniqueTrend" name="Avg (best fit)" stroke={COLORS.trend} strokeWidth={2} strokeDasharray="5 4" dot={false} legendType="plainline" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </ChartCard>
             )}
