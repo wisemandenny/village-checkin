@@ -31,6 +31,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Production is served at [https://app.takesavillagemusic.com](https://app.takesavillagemusic.com).
+The legacy hostname `village-checkin.vercel.app` permanently redirects there
+(except `/api/webhook/*`, so missed webhook deliveries can still reach the old
+host during migration).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the root [README](../README.md) for environment variables and the
+[STAGING.md](../STAGING.md) runbook for the separate staging project.

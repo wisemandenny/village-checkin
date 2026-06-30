@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { ACTIVE_STATUSES } from "@/lib/subscription-sync";
 import type { Subscription } from "@/lib/types";
 
 type SubscriptionWithVillager = Subscription & {
@@ -53,6 +54,29 @@ function groupForSubscription(sub: SubscriptionWithVillager): Group {
   const base = GROUP_FOR_STATUS[sub.status] ?? "ended";
   if (base === "active" && sub.cancel_at_period_end) return "ending";
   return base;
+}
+
+function pickSubscriptionForVillager(
+  rows: SubscriptionWithVillager[]
+): SubscriptionWithVillager {
+  const active = rows.find((s) => ACTIVE_STATUSES.has(s.status));
+  if (active) return active;
+  return [...rows].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )[0];
+}
+
+function dedupeSubscriptionsByVillager(
+  subscriptions: SubscriptionWithVillager[]
+): SubscriptionWithVillager[] {
+  const byVillager = new Map<string, SubscriptionWithVillager[]>();
+  for (const sub of subscriptions) {
+    const rows = byVillager.get(sub.villager_id);
+    if (rows) rows.push(sub);
+    else byVillager.set(sub.villager_id, [sub]);
+  }
+  return [...byVillager.values()].map(pickSubscriptionForVillager);
 }
 
 function formatCents(cents: number): string {
@@ -150,7 +174,7 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
       paused: [],
       ended: [],
     };
-    for (const sub of subscriptions) {
+    for (const sub of dedupeSubscriptionsByVillager(subscriptions)) {
       buckets[groupForSubscription(sub)].push(sub);
     }
     return buckets;
