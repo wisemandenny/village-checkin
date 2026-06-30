@@ -19,6 +19,7 @@ export default function GalleryPage() {
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [preview, setPreview] = useState<GalleryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { me, uploading, uploadProgress, error, setError, uploadFiles } =
@@ -39,6 +40,20 @@ export default function GalleryPage() {
       setLoading(false);
     })();
   }, [loadGallery]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [preview]);
 
   // Uploading is open to any signed-in villager; no check-in is required.
   const canUpload = configured && me && !uploading;
@@ -168,13 +183,20 @@ export default function GalleryPage() {
               >
                 <div className="relative aspect-square bg-[var(--color-surface)]">
                   {item.kind === "photo" ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={item.url}
-                      alt={`Photo by ${item.display_name}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setPreview(item)}
+                      className="h-full w-full cursor-zoom-in"
+                      aria-label={`Open photo by ${item.display_name}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.url}
+                        alt={`Photo by ${item.display_name}`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
                   ) : (
                     <video
                       src={item.url}
@@ -229,6 +251,32 @@ export default function GalleryPage() {
           </Link>
         </div>
       </div>
+
+      {preview && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Photo by ${preview.display_name}`}
+          onClick={() => setPreview(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+        >
+          <button
+            type="button"
+            onClick={() => setPreview(null)}
+            aria-label="Close preview"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl leading-none text-white transition hover:bg-white/20"
+          >
+            ×
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview.url}
+            alt={`Photo by ${preview.display_name}`}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+          />
+        </div>
+      )}
     </main>
   );
 }
