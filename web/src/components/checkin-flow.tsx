@@ -274,20 +274,24 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </Reveal>
         )
       )}
-      <WhosHereLink />
+      <CommunityLinks />
     </div>
   );
 }
 
-// Entry point to the avatar board, styled as a secondary button so it's clearly
+// Entry points to community pages, styled as secondary buttons so they're clearly
 // visible and tappable from the check-in and paid screens.
-function WhosHereLink() {
+function CommunityLinks() {
+  const linkClass =
+    "mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]";
   return (
-    <Link
-      href="/here"
-      className="mt-2 inline-flex h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
-    >
-      See who&apos;s here
-    </Link>
+    <div className="flex flex-col items-center gap-2">
+      <Link href="/here" className={linkClass}>
+        See who&apos;s here
+      </Link>
+      <Link href="/gallery" className={linkClass}>
+        Village gallery
+      </Link>
+    </div>
   );
 }
