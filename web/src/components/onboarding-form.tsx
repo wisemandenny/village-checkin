@@ -26,7 +26,7 @@ const INSTRUMENTS = INSTRUMENT_ORDER.filter((inst) => inst !== "Other");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
-  const [mode, setMode] = useState<"register" | "recover">("register");
+  const [mode, setMode] = useState<"choose" | "register" | "recover">("choose");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [igHandle, setIgHandle] = useState("");
@@ -153,6 +153,24 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     setDisplayName("");
     setIgTaken(null);
     if (prefillIg) setRecoverIg(prefillIg);
+  }
+
+  // "First time?" entry: open the full registration form.
+  function switchToRegister() {
+    setMode("register");
+    setError(null);
+  }
+
+  // Return to the landing choice, clearing any in-progress recover input and
+  // pending suggestion/duplicate lookups so the two paths don't leak state.
+  function backToChoose() {
+    if (igCheckTimer.current) clearTimeout(igCheckTimer.current);
+    igCheckSeq.current++;
+    clearSuggestions();
+    setMode("choose");
+    setError(null);
+    setRecoverIg("");
+    setIgTaken(null);
   }
 
   const isEmailValid = EMAIL_RE.test(email.trim());
@@ -304,6 +322,31 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     }
   }
 
+  if (mode === "choose") {
+    return (
+      <Reveal className="w-full max-w-sm">
+        <div className="flex flex-col gap-4">
+          <button
+            type="button"
+            onClick={switchToRegister}
+            className="flex h-16 w-full flex-col items-center justify-center rounded-2xl bg-[var(--color-accent)] text-white transition-all hover:bg-[var(--color-accent-light)] active:scale-[0.98]"
+          >
+            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">First time?</span>
+            <span className="text-xs text-white/80">Join the Village</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => switchToRecover()}
+            className="flex h-16 w-full flex-col items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] transition-all hover:border-[var(--color-accent)]/60 active:scale-[0.98]"
+          >
+            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Long time</span>
+            <span className="text-xs text-[var(--color-muted)]">Link your account to this device</span>
+          </button>
+        </div>
+      </Reveal>
+    );
+  }
+
   if (mode === "recover") {
     return (
       <Reveal className="w-full max-w-sm">
@@ -352,15 +395,15 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--color-accent)] text-white text-lg font-semibold font-[family-name:var(--font-domaine)] transition-all hover:bg-[var(--color-accent-light)] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading && <Spinner />}
-            {loading ? "Looking you up..." : "Reconnect"}
+            {loading ? "Looking you up..." : "Enter"}
           </button>
 
           <button
             type="button"
-            onClick={() => { setMode("register"); setError(null); setRecoverIg(""); clearSuggestions(); }}
+            onClick={backToChoose}
             className="text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
           >
-            Never mind, I&apos;m new here
+            Back
           </button>
         </form>
       </Reveal>
@@ -370,19 +413,6 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
   return (
     <form onSubmit={handleRegister} className="flex flex-col gap-6 w-full max-w-sm">
       <Stagger step={70}>
-        <Reveal className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-          <span className="text-sm text-[var(--color-muted)]">
-            Been here before?
-          </span>
-          <button
-            type="button"
-            onClick={() => switchToRecover()}
-            className="text-sm font-semibold text-[var(--color-accent)] underline underline-offset-4 hover:text-[var(--color-accent-light)] transition-colors"
-          >
-            Reconnect your account
-          </button>
-        </Reveal>
-
         <Reveal className="flex flex-col gap-2">
           <label htmlFor="name" className="text-sm font-medium text-[var(--color-muted)]">
             What should we call you?
@@ -585,10 +615,10 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         <Reveal>
           <button
             type="button"
-            onClick={() => switchToRecover()}
+            onClick={backToChoose}
             className="w-full text-sm text-[var(--color-muted)] underline underline-offset-4 hover:text-[var(--color-foreground)] transition-colors"
           >
-            Already registered on another phone? Reconnect your account
+            Back
           </button>
         </Reveal>
       </Stagger>
