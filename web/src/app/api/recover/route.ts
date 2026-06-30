@@ -30,11 +30,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Upsert the new device_id onto the existing villager
+  // Add the new device to the villager's existing devices (keep the old ones so
+  // every device that has signed in continues to resolve to this account).
+  const existingDevices: string[] = Array.isArray(villager.device_ids)
+    ? villager.device_ids
+    : [];
+  const mergedDevices = Array.from(
+    new Set([...existingDevices, new_device_id])
+  );
+
   const { error: updateErr } = await supabase
     .from("villagers")
     .update({
-      device_id: new_device_id,
+      device_ids: mergedDevices,
       last_visited_at: new Date().toISOString(),
     })
     .eq("id", villager.id);
@@ -52,6 +60,6 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({
-    villager: { ...villager, device_id: new_device_id },
+    villager: { ...villager, device_ids: mergedDevices },
   });
 }

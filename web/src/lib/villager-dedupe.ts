@@ -18,6 +18,20 @@ export function normalizeIgHandle(handle: string): string {
   return normalized;
 }
 
+// Coerces a device_ids payload (an array, a single string, or a
+// comma-separated string from the admin form) into a deduped string[].
+export function normalizeDeviceIds(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(",")
+      : [];
+  const cleaned = raw
+    .map((id) => (typeof id === "string" ? id.trim() : ""))
+    .filter(Boolean);
+  return Array.from(new Set(cleaned));
+}
+
 export type DuplicateField = "email" | "ig_handle";
 
 // Returns which unique field (if any) already belongs to another villager.
@@ -66,7 +80,11 @@ export function uniqueViolationMessage(error: {
   const detail = error.message ?? "";
   if (detail.includes("idx_villagers_email_unique")) return EMAIL_TAKEN;
   if (detail.includes("idx_villagers_ig_handle_unique")) return IG_TAKEN;
-  if (detail.includes("device_id")) return DEVICE_TAKEN;
+  if (
+    detail.includes("villagers_device_ids_no_overlap") ||
+    detail.includes("device_id")
+  )
+    return DEVICE_TAKEN;
   return "That record already exists.";
 }
 

@@ -3,10 +3,11 @@
 -- Enable UUID generation
 create extension if not exists "pgcrypto";
 
--- Villagers table: one row per unique device
+-- Villagers table: one row per villager. A villager can sign in from multiple
+-- devices, so device_ids holds every device that resolves to this account.
 create table villagers (
   id          uuid primary key default gen_random_uuid(),
-  device_id   text unique not null,
+  device_ids  text[] not null default '{}',
   display_name text not null,
   ig_handle    text,
   roles        text[] not null default '{}',
@@ -69,8 +70,11 @@ create unique index idx_villagers_ig_handle_unique
 -- Index for fast lookups of a villager's subscriptions
 create index idx_subscriptions_villager_id on subscriptions(villager_id);
 
--- Index for fast lookups by device_id
-create index idx_villagers_device_id on villagers(device_id);
+-- Global uniqueness: no device id may belong to two villagers. The GIN
+-- exclusion index also accelerates containment (@>) lookups by device_id.
+alter table villagers
+  add constraint villagers_device_ids_no_overlap
+  exclude using gin (device_ids with &&);
 
 -- Index for fast lookups by villager
 create index idx_check_ins_villager_id on check_ins(villager_id);
