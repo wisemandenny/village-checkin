@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const { data: villager } = await supabase
     .from("villagers")
     .select("stripe_customer_id")
-    .eq("device_id", deviceId)
+    .contains("device_ids", [deviceId])
     .single();
 
   if (!villager?.stripe_customer_id) {

@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest) {
   const { data, error } = await supabase
     .from("villagers")
     .update({ avatar_head, avatar_body })
-    .eq("device_id", device_id)
+    .contains("device_ids", [device_id])
     .select("id, display_name, avatar_head, avatar_body")
     .maybeSingle();
 

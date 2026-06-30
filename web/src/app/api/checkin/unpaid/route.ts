@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const { data: villager } = await supabase
     .from("villagers")
     .select("id, ig_handle, roles")
-    .eq("device_id", deviceId)
+    .contains("device_ids", [deviceId])
     .single();
 
   if (!villager) {

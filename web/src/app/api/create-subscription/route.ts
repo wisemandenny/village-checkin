@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { data: villager } = await supabase
       .from("villagers")
       .select("id, stripe_customer_id, display_name, email, roles, ig_handle")
-      .eq("device_id", device_id)
+      .contains("device_ids", [device_id])
       .single();
 
     if (!villager) {

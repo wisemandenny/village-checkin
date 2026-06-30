@@ -40,7 +40,7 @@ type SortDir = "asc" | "desc";
 type ModalMode = "create" | "edit" | null;
 
 type VillagerForm = {
-  device_id: string;
+  device_ids_text: string;
   display_name: string;
   ig_handle: string;
   roles_text: string;
@@ -54,7 +54,7 @@ type VillagerForm = {
 };
 
 const EMPTY_FORM: VillagerForm = {
-  device_id: "",
+  device_ids_text: "",
   display_name: "",
   ig_handle: "",
   roles_text: "",
@@ -188,7 +188,7 @@ export default function VillagersPanel({ token }: { token: string }) {
 
   function openEdit(v: Villager) {
     setForm({
-      device_id: v.device_id,
+      device_ids_text: (v.device_ids ?? []).join(", "),
       display_name: v.display_name,
       ig_handle: v.ig_handle || "",
       roles_text: (v.roles ?? []).join(", "),
@@ -214,7 +214,7 @@ export default function VillagersPanel({ token }: { token: string }) {
       s.split(",").map((x) => x.trim()).filter(Boolean);
 
     const payload = {
-      device_id: form.device_id,
+      device_ids: parseList(form.device_ids_text),
       display_name: form.display_name,
       ig_handle: form.ig_handle || null,
       roles: parseList(form.roles_text),
@@ -539,19 +539,14 @@ export default function VillagersPanel({ token }: { token: string }) {
                 />
               </Field>
 
-              <Field label="Device ID" required>
+              <Field label="Device IDs">
                 <input
                   type="text"
-                  required
-                  value={form.device_id}
+                  value={form.device_ids_text}
                   onChange={(e) =>
-                    setForm({ ...form, device_id: e.target.value })
+                    setForm({ ...form, device_ids_text: e.target.value })
                   }
-                  placeholder={
-                    modalMode === "create"
-                      ? "Unique device identifier"
-                      : undefined
-                  }
+                  placeholder="Comma-separated device identifiers"
                   className="input"
                 />
               </Field>

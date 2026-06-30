@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const { data: villager, error: lookupError } = await supabase
     .from("villagers")
     .select("id")
-    .eq("device_id", device_id)
+    .contains("device_ids", [device_id])
     .maybeSingle();
 
   if (lookupError) {
