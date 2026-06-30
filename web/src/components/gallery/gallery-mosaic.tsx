@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Reveal } from "@/components/motion";
 import { ACCEPT, useGalleryUpload } from "@/lib/use-gallery-upload";
+import { MediaPreviewer, PlayBadge } from "@/components/gallery/media-previewer";
 
 interface MosaicItem {
   id: string;
@@ -24,6 +25,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [items, setItems] = useState<MosaicItem[]>([]);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [preview, setPreview] = useState<MosaicItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { me, uploading, uploadProgress, error, setError, uploadFiles } =
@@ -103,21 +105,33 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                     isHighlight ? "col-span-4 row-span-4" : "col-span-2 row-span-2"
                   }`}
                 >
-                  {item.kind === "photo" ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={item.url}
-                      alt={`Photo by ${item.display_name}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <video
-                      src={item.url}
-                      preload="metadata"
-                      className="h-full w-full object-cover"
-                    />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPreview(item)}
+                    className="group h-full w-full cursor-zoom-in"
+                    aria-label={`Open ${item.kind} by ${item.display_name}`}
+                  >
+                    {item.kind === "photo" ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={item.url}
+                        alt={`Photo by ${item.display_name}`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <>
+                        <video
+                          src={item.url}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                        <PlayBadge size={isHighlight ? "md" : "sm"} />
+                      </>
+                    )}
+                  </button>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-[10px] font-medium text-white">
                     {item.display_name}
                     {isMine && " (you)"}
@@ -165,6 +179,8 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
           </div>
         )}
       </div>
+
+      <MediaPreviewer item={preview} onClose={() => setPreview(null)} />
     </Reveal>
   );
 }
