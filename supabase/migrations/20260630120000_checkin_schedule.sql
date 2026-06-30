@@ -6,16 +6,18 @@
 -- until an admin turns the schedule on; the manual check-ins toggle keeps
 -- working either way.
 --
+-- All times are wall-clock Toronto (America/Toronto) local time; daylight
+-- saving is handled automatically by the app, so no timezone is stored.
+--
 -- Shape:
 --   {
---     "enabled":  false,            -- when false, the cron no-ops (manual only)
---     "timezone": "America/New_York",
+--     "enabled": false,                        -- when false, the cron no-ops
 --     "open":  { "day": 1, "time": "17:00" },  -- day: 0=Sun..6=Sat
 --     "close": { "day": 2, "time": "04:00" }   -- window may wrap past midnight
 --   }
 insert into studio_settings (key, value)
 values (
   'checkin_schedule',
-  '{"enabled":false,"timezone":"America/New_York","open":{"day":1,"time":"17:00"},"close":{"day":2,"time":"04:00"}}'::jsonb
+  '{"enabled":false,"open":{"day":1,"time":"17:00"},"close":{"day":2,"time":"04:00"}}'::jsonb
 )
 on conflict (key) do nothing;

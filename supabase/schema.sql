@@ -137,9 +137,11 @@ insert into studio_settings (key, value) values ('exclusive_handles', '[]'::json
 -- Check-in schedule: a recurring weekly window a cron uses to flip
 -- 'checkins_enabled' automatically. Shipped DISABLED so existing behavior is
 -- unchanged until an admin turns it on; the manual toggle keeps working.
--- day: 0=Sun..6=Sat; the window may wrap past midnight. The companion
--- 'checkin_schedule_last_state' key is created on demand by the cron.
-insert into studio_settings (key, value) values ('checkin_schedule', '{"enabled":false,"timezone":"America/New_York","open":{"day":1,"time":"17:00"},"close":{"day":2,"time":"04:00"}}'::jsonb);
+-- Times are Toronto (America/Toronto) local wall-clock; DST is handled by the
+-- app, so no timezone is stored. day: 0=Sun..6=Sat; the window may wrap past
+-- midnight. The companion 'checkin_schedule_last_state' key is created on
+-- demand by the cron.
+insert into studio_settings (key, value) values ('checkin_schedule', '{"enabled":false,"open":{"day":1,"time":"17:00"},"close":{"day":2,"time":"04:00"}}'::jsonb);
 
 alter table studio_settings enable row level security;
 

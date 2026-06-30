@@ -1,29 +1,31 @@
 // Recurring weekly schedule that a cron uses to flip `checkins_enabled`.
 //
-// The window is expressed in wall-clock time for a given IANA timezone, so it
-// stays correct across DST changes (we read the local weekday/hour/minute via
-// Intl rather than doing UTC offset math). The window may wrap past the end of
-// the week back to Sunday (e.g. open Sat 22:00, close Sun 02:00).
+// All times are wall-clock time in the studio's local timezone (Toronto, ON).
+// We read the local weekday/hour/minute via Intl rather than doing UTC offset
+// math, so the schedule stays correct across daylight saving transitions
+// automatically. The window may wrap past the end of the week back to Sunday
+// (e.g. open Sat 22:00, close Sun 02:00).
+
+// The studio's fixed local timezone. America/Toronto carries the EST/EDT DST
+// rules, so wall-clock open/close times shift with daylight saving on their own.
+export const STUDIO_TIMEZONE = "America/Toronto";
 
 export interface ScheduleBoundary {
   // 0 = Sunday .. 6 = Saturday
   day: number;
-  // "HH:MM" 24-hour wall-clock time in the schedule's timezone
+  // "HH:MM" 24-hour wall-clock time in the studio's local timezone
   time: string;
 }
 
 export interface CheckinSchedule {
   // When false, the cron no-ops and check-ins stay under manual control.
   enabled: boolean;
-  // IANA timezone name, e.g. "America/New_York".
-  timezone: string;
   open: ScheduleBoundary;
   close: ScheduleBoundary;
 }
 
 export const DEFAULT_CHECKIN_SCHEDULE: CheckinSchedule = {
   enabled: false,
-  timezone: "America/New_York",
   open: { day: 1, time: "17:00" },
   close: { day: 2, time: "04:00" },
 };
@@ -53,10 +55,10 @@ function boundaryToMinuteOfWeek(b: ScheduleBoundary): number {
   return day * 24 * 60 + parseTimeToMinutes(b.time);
 }
 
-// Current wall-clock minute-of-week in the given timezone.
-function minuteOfWeekInTz(date: Date, timezone: string): number {
+// Current wall-clock minute-of-week in the studio's local timezone.
+function minuteOfWeek(date: Date): number {
   const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
+    timeZone: STUDIO_TIMEZONE,
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
@@ -95,10 +97,6 @@ export function normalizeSchedule(value: unknown): CheckinSchedule {
 
   return {
     enabled: v.enabled === true,
-    timezone:
-      typeof v.timezone === "string" && v.timezone.trim()
-        ? v.timezone
-        : DEFAULT_CHECKIN_SCHEDULE.timezone,
     open: {
       day: validDay(open.day) ? open.day : DEFAULT_CHECKIN_SCHEDULE.open.day,
       time: validTime(open.time) ? open.time : DEFAULT_CHECKIN_SCHEDULE.open.time,
@@ -118,7 +116,7 @@ export function normalizeSchedule(value: unknown): CheckinSchedule {
 export function isOpenAt(schedule: CheckinSchedule, now: Date): boolean {
   const start = boundaryToMinuteOfWeek(schedule.open);
   const end = boundaryToMinuteOfWeek(schedule.close);
-  const current = minuteOfWeekInTz(now, schedule.timezone);
+  const current = minuteOfWeek(now);
 
   if (start === end) return true;
 

@@ -121,9 +121,11 @@ If OAuth is not configured, purchase recording simply no-ops; tags and the
 ## Scheduled check-ins
 
 Admins can toggle check-ins on/off manually in **Settings → Check-ins**, or hand
-control to a weekly schedule in **Settings → Check-in schedule** (timezone, open
-day/time, close day/time). The schedule lives in `studio_settings.checkin_schedule`
-and is enforced by a GitHub Actions cron ([.github/workflows/checkin-schedule.yml](.github/workflows/checkin-schedule.yml))
+control to a weekly schedule in **Settings → Check-in schedule** (open day/time,
+close day/time). Schedule times are Toronto (`America/Toronto`) local wall-clock
+time; daylight saving is handled automatically. The schedule lives in
+`studio_settings.checkin_schedule` and is enforced by a GitHub Actions cron
+([.github/workflows/checkin-schedule.yml](.github/workflows/checkin-schedule.yml))
 that runs every 15 minutes and calls `/api/cron/checkins` with the `CRON_SECRET`
 bearer.
 

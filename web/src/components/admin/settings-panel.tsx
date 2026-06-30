@@ -16,17 +16,6 @@ const DAY_NAMES = [
   "Saturday",
 ];
 
-// A short, curated timezone list covers the studio's needs; admins running
-// elsewhere can still store any IANA name via the DB.
-const TIMEZONES = [
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Toronto",
-  "UTC",
-];
-
 interface SettingsPanelProps {
   token: string;
   onShowChangelog?: () => void;
@@ -472,24 +461,6 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block font-medium text-[var(--color-muted)]">Timezone</span>
-            <select
-              value={schedule.timezone}
-              onChange={(e) => setSchedule({ ...schedule, timezone: e.target.value })}
-              className="w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25"
-            >
-              {(TIMEZONES.includes(schedule.timezone)
-                ? TIMEZONES
-                : [schedule.timezone, ...TIMEZONES]
-              ).map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <div className="rounded-lg border border-[var(--color-border)] p-4">
             <p className="mb-3 text-sm font-medium">Opens</p>
             <div className="flex gap-3">
