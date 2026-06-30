@@ -25,7 +25,7 @@ export function buildReminder(
   const intro =
     kind === "1h"
       ? "Thanks for coming to Potluck Sessions. It looks like your payment didn't go through. You can take care of it here:"
-      : "Your recent Village visit still hasn't been paid for. You can take care of it here:";
+      : "Your recent Potluck Sessions visit still hasn't been paid for. You can take care of it here:";
 
   const footerNote =
     "If you already paid or visited on a membership, you can ignore this.";
