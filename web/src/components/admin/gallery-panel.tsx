@@ -32,6 +32,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Shared base so every toolbar button has identical sizing and spacing;
+// per-button classes only add colors.
+const toolbarButtonClass =
+  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed";
+
 function downloadFilename(item: AdminUpload): string {
   let ext = "";
   try {
@@ -64,6 +69,15 @@ export default function GalleryPanel({ token }: { token: string }) {
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((cur) => {
+      if (ordered.length > 0 && cur.size >= ordered.length) {
+        return new Set();
+      }
+      return new Set(ordered.map((u) => u.id));
     });
   }
 
@@ -225,34 +239,46 @@ export default function GalleryPanel({ token }: { token: string }) {
   const reported = uploads.filter((u) => u.reported && !u.deleted_at);
   const rest = uploads.filter((u) => !u.reported || u.deleted_at);
   const ordered = [...reported, ...rest];
+  const allSelected = ordered.length > 0 && selectedIds.size >= ordered.length;
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Gallery moderation</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
+            onClick={toggleSelectAll}
+            disabled={loading || ordered.length === 0}
+            className={`${toolbarButtonClass} border border-[var(--color-border)] hover:bg-[var(--color-surface)]`}
+          >
+            {allSelected ? "Deselect all" : "Select all"}
+          </button>
+          <button
+            type="button"
             onClick={handleDownloadSelected}
             disabled={downloading || bulkTakingDown || selectedIds.size === 0}
-            className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
+            className={`${toolbarButtonClass} bg-green-600 text-white hover:bg-green-700`}
           >
             {downloading
               ? "Downloading…"
               : `Download${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
           </button>
           <button
+            type="button"
             onClick={handleTakedownSelected}
             disabled={bulkTakingDown || downloading || selectedIds.size === 0}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+            className={`${toolbarButtonClass} bg-red-600 text-white hover:bg-red-700`}
           >
             {bulkTakingDown
               ? "Removing…"
               : `Take down${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
           </button>
           <button
+            type="button"
             onClick={load}
             disabled={loading}
-            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm transition hover:bg-[var(--color-surface)] disabled:opacity-50"
+            className={`${toolbarButtonClass} border border-[var(--color-border)] hover:bg-[var(--color-surface)]`}
           >
             {loading ? "Loading…" : "Refresh"}
           </button>
