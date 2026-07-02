@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useSyncExternalStore, FormEvent } from "react";
+import Link from "next/link";
 import VillagersPanel from "@/components/admin/villagers-panel";
 import CheckInsPanel from "@/components/admin/checkins-panel";
 import SubscriptionsPanel from "@/components/admin/subscriptions-panel";
@@ -11,6 +12,34 @@ import StatisticsPanel from "@/components/admin/statistics-panel";
 
 type Tab = "villagers" | "checkins" | "subscriptions" | "statistics" | "gallery" | "settings" | "changelog";
 
+// The admin session token is persisted in localStorage so admins stay logged in
+// across tab/browser restarts. We treat localStorage as an external store and
+// read it with useSyncExternalStore instead of seeding state from an effect.
+const TOKEN_KEY = "admin_token";
+const TOKEN_EVENT = "admin-token-change";
+
+function subscribeToken(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(TOKEN_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(TOKEN_EVENT, onChange);
+  };
+}
+
+function getTokenSnapshot(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setStoredToken(token: string | null) {
+  if (token === null) {
+    localStorage.removeItem(TOKEN_KEY);
+  } else {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+  window.dispatchEvent(new Event(TOKEN_EVENT));
+}
+
 const leftTabs: { key: Tab; label: string }[] = [
   { key: "villagers", label: "Villagers" },
   { key: "checkins", label: "Check-ins" },
@@ -20,19 +49,11 @@ const leftTabs: { key: Tab; label: string }[] = [
 ];
 
 export default function AdminPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const token = useSyncExternalStore(subscribeToken, getTokenSnapshot, () => null);
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("villagers");
-
-  useEffect(() => {
-    // Persist the admin session on the device (localStorage) so admins stay
-    // logged in across tab/browser restarts and don't re-enter the password
-    // every visit.
-    const saved = localStorage.getItem("admin_token");
-    if (saved) setToken(saved);
-  }, []);
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -43,8 +64,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${passwordInput}` },
       });
       if (!res.ok) throw new Error("Invalid password");
-      localStorage.setItem("admin_token", passwordInput);
-      setToken(passwordInput);
+      setStoredToken(passwordInput);
     } catch {
       setLoginError("Invalid password. Please try again.");
     } finally {
@@ -53,8 +73,7 @@ export default function AdminPage() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("admin_token");
-    setToken(null);
+    setStoredToken(null);
   }
 
   if (!token) {
@@ -86,12 +105,12 @@ export default function AdminPage() {
           >
             {loggingIn ? "Signing in…" : "Sign In"}
           </button>
-          <a
+          <Link
             href="/"
             className="mt-4 block text-center text-sm text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]"
           >
             &larr; Back to check-in
-          </a>
+          </Link>
         </form>
       </div>
     );

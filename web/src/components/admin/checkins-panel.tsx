@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, useTransition, FormEvent } from "react";
 import type { CheckIn, PaymentMethod, CheckInStatus, Villager } from "@/lib/types";
 
 type CheckInWithVillager = CheckIn & {
@@ -192,11 +192,19 @@ function computeStreaks(checkins: { created_at: string }[]): StreakResult {
 export default function CheckInsPanel({ token }: { token: string }) {
   const [checkins, setCheckins] = useState<CheckInWithVillager[]>([]);
   const [villagers, setVillagers] = useState<Villager[]>([]);
-  const [loading, setLoading] = useState(false);
+  // The fetch runs inside a transition so we never call setState synchronously
+  // in the load effect. `loading` stays true until the first load resolves.
+  const [isPending, startTransition] = useTransition();
+  const [, startAuxTransition] = useTransition();
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loading = isPending || !hasLoaded;
   const [error, setError] = useState("");
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
   const [last24hOnly, setLast24hOnly] = useState(true);
+  // Reference "now" for the 24h window, captured outside render (on load and
+  // when the filter is toggled) so we never call Date.now() during render.
+  const [now, setNow] = useState(0);
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -234,8 +242,6 @@ export default function CheckInsPanel({ token }: { token: string }) {
   );
 
   const loadCheckins = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const params = new URLSearchParams();
       if (filterVillagerId) params.set("villager_id", filterVillagerId);
@@ -245,11 +251,13 @@ export default function CheckInsPanel({ token }: { token: string }) {
         throw new Error(body.error || "Failed to load check-ins");
       }
       const { checkins } = await res.json();
+      setError("");
+      setNow(Date.now());
       setCheckins(checkins);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load check-ins");
     } finally {
-      setLoading(false);
+      setHasLoaded(true);
     }
   }, [filterVillagerId, apiFetch]);
 
@@ -278,12 +286,15 @@ export default function CheckInsPanel({ token }: { token: string }) {
   }, [apiFetch]);
 
   useEffect(() => {
-    loadCheckins();
+    startTransition(async () => {
+      await loadCheckins();
+    });
   }, [loadCheckins]);
 
   useEffect(() => {
-    loadVillagers();
-    loadAllCheckins();
+    startAuxTransition(async () => {
+      await Promise.all([loadVillagers(), loadAllCheckins()]);
+    });
   }, [loadVillagers, loadAllCheckins]);
 
   function openCreate() {
@@ -419,14 +430,14 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
   const displayedCheckins = useMemo(() => {
     if (!last24hOnly) return checkins;
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = now - 24 * 60 * 60 * 1000;
     return checkins.filter((c) => new Date(c.created_at).getTime() >= cutoff);
-  }, [checkins, last24hOnly]);
+  }, [checkins, last24hOnly, now]);
 
   const last24hStats = useMemo(() => {
     if (!last24hOnly) return null;
 
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = now - 24 * 60 * 60 * 1000;
     const isRecent = (iso: string) => new Date(iso).getTime() >= cutoff;
 
     const paid = displayedCheckins.filter(
@@ -461,7 +472,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
       uniqueVillagers,
       newVillagers,
     };
-  }, [last24hOnly, displayedCheckins, allCheckins]);
+  }, [last24hOnly, displayedCheckins, allCheckins, now]);
 
   const villagerStats = useMemo(() => {
     if (!filterVillagerId || checkins.length === 0) return null;
@@ -611,7 +622,10 @@ export default function CheckInsPanel({ token }: { token: string }) {
           <input
             type="checkbox"
             checked={last24hOnly}
-            onChange={(e) => setLast24hOnly(e.target.checked)}
+            onChange={(e) => {
+              setLast24hOnly(e.target.checked);
+              setNow(Date.now());
+            }}
             className="h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-accent)]"
           />
           Past 24 hours

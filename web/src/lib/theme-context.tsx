@@ -1,6 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useSyncExternalStore,
+} from "react";
 
 type Theme = "light" | "dark";
 
@@ -14,24 +19,37 @@ const ThemeContext = createContext<ThemeContextValue>({
   toggle: () => {},
 });
 
+// The active theme lives on <html> as the `dark` class (set pre-hydration by
+// an inline script). Treat that class as the source of truth and read it via
+// useSyncExternalStore so we never mirror it into state inside an effect.
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  return () => observer.disconnect();
+}
+
+function getSnapshot(): Theme {
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+// Safe server-side default; the real value is read from the DOM on the client.
+function getServerSnapshot(): Theme {
+  return "light";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Safe server-side default; corrected from DOM after mount to avoid
-  // hydration mismatches.
-  const [theme, setTheme] = useState<Theme>("light");
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    setTheme(isDark ? "dark" : "light");
-  }, []);
-
-  function toggle() {
-    const next: Theme = theme === "light" ? "dark" : "light";
-    setTheme(next);
+  const toggle = useCallback(() => {
+    const next: Theme = getSnapshot() === "light" ? "dark" : "light";
     document.documentElement.classList.toggle("dark", next === "dark");
     try {
       localStorage.setItem("theme", next);
     } catch {}
-  }
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, toggle }}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
@@ -32,7 +33,6 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [isElder, setIsElder] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paidMethod, setPaidMethod] = useState<PaymentMethod | null>(null);
   // True when this visit's check-in row predates this session (the server
@@ -74,7 +74,6 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       const check_in = statusData.check_in;
       setHasActiveSubscription(statusData.has_active_subscription === true);
       setIsExclusive(statusData.is_exclusive === true);
-      setIsElder(statusData.is_elder === true);
       setAlreadyCheckedIn(true);
       if (check_in?.id) setCheckInId(check_in.id);
 
@@ -126,7 +125,6 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
         setCheckInId(check_in.id);
         setIsExclusive(is_exclusive === true);
         setHasActiveSubscription(has_active_subscription === true);
-        setIsElder(is_elder === true);
 
         if (settings.payments_enabled === true && !has_active_subscription && !is_elder) {
           setStep("payment");
@@ -175,9 +173,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
   if (step === "checking-in") {
     return (
       <div className="flex flex-col items-center gap-6 text-center">
-        <img
+        <Image
           src="/potluck-chinese.png"
           alt="Loading…"
+          width={1849}
+          height={1622}
           className="h-36 w-auto animate-pulse-slow"
         />
         <p className="text-[var(--color-muted)]">Checking you in...</p>
@@ -203,7 +203,6 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
                     setCheckInId(check_in.id);
                     setIsExclusive(is_exclusive === true);
                     setHasActiveSubscription(has_active_subscription === true);
-                    setIsElder(is_elder === true);
                     if (paymentsEnabled && !has_active_subscription && !is_elder) {
                       setStep("payment");
                     } else {

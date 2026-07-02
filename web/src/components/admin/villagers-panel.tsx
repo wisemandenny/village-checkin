@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, useTransition, FormEvent } from "react";
 import type { Villager, VillagerSubscriptionSummary } from "@/lib/types";
 import { sortRoles, sortInstruments } from "@/lib/tag-order";
 
@@ -92,7 +92,12 @@ function fromDatetimeLocal(val: string): string {
 
 export default function VillagersPanel({ token }: { token: string }) {
   const [villagers, setVillagers] = useState<Villager[]>([]);
-  const [loading, setLoading] = useState(false);
+  // The fetch runs inside a transition so we never call setState synchronously
+  // in the load effect. `loading` stays true until the first load resolves to
+  // preserve the initial loading row.
+  const [isPending, startTransition] = useTransition();
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loading = isPending || !hasLoaded;
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
@@ -124,8 +129,6 @@ export default function VillagersPanel({ token }: { token: string }) {
   );
 
   const loadVillagers = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set("search", debouncedSearch);
@@ -135,11 +138,12 @@ export default function VillagersPanel({ token }: { token: string }) {
         throw new Error(body.error || "Failed to load villagers");
       }
       const { villagers } = await res.json();
+      setError("");
       setVillagers(villagers);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load villagers");
     } finally {
-      setLoading(false);
+      setHasLoaded(true);
     }
   }, [debouncedSearch, apiFetch]);
 
@@ -149,7 +153,9 @@ export default function VillagersPanel({ token }: { token: string }) {
   }, [search]);
 
   useEffect(() => {
-    loadVillagers();
+    startTransition(async () => {
+      await loadVillagers();
+    });
   }, [loadVillagers]);
 
   const sortedVillagers = useMemo(() => {

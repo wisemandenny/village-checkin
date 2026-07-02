@@ -7,7 +7,6 @@ Frictionless check-in and "pay what you can" system for an open recording studio
 ```
 village-checkin/
 ├── web/              # Next.js (App Router) — frontend + API
-├── tablet-kiosk/     # React Native (Expo) — front desk kiosk
 └── supabase/         # SQL schema migration
 ```
 
@@ -16,13 +15,6 @@ village-checkin/
 - **Next.js** with App Router, React 19, Tailwind CSS
 - Device-ID based auth via `localStorage` (no passwords)
 - API routes for registration, check-in, Stripe Checkout fallback, webhooks
-- Supabase Realtime broadcast to trigger payments on the tablet
-
-### Tablet Kiosk (`tablet-kiosk/`)
-
-- **Expo / React Native** targeting Samsung Galaxy Tab Active3
-- Supabase Realtime subscriber — receives payment requests from web clients
-- Stripe Terminal SDK for physical card tap-to-pay
 
 ## Getting Started
 
@@ -30,7 +22,7 @@ village-checkin/
 
 - Node.js 18+
 - Supabase project (with Realtime enabled)
-- Stripe account (with Terminal enabled for physical payments)
+- Stripe account
 
 ### 1. Database Setup
 
@@ -43,15 +35,6 @@ cd web
 cp .env.example .env.local    # Fill in your keys
 npm install
 npm run dev
-```
-
-### 3. Tablet Kiosk
-
-```bash
-cd tablet-kiosk
-# Edit src/config.ts with your Supabase + API URLs
-npm install
-npx expo start
 ```
 
 ## Environment Variables (Web)
@@ -161,10 +144,9 @@ as a repository **Actions secret** of the same name.
 ## Payment Flow
 
 1. User opens web app on phone → identifies via `localStorage` device ID
-2. Chooses an amount → selects "Tap at Front Desk" or "Pay Online"
-3. **Terminal path:** API broadcasts payment request via Supabase Realtime → tablet receives it → initiates Stripe Terminal charge → user taps card
-4. **Online path:** API creates Stripe Checkout session → user completes payment on phone
-5. Webhook/tablet updates `check_ins` record to `paid`
+2. Chooses an amount → pays online
+3. API creates a Stripe Checkout session → user completes payment on phone
+4. Webhook updates the `check_ins` record to `paid`
 
 ### Recurring support (pay what you can)
 
