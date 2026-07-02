@@ -14,6 +14,39 @@ type SubscriptionWithVillager = Subscription & {
 
 type Group = "active" | "ending" | "pending" | "paused" | "ended";
 
+type SortField = "villager" | "amount" | "interval" | "status" | "updated_at";
+type SortDir = "asc" | "desc";
+
+function sortSubscriptions(
+  subscriptions: SubscriptionWithVillager[],
+  sortBy: SortField,
+  sortDir: SortDir
+): SubscriptionWithVillager[] {
+  const dir = sortDir === "asc" ? 1 : -1;
+  return [...subscriptions].sort((a, b) => {
+    switch (sortBy) {
+      case "villager":
+        return (
+          String(a.villagers?.display_name ?? "").localeCompare(
+            String(b.villagers?.display_name ?? "")
+          ) * dir
+        );
+      case "amount":
+        return (a.amount - b.amount) * dir;
+      case "updated_at":
+        return (
+          (new Date(a.updated_at).getTime() -
+            new Date(b.updated_at).getTime()) *
+          dir
+        );
+      default:
+        return (
+          String(a[sortBy] ?? "").localeCompare(String(b[sortBy] ?? "")) * dir
+        );
+    }
+  });
+}
+
 const GROUP_ORDER: Group[] = ["active", "ending", "pending", "paused", "ended"];
 
 const GROUP_FOR_STATUS: Record<string, Group> = {
@@ -103,6 +136,17 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState("");
+  const [sortBy, setSortBy] = useState<SortField>("villager");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function handleSort(field: SortField) {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+  }
 
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
@@ -231,19 +275,37 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
             key={group}
             group={group}
             subscriptions={grouped[group]}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
           />
         ))}
     </>
   );
 }
 
+const SUB_COLUMNS: { key: SortField; label: string; className?: string }[] = [
+  { key: "villager", label: "Villager" },
+  { key: "amount", label: "Amount" },
+  { key: "interval", label: "Interval" },
+  { key: "status", label: "Status" },
+  { key: "updated_at", label: "Updated", className: "hidden md:table-cell" },
+];
+
 function SubscriptionGroup({
   group,
   subscriptions,
+  sortBy,
+  sortDir,
+  onSort,
 }: {
   group: Group;
   subscriptions: SubscriptionWithVillager[];
+  sortBy: SortField;
+  sortDir: SortDir;
+  onSort: (field: SortField) => void;
 }) {
+  const sorted = sortSubscriptions(subscriptions, sortBy, sortDir);
   return (
     <div className="mb-6">
       <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--color-muted)]">
@@ -258,25 +320,24 @@ function SubscriptionGroup({
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Villager
-              </th>
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Amount
-              </th>
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Interval
-              </th>
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Status
-              </th>
-              <th className="hidden px-4 py-3 font-semibold text-[var(--color-muted)] md:table-cell">
-                Updated
-              </th>
+              {SUB_COLUMNS.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => onSort(col.key)}
+                  className={`cursor-pointer select-none px-4 py-3 font-semibold text-[var(--color-muted)] transition hover:text-[var(--color-foreground)] ${col.className ?? ""}`}
+                >
+                  {col.label}
+                  {sortBy !== col.key ? (
+                    <span className="ml-1 opacity-30">↕</span>
+                  ) : (
+                    <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {subscriptions.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
                 <td
                   colSpan={5}
@@ -286,7 +347,7 @@ function SubscriptionGroup({
                 </td>
               </tr>
             )}
-            {subscriptions.map((sub) => (
+            {sorted.map((sub) => (
               <tr
                 key={sub.id}
                 className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
