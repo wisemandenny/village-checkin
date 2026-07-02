@@ -9,6 +9,15 @@ type CheckInWithVillager = CheckIn & {
 
 type ModalMode = "create" | "edit" | null;
 
+type SortField =
+  | "villager"
+  | "intent_amount"
+  | "payment_method"
+  | "status"
+  | "created_at"
+  | "stripe_transaction_id";
+type SortDir = "asc" | "desc";
+
 const PAYMENT_METHODS: PaymentMethod[] = [
   "terminal",
   "online_fallback",
@@ -202,6 +211,8 @@ export default function CheckInsPanel({ token }: { token: string }) {
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
   const [last24hOnly, setLast24hOnly] = useState(true);
+  const [sortBy, setSortBy] = useState<SortField>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Reference "now" for the 24h window, captured outside render (on load and
   // when the filter is toggled) so we never call Date.now() during render.
   const [now, setNow] = useState(0);
@@ -429,10 +440,63 @@ export default function CheckInsPanel({ token }: { token: string }) {
   }
 
   const displayedCheckins = useMemo(() => {
-    if (!last24hOnly) return checkins;
-    const cutoff = now - 24 * 60 * 60 * 1000;
-    return checkins.filter((c) => new Date(c.created_at).getTime() >= cutoff);
-  }, [checkins, last24hOnly, now]);
+    const filtered = last24hOnly
+      ? checkins.filter((c) => {
+          const cutoff = now - 24 * 60 * 60 * 1000;
+          return new Date(c.created_at).getTime() >= cutoff;
+        })
+      : checkins;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "villager":
+          return (
+            String(a.villagers?.display_name ?? "").localeCompare(
+              String(b.villagers?.display_name ?? "")
+            ) * dir
+          );
+        case "intent_amount":
+          return (a.intent_amount - b.intent_amount) * dir;
+        case "created_at":
+          return (
+            (new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime()) *
+            dir
+          );
+        default:
+          return (
+            String(a[sortBy] ?? "").localeCompare(String(b[sortBy] ?? "")) * dir
+          );
+      }
+    });
+  }, [checkins, last24hOnly, now, sortBy, sortDir]);
+
+  function handleSort(field: SortField) {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+  }
+
+  function SortIcon({ field }: { field: SortField }) {
+    if (sortBy !== field) return <span className="ml-1 opacity-30">↕</span>;
+    return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  const columns: { key: SortField; label: string; className?: string }[] = [
+    { key: "villager", label: "Villager" },
+    { key: "intent_amount", label: "Amount" },
+    { key: "payment_method", label: "Method", className: "hidden md:table-cell" },
+    { key: "status", label: "Status" },
+    { key: "created_at", label: "Date", className: "hidden md:table-cell" },
+    {
+      key: "stripe_transaction_id",
+      label: "Stripe ID",
+      className: "hidden lg:table-cell",
+    },
+  ];
 
   const last24hStats = useMemo(() => {
     if (!last24hOnly) return null;
@@ -710,24 +774,16 @@ export default function CheckInsPanel({ token }: { token: string }) {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Villager
-              </th>
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Amount
-              </th>
-              <th className="hidden px-4 py-3 font-semibold text-[var(--color-muted)] md:table-cell">
-                Method
-              </th>
-              <th className="px-4 py-3 font-semibold text-[var(--color-muted)]">
-                Status
-              </th>
-              <th className="hidden px-4 py-3 font-semibold text-[var(--color-muted)] md:table-cell">
-                Date
-              </th>
-              <th className="hidden px-4 py-3 font-semibold text-[var(--color-muted)] lg:table-cell">
-                Stripe ID
-              </th>
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className={`cursor-pointer select-none px-4 py-3 font-semibold text-[var(--color-muted)] transition hover:text-[var(--color-foreground)] ${col.className ?? ""}`}
+                >
+                  {col.label}
+                  <SortIcon field={col.key} />
+                </th>
+              ))}
               <th className="px-4 py-3 text-right font-semibold text-[var(--color-muted)]">
                 Actions
               </th>

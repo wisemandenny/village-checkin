@@ -1,8 +1,17 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useTheme } from "@/lib/theme-context";
 
-export function ThemeToggle() {
+const BASE_CLASS =
+  "relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] shadow-sm transition-colors duration-200 hover:bg-[var(--color-border)]";
+
+/**
+ * The toggle itself. `className` controls placement so it can render both as a
+ * fixed floating control (default site chrome) and inline within a page header
+ * (e.g. the admin panel, where a fixed toggle would overlap the title).
+ */
+export function ThemeToggleButton({ className = "" }: { className?: string }) {
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
 
@@ -10,7 +19,7 @@ export function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="fixed left-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] shadow-sm transition-colors duration-200 hover:bg-[var(--color-border)]"
+      className={`${BASE_CLASS} ${className}`}
     >
       {/* Sun — visible in light mode */}
       <span
@@ -49,4 +58,13 @@ export function ThemeToggle() {
       </span>
     </button>
   );
+}
+
+export function ThemeToggle() {
+  const pathname = usePathname();
+  // Admin routes render their own toggle inside the page chrome (see admin/page.tsx)
+  // so it never overlaps the "Admin Panel" heading; skip the global fixed one there.
+  if (pathname?.startsWith("/admin")) return null;
+
+  return <ThemeToggleButton className="fixed left-4 top-4 z-50" />;
 }

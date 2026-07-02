@@ -100,7 +100,14 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
           </button>
         ) : (
           <div className="max-h-[70vh] overflow-y-auto pr-1">
-            <div className="grid grid-flow-row-dense grid-cols-8 gap-1.5 [grid-auto-rows:90px]">
+            {/*
+              Row height tracks the column width (via container-query units) so
+              every tile stays square at any width. A fixed row height instead
+              stretched tiles into tall rectangles on narrow screens — and the
+              4x4 highlight made that distortion obvious across the whole grid.
+            */}
+            <div className="@container">
+            <div className="grid grid-flow-row-dense grid-cols-8 gap-1.5 [grid-auto-rows:calc((100cqw_-_7_*_0.375rem)_/_8)]">
             {items.map((item) => {
               const isHighlight = highlightIds.has(item.id);
               const isMine = me?.id === item.villager_id;
@@ -145,6 +152,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                 </div>
               );
             })}
+            </div>
             </div>
           </div>
         )}

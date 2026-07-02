@@ -102,8 +102,8 @@ export default function VillagersPanel({ token }: { token: string }) {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortBy, setSortBy] = useState<SortField>("first_visited_at");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortBy, setSortBy] = useState<SortField>("display_name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);

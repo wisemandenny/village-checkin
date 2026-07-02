@@ -9,6 +9,7 @@ import SettingsPanel from "@/components/admin/settings-panel";
 import ChangelogPanel from "@/components/admin/changelog-panel";
 import GalleryPanel from "@/components/admin/gallery-panel";
 import StatisticsPanel from "@/components/admin/statistics-panel";
+import { ThemeToggleButton } from "@/components/theme-toggle";
 
 type Tab = "villagers" | "checkins" | "subscriptions" | "statistics" | "gallery" | "settings" | "changelog";
 
@@ -79,6 +80,7 @@ export default function AdminPage() {
   if (!token) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
+        <ThemeToggleButton className="fixed left-4 top-4 z-50" />
         <form
           onSubmit={handleLogin}
           className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8 shadow-lg"
@@ -117,7 +119,7 @@ export default function AdminPage() {
   }
 
   const tabClass = (key: Tab) =>
-    `rounded-md px-4 py-2 text-sm font-medium transition ${
+    `shrink-0 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition ${
       activeTab === key
         ? "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-sm"
         : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"
@@ -128,16 +130,19 @@ export default function AdminPage() {
       {/* Top bar */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Admin Panel</h1>
-        <button
-          onClick={handleLogout}
-          className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface)]"
-        >
-          Logout
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggleButton />
+          <button
+            onClick={handleLogout}
+            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface)]"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
+      <div className="mb-6 flex items-center gap-1 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
         {leftTabs.map((tab) => (
           <button
             key={tab.key}
@@ -147,7 +152,7 @@ export default function AdminPage() {
             {tab.label}
           </button>
         ))}
-        <div className="flex-1" />
+        <div className="hidden flex-1 sm:block" />
         <button
           onClick={() => setActiveTab("settings")}
           className={`${tabClass("settings")} inline-flex items-center gap-1.5`}
