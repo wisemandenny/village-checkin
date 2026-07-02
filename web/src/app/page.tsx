@@ -29,9 +29,13 @@ export default function Home() {
   const checkInAlreadyRef = useRef<boolean>(false);
   const cleanedUpRef = useRef(false);
 
-  screenRef.current = screen;
-  deviceIdRef.current = deviceId;
-  isNewRegistrationRef.current = isNewRegistration;
+  // Keep the refs read by the popstate handler current after each render.
+  // Writing them during render is disallowed, so sync them in an effect.
+  useEffect(() => {
+    screenRef.current = screen;
+    deviceIdRef.current = deviceId;
+    isNewRegistrationRef.current = isNewRegistration;
+  });
 
   const handleCheckInState = useCallback(
     ({
@@ -55,7 +59,6 @@ export default function Home() {
 
   useEffect(() => {
     const { deviceId: id, isNew } = getOrCreateDeviceId();
-    setDeviceId(id);
 
     (async () => {
       // Resolve check-ins flag up front — decides whether a returning villager
@@ -69,6 +72,11 @@ export default function Home() {
       } catch {
         // Default: check-ins on.
       }
+
+      // Publish the device id after the first await so this isn't a synchronous
+      // setState inside the effect body. The loading screen doesn't use it, so
+      // there's no visible gap before it's set.
+      setDeviceId(id);
 
       if (isNew) {
         setScreen("onboarding");
@@ -162,9 +170,11 @@ export default function Home() {
         </div>
 
         {screen === "loading" && (
-          <img
+          <Image
             src="/potluck-chinese.png"
             alt="Loading…"
+            width={1849}
+            height={1622}
             className="h-36 w-auto animate-pulse-slow"
           />
         )}

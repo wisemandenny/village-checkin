@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useCallback, useTransition, FormEvent } from "react";
 import {
   CheckinSchedule,
   DEFAULT_CHECKIN_SCHEDULE,
@@ -31,7 +31,12 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [scheduleMessage, setScheduleMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // The initial fetches run inside transitions so we never call setState
+  // synchronously in the load effect. `loading` stays true until settings load.
+  const [isPending, startTransition] = useTransition();
+  const [, startAuxTransition] = useTransition();
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loading = isPending || !hasLoaded;
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -58,14 +63,7 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
   const [testSending, setTestSending] = useState(false);
   const [testMessage, setTestMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    loadSettings();
-    loadExclusiveHandles();
-    loadTestVillagers();
-  }, []);
-
-  async function loadSettings() {
-    setLoading(true);
+  const loadSettings = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/settings", {
         headers: { Authorization: `Bearer ${token}` },
@@ -82,9 +80,9 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     } catch {
       setMessage({ type: "error", text: "Failed to load settings" });
     } finally {
-      setLoading(false);
+      setHasLoaded(true);
     }
-  }
+  }, [token]);
 
   async function togglePayments() {
     const newValue = !paymentsEnabled;
@@ -262,7 +260,7 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     }
   }
 
-  async function loadExclusiveHandles() {
+  const loadExclusiveHandles = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/exclusive-handles", {
         headers: { Authorization: `Bearer ${token}` },
@@ -273,7 +271,7 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     } catch {
       // non-fatal; admin can still edit and save
     }
-  }
+  }, [token]);
 
   async function saveExclusiveHandles() {
     setExclusiveSaving(true);
@@ -322,7 +320,7 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     }
   }
 
-  async function loadTestVillagers() {
+  const loadTestVillagers = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/villagers", {
         headers: { Authorization: `Bearer ${token}` },
@@ -340,7 +338,16 @@ export default function SettingsPanel({ token, onShowChangelog }: SettingsPanelP
     } catch {
       // non-fatal; the dropdown just stays empty
     }
-  }
+  }, [token]);
+
+  useEffect(() => {
+    startTransition(async () => {
+      await loadSettings();
+    });
+    startAuxTransition(async () => {
+      await Promise.all([loadExclusiveHandles(), loadTestVillagers()]);
+    });
+  }, [loadSettings, loadExclusiveHandles, loadTestVillagers]);
 
   async function sendTestReminders() {
     if (!testVillagerId) {

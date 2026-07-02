@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useTransition } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -171,7 +171,12 @@ export default function StatisticsPanel({ token }: { token: string }) {
   const [allCheckins, setAllCheckins] = useState<CheckInWithVillager[]>([]);
   const [villagers, setVillagers] = useState<Villager[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The fetch runs inside a transition so we never call setState synchronously
+  // in the load effect. `loading` stays true until the first load resolves to
+  // avoid a flash of the empty state before data arrives.
+  const [isPending, startTransition] = useTransition();
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loading = isPending || !hasLoaded;
   const [error, setError] = useState("");
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
@@ -204,8 +209,6 @@ export default function StatisticsPanel({ token }: { token: string }) {
   );
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const [checkinsRes, villagersRes, subscriptionsRes] = await Promise.all([
         apiFetch("/api/admin/checkins"),
@@ -217,6 +220,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
         throw new Error(body.error || "Failed to load check-ins");
       }
       const { checkins } = await checkinsRes.json();
+      setError("");
       setAllCheckins(checkins);
       if (villagersRes.ok) {
         const { villagers } = await villagersRes.json();
@@ -229,12 +233,14 @@ export default function StatisticsPanel({ token }: { token: string }) {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load statistics");
     } finally {
-      setLoading(false);
+      setHasLoaded(true);
     }
   }, [apiFetch]);
 
   useEffect(() => {
-    load();
+    startTransition(async () => {
+      await load();
+    });
   }, [load]);
 
   // Earliest-ever check-in per villager (across all history, ignoring filters)
