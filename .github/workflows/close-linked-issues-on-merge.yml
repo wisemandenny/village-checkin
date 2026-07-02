@@ -1,0 +1,52 @@
+name: Close linked issues on merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  close-issues:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Close issues referenced by closing keywords
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const closingKeywords = /\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
+            const text = `${context.payload.pull_request.title}\n${context.payload.pull_request.body ?? ''}`;
+            const issueNumbers = new Set();
+            let match;
+            while ((match = closingKeywords.exec(text)) !== null) {
+              issueNumbers.add(parseInt(match[2], 10));
+            }
+
+            if (issueNumbers.size === 0) {
+              console.log('No closing keywords found in PR title or body.');
+              return;
+            }
+
+            for (const issueNumber of issueNumbers) {
+              try {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: `Closed by #${context.payload.pull_request.number}.`,
+                });
+                console.log(`Closed issue #${issueNumber}`);
+              } catch (error) {
+                console.log(`Could not close issue #${issueNumber}: ${error.message}`);
+              }
+            }
