@@ -148,40 +148,51 @@ export default function GalleryPanel({ token }: { token: string }) {
     }
   }
 
+  function saveBlob(blob: Blob, filename: string) {
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Defer the revoke: revoking synchronously can cancel/truncate the download
+    // before the browser has finished reading the blob.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+  }
+
   async function handleDownloadSelected() {
     const targets = uploads.filter((u) => selectedIds.has(u.id));
     if (targets.length === 0) return;
     setDownloading(true);
     setError("");
-    const failures: string[] = [];
-    // Sequential: fetch each through the same-origin admin proxy (with the bearer
-    // token) and save the blob. Going through our own origin avoids any R2 CORS
-    // dependency, so this works on localhost, preview, and prod alike.
-    for (const item of targets) {
-      try {
+    try {
+      if (targets.length === 1) {
+        // Single selection: stream the file directly through the same-origin
+        // admin proxy and save it under its own name.
+        const item = targets[0];
         const res = await apiFetch(`/api/admin/gallery/${item.id}/download`);
         if (!res.ok) throw new Error(String(res.status));
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = objectUrl;
-        a.download = downloadFilename(item);
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        // Defer the revoke: revoking synchronously can cancel/truncate the
-        // download before the browser reads the blob, which is most likely to
-        // happen during rapid multi-file downloads.
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
-      } catch {
-        failures.push(item.display_name);
+        saveBlob(await res.blob(), downloadFilename(item));
+      } else {
+        // Multiple selections: bundle the exact selected set into one zip and
+        // save it in a single action. Triggering many programmatic downloads at
+        // once is unreliable (browsers coalesce rapid downloads and typically
+        // only keep the last one), so a single archive guarantees every checked
+        // file is delivered.
+        const res = await apiFetch("/api/admin/gallery/download", {
+          method: "POST",
+          body: JSON.stringify({ ids: targets.map((u) => u.id) }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        saveBlob(await res.blob(), "village-gallery.zip");
       }
+    } catch {
+      setError(`Could not download ${targets.length} selected item(s).`);
+    } finally {
+      setDownloading(false);
     }
-    if (failures.length > 0) {
-      setError(`Could not download ${failures.length} of ${targets.length} item(s).`);
-    }
-    setDownloading(false);
   }
 
   async function handleTakedownSelected() {
