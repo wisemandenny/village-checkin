@@ -488,9 +488,9 @@ export default function CheckInsPanel({ token }: { token: string }) {
   const columns: { key: SortField; label: string; className?: string }[] = [
     { key: "villager", label: "Villager" },
     { key: "intent_amount", label: "Amount" },
-    { key: "payment_method", label: "Method", className: "hidden md:table-cell" },
+    { key: "payment_method", label: "Method" },
     { key: "status", label: "Status" },
-    { key: "created_at", label: "Date", className: "hidden md:table-cell" },
+    { key: "created_at", label: "Date" },
     {
       key: "stripe_transaction_id",
       label: "Stripe ID",
@@ -824,7 +824,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   <td className="px-4 py-3 tabular-nums">
                     {formatCents(c.intent_amount)}
                   </td>
-                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
                     {METHOD_LABELS[c.payment_method] || c.payment_method}
                   </td>
                   <td className="px-4 py-3">
@@ -834,7 +834,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
                       {c.status}
                     </span>
                   </td>
-                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(c.created_at)}
                   </td>
                   <td className="hidden px-4 py-3 font-mono text-xs text-[var(--color-muted)] lg:table-cell">
