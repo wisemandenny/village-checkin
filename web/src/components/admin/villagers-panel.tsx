@@ -307,12 +307,12 @@ export default function VillagersPanel({ token }: { token: string }) {
   const columns: { key: string; label: string; sortable?: boolean; hideOnMobile?: boolean }[] = [
     { key: "display_name", label: "Name", sortable: true },
     { key: "ig_handle", label: "IG Handle", sortable: true },
-    { key: "roles", label: "Roles", hideOnMobile: true },
-    { key: "instruments", label: "Instruments", hideOnMobile: true },
-    { key: "email", label: "Email", sortable: true, hideOnMobile: true },
-    { key: "subscription", label: "Subscription", sortable: true, hideOnMobile: true },
+    { key: "roles", label: "Roles" },
+    { key: "instruments", label: "Instruments" },
+    { key: "email", label: "Email", sortable: true },
+    { key: "subscription", label: "Subscription", sortable: true },
     { key: "first_visited_at", label: "First Visit", sortable: true },
-    { key: "last_visited_at", label: "Last Visit", sortable: true, hideOnMobile: true },
+    { key: "last_visited_at", label: "Last Visit", sortable: true },
   ];
 
   return (
@@ -436,7 +436,7 @@ export default function VillagersPanel({ token }: { token: string }) {
                       </a>
                     ) : "—"}
                   </td>
-                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
                     {(() => {
                       const shown = sortRoles(
                         (v.roles ?? []).filter((r) => r !== "exclusive")
@@ -444,15 +444,15 @@ export default function VillagersPanel({ token }: { token: string }) {
                       return shown.length ? shown.join(", ") : "—";
                     })()}
                   </td>
-                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
                     {v.instruments?.length
                       ? sortInstruments(v.instruments).join(", ")
                       : "—"}
                   </td>
-                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
                     {v.email || "—"}
                   </td>
-                  <td className="hidden px-4 py-3 md:table-cell">
+                  <td className="px-4 py-3">
                     {v.subscription ? (
                       <span className="inline-flex items-center gap-1.5">
                         <span
@@ -471,7 +471,7 @@ export default function VillagersPanel({ token }: { token: string }) {
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(v.first_visited_at)}
                   </td>
-                  <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(v.last_visited_at)}
                   </td>
                   <td className="px-4 py-3 text-right">

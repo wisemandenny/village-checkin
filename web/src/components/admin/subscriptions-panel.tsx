@@ -289,7 +289,7 @@ const SUB_COLUMNS: { key: SortField; label: string; className?: string }[] = [
   { key: "amount", label: "Amount" },
   { key: "interval", label: "Interval" },
   { key: "status", label: "Status" },
-  { key: "updated_at", label: "Updated", className: "hidden md:table-cell" },
+  { key: "updated_at", label: "Updated" },
 ];
 
 function SubscriptionGroup({
@@ -369,7 +369,7 @@ function SubscriptionGroup({
                     </span>
                   )}
                 </td>
-                <td className="hidden px-4 py-3 text-[var(--color-muted)] md:table-cell">
+                <td className="px-4 py-3 text-[var(--color-muted)]">
                   {formatDate(sub.updated_at)}
                 </td>
               </tr>
