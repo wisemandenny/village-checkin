@@ -9,9 +9,10 @@ import SettingsPanel from "@/components/admin/settings-panel";
 import ChangelogPanel from "@/components/admin/changelog-panel";
 import GalleryPanel from "@/components/admin/gallery-panel";
 import StatisticsPanel from "@/components/admin/statistics-panel";
+import BookingsPanel from "@/components/admin/bookings-panel";
 import { ThemeToggleButton } from "@/components/theme-toggle";
 
-type Tab = "villagers" | "checkins" | "subscriptions" | "statistics" | "gallery" | "settings" | "changelog";
+type Tab = "villagers" | "checkins" | "subscriptions" | "statistics" | "gallery" | "bookings" | "settings" | "changelog";
 
 // The admin session token is persisted in localStorage so admins stay logged in
 // across tab/browser restarts. We treat localStorage as an external store and
@@ -47,6 +48,7 @@ const leftTabs: { key: Tab; label: string }[] = [
   { key: "subscriptions", label: "Subscriptions" },
   { key: "statistics", label: "Statistics" },
   { key: "gallery", label: "Gallery" },
+  { key: "bookings", label: "Bookings" },
 ];
 
 export default function AdminPage() {
@@ -171,6 +173,7 @@ export default function AdminPage() {
       {activeTab === "subscriptions" && <SubscriptionsPanel token={token} />}
       {activeTab === "statistics" && <StatisticsPanel token={token} />}
       {activeTab === "gallery" && <GalleryPanel token={token} />}
+      {activeTab === "bookings" && <BookingsPanel token={token} />}
       {activeTab === "settings" && <SettingsPanel token={token} onShowChangelog={() => setActiveTab("changelog")} />}
       {activeTab === "changelog" && <ChangelogPanel />}
     </div>
