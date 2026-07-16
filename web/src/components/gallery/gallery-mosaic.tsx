@@ -164,8 +164,9 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
           >
             {/*
               Row height tracks the column width (via container-query units) so
-              every tile stays square at any width. Uniform 4-across tiles keep
-              the endless feed readable across week sections.
+              every tile stays square at any width. Two-across tiles (each
+              spanning 4 of 8 columns) keep the endless feed readable across
+              week sections.
             */}
             <div className="@container space-y-5">
               {weeks.map((week) => (
@@ -182,7 +183,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                       return (
                         <div
                           key={item.id}
-                          className="relative col-span-2 row-span-2 overflow-hidden rounded-lg bg-[var(--color-surface)]"
+                          className="relative col-span-4 row-span-4 overflow-hidden rounded-lg bg-[var(--color-surface)]"
                         >
                           <button
                             type="button"
@@ -207,7 +208,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
                                   playsInline
                                   className="h-full w-full object-cover"
                                 />
-                                <PlayBadge size="sm" />
+                                <PlayBadge size="md" />
                               </>
                             )}
                           </button>
