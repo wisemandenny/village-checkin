@@ -155,7 +155,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
     if (prefillIg) setRecoverIg(prefillIg);
   }
 
-  // "First time?" entry: open the full registration form.
+  // Register entry: open the full registration form.
   function switchToRegister() {
     setMode("register");
     setError(null);
@@ -331,7 +331,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             onClick={switchToRegister}
             className="flex h-16 w-full flex-col items-center justify-center rounded-2xl bg-[var(--color-accent)] text-white transition-all hover:bg-[var(--color-accent-light)] active:scale-[0.98]"
           >
-            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">First time?</span>
+            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Register</span>
             <span className="text-xs text-white/80">Join the Village</span>
           </button>
           <button
@@ -339,7 +339,7 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
             onClick={() => switchToRecover()}
             className="flex h-16 w-full flex-col items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] transition-all hover:border-[var(--color-accent)]/60 active:scale-[0.98]"
           >
-            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Long time</span>
+            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Sign In</span>
             <span className="text-xs text-[var(--color-muted)]">Link your account to this device</span>
           </button>
         </div>
