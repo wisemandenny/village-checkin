@@ -328,19 +328,19 @@ export function OnboardingForm({ deviceId, onComplete }: OnboardingFormProps) {
         <div className="flex flex-col gap-4">
           <button
             type="button"
-            onClick={switchToRegister}
+            onClick={() => switchToRecover()}
             className="flex h-16 w-full flex-col items-center justify-center rounded-2xl bg-[var(--color-accent)] text-white transition-all hover:bg-[var(--color-accent-light)] active:scale-[0.98]"
           >
-            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Register</span>
-            <span className="text-xs text-white/80">Join the Village</span>
+            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Sign In</span>
+            <span className="text-xs text-white/80">I have an account</span>
           </button>
           <button
             type="button"
-            onClick={() => switchToRecover()}
+            onClick={switchToRegister}
             className="flex h-16 w-full flex-col items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] transition-all hover:border-[var(--color-accent)]/60 active:scale-[0.98]"
           >
-            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Sign In</span>
-            <span className="text-xs text-[var(--color-muted)]">Link your account to this device</span>
+            <span className="text-lg font-semibold font-[family-name:var(--font-domaine)]">Register</span>
+            <span className="text-xs text-[var(--color-muted)]">I need an account</span>
           </button>
         </div>
       </Reveal>
