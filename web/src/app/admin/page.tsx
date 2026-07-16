@@ -73,6 +73,10 @@ export default function AdminPage() {
     }
   }
 
+  function handleLogout() {
+    setStoredToken(null);
+  }
+
   if (!token) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -134,6 +138,13 @@ export default function AdminPage() {
           >
             Back to Check-in
           </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-lg px-3 py-2 text-sm text-[var(--color-muted)] transition hover:text-[var(--color-foreground)]"
+          >
+            Logout
+          </button>
         </div>
       </div>
 
