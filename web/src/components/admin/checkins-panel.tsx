@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo, useTransition, FormEvent } from "react";
 import type { CheckIn, PaymentMethod, CheckInStatus, Villager } from "@/lib/types";
+import {
+  computeStreaks,
+  formatMondayMD,
+  formatWeekLabel,
+} from "@/lib/checkin-streaks";
 
 type CheckInWithVillager = CheckIn & {
   villagers: { display_name: string } | null;
@@ -90,113 +95,6 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
   skipped:
     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
 };
-
-/**
- * Map any check-in timestamp to the Monday of its week.
- * Special case: Tue 12am–4am rolls back to the previous Monday (late session).
- */
-function toMondayOfWeek(iso: string): string {
-  const d = new Date(iso);
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const hour = d.getHours();
-
-  if (day === 2 && hour < 4) {
-    d.setDate(d.getDate() - 1);
-  } else {
-    const offset = day === 0 ? 6 : day - 1;
-    d.setDate(d.getDate() - offset);
-  }
-
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-interface StreakResult {
-  current: number;
-  currentStart: string | null;
-  best: number;
-  bestStart: string | null;
-  bestEnd: string | null;
-  bestIsCurrent: boolean;
-}
-
-function formatMD(mondayKey: string): string {
-  const d = new Date(mondayKey + "T00:00:00");
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
-function computeStreaks(checkins: { created_at: string }[]): StreakResult {
-  const empty: StreakResult = { current: 0, currentStart: null, best: 0, bestStart: null, bestEnd: null, bestIsCurrent: false };
-  if (checkins.length === 0) return empty;
-
-  const mondaySet = new Set<string>();
-  for (const c of checkins) {
-    mondaySet.add(toMondayOfWeek(c.created_at));
-  }
-
-  // Sorted descending (most recent first)
-  const mondays = [...mondaySet].sort().reverse();
-
-  const thisMondayKey = toMondayOfWeek(new Date().toISOString());
-  const thisMon = new Date(thisMondayKey + "T00:00:00");
-  const latestMon = new Date(mondays[0] + "T00:00:00");
-  const gapFromNow = Math.round(
-    (thisMon.getTime() - latestMon.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  let current = 0;
-  let currentStart: string | null = null;
-  if (gapFromNow <= 7) {
-    let expected = latestMon;
-    for (const m of mondays) {
-      const curr = new Date(m + "T00:00:00");
-      const diff = Math.round(
-        (expected.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (diff > 7) break;
-      current++;
-      currentStart = m;
-      expected = new Date(curr);
-      expected.setDate(expected.getDate() - 7);
-    }
-  }
-
-  // Best streak: find the longest run of consecutive weeks anywhere
-  // mondays are sorted descending, so a run's "start" is the last index and "end" is the first index
-  let best = 0;
-  let bestStartIdx = 0;
-  let bestEndIdx = 0;
-  let run = 1;
-  let runStartIdx = 0;
-  for (let i = 1; i < mondays.length; i++) {
-    const prev = new Date(mondays[i - 1] + "T00:00:00");
-    const curr = new Date(mondays[i] + "T00:00:00");
-    const diff = Math.round(
-      (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    if (diff <= 7) {
-      run++;
-    } else {
-      if (run > best) {
-        best = run;
-        bestEndIdx = runStartIdx;
-        bestStartIdx = i - 1;
-      }
-      run = 1;
-      runStartIdx = i;
-    }
-  }
-  if (run > best) {
-    best = run;
-    bestEndIdx = runStartIdx;
-    bestStartIdx = mondays.length - 1;
-  }
-
-  const bestStart = mondays[bestStartIdx] ?? null;
-  const bestEnd = mondays[bestEndIdx] ?? null;
-  const bestIsCurrent = bestEnd === mondays[0] && gapFromNow <= 7;
-
-  return { current, currentStart, best, bestStart, bestEnd, bestIsCurrent };
-}
 
 export default function CheckInsPanel({ token }: { token: string }) {
   const [checkins, setCheckins] = useState<CheckInWithVillager[]>([]);
@@ -726,13 +624,13 @@ export default function CheckInsPanel({ token }: { token: string }) {
           <StatCard label="Total Check-ins" value={String(villagerStats.totalCheckins)} />
           <StatCard
             label="Current Streak"
-            value={`${villagerStats.currentStreak} wk${villagerStats.currentStreak !== 1 ? "s" : ""}`}
-            subtitle={villagerStats.currentStreakStart ? `Starting ${formatMD(villagerStats.currentStreakStart)}` : undefined}
+            value={formatWeekLabel(villagerStats.currentStreak)}
+            subtitle={villagerStats.currentStreakStart ? `Starting ${formatMondayMD(villagerStats.currentStreakStart)}` : undefined}
           />
           <StatCard
             label="Best Streak"
-            value={`${villagerStats.bestStreak} wk${villagerStats.bestStreak !== 1 ? "s" : ""}`}
-            subtitle={villagerStats.bestStart ? `${formatMD(villagerStats.bestStart)} – ${villagerStats.bestIsCurrent ? "present" : formatMD(villagerStats.bestEnd!)}` : undefined}
+            value={formatWeekLabel(villagerStats.bestStreak)}
+            subtitle={villagerStats.bestStart ? `${formatMondayMD(villagerStats.bestStart)} – ${villagerStats.bestIsCurrent ? "present" : formatMondayMD(villagerStats.bestEnd!)}` : undefined}
           />
           <StatCard label="Total Contributed" value={formatCents(villagerStats.totalContributed)} />
           <StatCard label="Avg Contribution" value={formatCents(Math.round(villagerStats.avgContribution))} />
