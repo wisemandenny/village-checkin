@@ -1,5 +1,6 @@
 import { getStripe, getSupporterProductId } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
+import { recordContribution } from "@/lib/contributions";
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import {
@@ -11,6 +12,18 @@ import {
 } from "@/lib/subscription-sync";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
+
+async function villagerIdForCheckIn(
+  supabase: SupabaseClient,
+  checkInId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("check_ins")
+    .select("villager_id")
+    .eq("id", checkInId)
+    .maybeSingle();
+  return data?.villager_id ?? null;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -44,7 +57,28 @@ export async function POST(req: NextRequest) {
             .update({ status: "paid", stripe_transaction_id: session.payment_intent as string })
             .eq("id", checkInId);
           if (error) console.error("[check_ins] update failed", checkInId, error);
-          await recordCheckInPurchase(supabase, checkInId, session.payment_intent as string, session.amount_total ?? 0, session.currency ?? "cad");
+          const amount = session.amount_total ?? 0;
+          const txnId =
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : session.payment_intent?.id ?? null;
+          const villagerId = await villagerIdForCheckIn(supabase, checkInId);
+          if (villagerId) {
+            await recordContribution(supabase, {
+              villagerId,
+              amountCents: amount,
+              source: "check_in",
+              checkInId,
+              stripeTransactionId: txnId,
+            });
+          }
+          await recordCheckInPurchase(
+            supabase,
+            checkInId,
+            txnId ?? session.id,
+            amount,
+            session.currency ?? "cad"
+          );
         }
         break;
       }
@@ -69,7 +103,23 @@ export async function POST(req: NextRequest) {
             })
             .eq("id", checkInId);
           if (error) console.error("[check_ins] update failed", checkInId, error);
-          await recordCheckInPurchase(supabase, checkInId, paymentIntent.id, paymentIntent.amount, paymentIntent.currency);
+          const villagerId = await villagerIdForCheckIn(supabase, checkInId);
+          if (villagerId) {
+            await recordContribution(supabase, {
+              villagerId,
+              amountCents: paymentIntent.amount,
+              source: "check_in",
+              checkInId,
+              stripeTransactionId: paymentIntent.id,
+            });
+          }
+          await recordCheckInPurchase(
+            supabase,
+            checkInId,
+            paymentIntent.id,
+            paymentIntent.amount,
+            paymentIntent.currency
+          );
         }
         break;
       }
@@ -183,7 +233,11 @@ async function handleInvoicePaid(
 
   // When a recurring subscription is first set up during check-in, mark that
   // check-in as paid (only the first invoice carries a fresh check_in_id).
-  if (invoice.billing_reason === "subscription_create" && meta.check_in_id) {
+  const checkInId =
+    invoice.billing_reason === "subscription_create" && meta.check_in_id
+      ? meta.check_in_id
+      : null;
+  if (checkInId) {
     const { error } = await supabase
       .from("check_ins")
       .update({
@@ -192,8 +246,26 @@ async function handleInvoicePaid(
         intent_amount: invoice.amount_paid,
         stripe_transaction_id: invoice.id,
       })
-      .eq("id", meta.check_in_id);
-    if (error) console.error("[check_ins] recurring mark-paid failed", meta.check_in_id, error);
+      .eq("id", checkInId);
+    if (error) console.error("[check_ins] recurring mark-paid failed", checkInId, error);
+  }
+
+  // Every paid subscription invoice counts toward lifetime contribution —
+  // including renewals that have no associated check-in.
+  if (villager) {
+    await recordContribution(supabase, {
+      villagerId: villager.id,
+      amountCents: invoice.amount_paid,
+      source:
+        invoice.billing_reason === "subscription_create"
+          ? "subscription_signup"
+          : "subscription_invoice",
+      checkInId,
+      stripeTransactionId: invoice.id,
+      createdAt: invoice.status_transitions?.paid_at
+        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+        : undefined,
+    });
   }
 }
 
@@ -290,5 +362,16 @@ async function handleSubscriptionSignup(
       .eq("id", meta.check_in_id);
     if (error)
       console.error("[check_ins] subscription signup mark-paid failed", meta.check_in_id, error);
+  }
+
+  // Signup fee counts even when there is no originating check-in (e.g. manage).
+  if (villager) {
+    await recordContribution(supabase, {
+      villagerId: villager.id,
+      amountCents: amount,
+      source: "subscription_signup",
+      checkInId: meta.check_in_id || null,
+      stripeTransactionId: pi.id,
+    });
   }
 }

@@ -1,5 +1,6 @@
 import { getStripe } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
+import { recordContribution } from "@/lib/contributions";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -55,6 +56,15 @@ export async function POST(req: NextRequest) {
           stripe_transaction_id: paymentIntent.id,
         })
         .eq("id", check_in_id);
+
+      // Webhook will also record this; unique stripe/check_in keys make it safe.
+      await recordContribution(supabase, {
+        villagerId: villager.id,
+        amountCents: amount,
+        source: "check_in",
+        checkInId: check_in_id,
+        stripeTransactionId: paymentIntent.id,
+      });
     }
 
     return NextResponse.json({ status: paymentIntent.status });

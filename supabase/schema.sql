@@ -104,18 +104,37 @@ create trigger trg_villagers_device_ids_unique
 -- Index for fast lookups by villager
 create index idx_check_ins_villager_id on check_ins(villager_id);
 
+-- Ledger of actual money received (desk check-ins + Stripe subscription charges).
+create table contributions (
+  id                     uuid primary key default gen_random_uuid(),
+  villager_id            uuid not null references villagers(id) on delete cascade,
+  amount_cents           integer not null check (amount_cents > 0),
+  source                 text not null check (source in (
+    'check_in',
+    'subscription_signup',
+    'subscription_invoice',
+    'admin'
+  )),
+  check_in_id            uuid unique references check_ins(id) on delete set null,
+  stripe_transaction_id  text unique,
+  created_at             timestamptz not null default now()
+);
+
+create index idx_contributions_villager_id on contributions (villager_id);
+
+alter table contributions enable row level security;
+
 -- Computed column for PostgREST/Supabase: selecting `total_contributed` on
--- villagers runs this SQL aggregate (sum of paid check-in intent amounts).
+-- villagers sums the contributions ledger.
 create or replace function total_contributed(villagers)
 returns integer
 language sql
 stable
 parallel safe
 as $$
-  select coalesce(sum(c.intent_amount), 0)::integer
-  from check_ins c
-  where c.villager_id = $1.id
-    and c.status = 'paid';
+  select coalesce(sum(c.amount_cents), 0)::integer
+  from contributions c
+  where c.villager_id = $1.id;
 $$;
 
 -- Row Level Security (RLS) policies

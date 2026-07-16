@@ -13,8 +13,8 @@ import {
   uniqueViolationMessage,
 } from "@/lib/villager-dedupe";
 
-// `total_contributed` is a Postgres computed column (see migration
-// 20260716130000_villager_total_contributed.sql) that sums paid check-ins.
+// `total_contributed` is a Postgres computed column that sums the contributions
+// ledger (see migration 20260716130000_villager_total_contributed.sql).
 const VILLAGER_SELECT =
   "*, total_contributed, subscriptions(status, amount, interval, created_at)";
 

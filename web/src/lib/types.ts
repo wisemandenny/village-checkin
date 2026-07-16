@@ -25,7 +25,7 @@ export interface Villager {
   first_visited_at: string;
   last_visited_at: string | null;
   subscription?: VillagerSubscriptionSummary | null;
-  /** Sum of paid check-in intent_amount values, in cents (SQL computed column). */
+  /** Lifetime cents contributed (SQL computed column over contributions). */
   total_contributed?: number;
 }
 
