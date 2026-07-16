@@ -114,6 +114,15 @@ function mondayDate(key: string): Date {
   return new Date(key + "T00:00:00");
 }
 
+/** First Monday on or after the 1st of the given local month (0-indexed). */
+function firstMondayOfMonth(year: number, month: number): Date {
+  const d = new Date(year, month, 1);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const offset = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
+  d.setDate(1 + offset);
+  return d;
+}
+
 function formatMD(mondayKey: string): string {
   const d = mondayDate(mondayKey);
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -129,8 +138,7 @@ type RangeKey = "mtd" | "1mo" | "3mo" | "6mo" | "1y" | "all";
 
 // Each range maps to a number of weekly buckets (or "all" / month-to-date).
 // Week counts approximate the calendar period: 13w ~= 3mo, 26w ~= 6mo, 52w ~= 1y.
-// MTD covers the current calendar month; the first week bucket may be partial
-// when the 1st is not a Monday (prior-month days in that week are excluded).
+// MTD starts at the first Monday of the current calendar month.
 const RANGE_OPTIONS: {
   key: RangeKey;
   label: string;
@@ -321,15 +329,11 @@ export default function StatisticsPanel({ token }: { token: string }) {
     const thisMondayKey = toMondayOfWeek(new Date().toISOString());
     const endMonday = mondayDate(thisMondayKey);
 
-    // Determine the first week to display, and the inclusive lower bound for
-    // which check-ins count. For MTD that bound is calendar month start (not
-    // the Monday of the week containing the 1st), so late prior-month visits
-    // in a partial first week are excluded.
+    // Determine the first week to display. MTD starts at the first Monday of
+    // the current calendar month (e.g. 2026-07-06 for July 2026).
     const weeksCount =
       RANGE_OPTIONS.find((o) => o.key === range)?.weeks ?? "all";
     let startMonday: Date;
-    let rangeStartMs: number;
-    let mtdMonthStartLabel: string | null = null;
     if (weeksCount === "all") {
       let earliest = Infinity;
       for (const c of allCheckins) {
@@ -337,17 +341,15 @@ export default function StatisticsPanel({ token }: { token: string }) {
         if (k < earliest) earliest = k;
       }
       startMonday = earliest === Infinity ? endMonday : new Date(earliest);
-      rangeStartMs = startMonday.getTime();
     } else if (weeksCount === "mtd") {
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      rangeStartMs = monthStart.getTime();
-      startMonday = mondayDate(toMondayOfWeek(monthStart.toISOString()));
-      mtdMonthStartLabel = `${monthStart.getMonth() + 1}/${monthStart.getDate()}`;
+      startMonday = firstMondayOfMonth(now.getFullYear(), now.getMonth());
+      // Before the first Monday of the month there is no MTD week yet.
+      if (startMonday.getTime() > endMonday.getTime()) return [];
     } else {
       startMonday = new Date(endMonday.getTime() - (weeksCount - 1) * WEEK_MS);
-      rangeStartMs = startMonday.getTime();
     }
+    const rangeStartMs = startMonday.getTime();
 
     // Build a continuous list of week keys so empty weeks still render as gaps.
     const weekKeys: string[] = [];
@@ -391,7 +393,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       byWeek.set(k, arr);
     }
 
-    const buckets = weekKeys.map((key, index) => {
+    const buckets = weekKeys.map((key) => {
       const rows = byWeek.get(key) ?? [];
       const paid = rows.filter(isPaid);
       const revenueCents = paid.reduce((s, c) => s + c.intent_amount, 0);
@@ -400,8 +402,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       const unique = uniqueIds.size;
 
       // Villagers whose first-ever visit lands in this week (and not excluded),
-      // plus the role breakdown of everyone active that week. First visits
-      // before rangeStartMs (e.g. late June in an MTD partial week) don't count.
+      // plus the role breakdown of everyone active that week.
       let newVillagers = 0;
       let producers = 0;
       let vocalists = 0;
@@ -446,12 +447,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       }
 
       return {
-        // For MTD, label the partial first week as month start (e.g. 7/1)
-        // instead of its Monday (e.g. 6/29), which falls in the prior month.
-        week:
-          index === 0 && mtdMonthStartLabel
-            ? mtdMonthStartLabel
-            : formatMD(key),
+        week: formatMD(key),
         key,
         checkins: rows.length,
         revenue: revenueCents / 100,
@@ -513,14 +509,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
     if (!start) return 0;
     // Recompute the average across the displayed weeks at the check-in level
     // (not an average of weekly averages) for an accurate per-payment figure.
-    // MTD uses calendar month start so prior-month days in the first week are out.
-    const startTime =
-      range === "mtd"
-        ? (() => {
-            const now = new Date();
-            return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-          })()
-        : mondayDate(start).getTime();
+    const startTime = mondayDate(start).getTime();
     let source = allCheckins.filter(
       (c) => new Date(c.created_at).getTime() >= startTime
     );
@@ -535,7 +524,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       }
     }
     return paid > 0 ? total / paid : 0;
-  }, [weeks, range, allCheckins, filterVillagerId, selectedRoles, matchesRoleFilter]);
+  }, [weeks, allCheckins, filterVillagerId, selectedRoles, matchesRoleFilter]);
 
   const tooltipStyle = {
     background: "var(--color-surface)",
