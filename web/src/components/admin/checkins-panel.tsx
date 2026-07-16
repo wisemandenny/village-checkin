@@ -825,7 +825,14 @@ export default function CheckInsPanel({ token }: { token: string }) {
                     {formatCents(c.intent_amount)}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
-                    {METHOD_LABELS[c.payment_method] || c.payment_method}
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      {METHOD_LABELS[c.payment_method] || c.payment_method}
+                      {c.paid_via_reminder ? (
+                        <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          Via reminder
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span

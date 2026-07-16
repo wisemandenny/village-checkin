@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         }
         const checkInId = paymentIntent.metadata?.check_in_id;
         if (checkInId) {
+          const viaReminder = paymentIntent.metadata?.via_reminder === "true";
           const { error } = await supabase
             .from("check_ins")
             .update({
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
               payment_method: "online_fallback",
               intent_amount: paymentIntent.amount,
               stripe_transaction_id: paymentIntent.id,
+              ...(viaReminder ? { paid_via_reminder: true } : {}),
             })
             .eq("id", checkInId);
           if (error) console.error("[check_ins] update failed", checkInId, error);

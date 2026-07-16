@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { amount, check_in_id, device_id, payment_method_id } = body;
+  const { amount, check_in_id, device_id, payment_method_id, via_reminder } = body;
 
   if (!amount || !check_in_id || !device_id || !payment_method_id) {
     return NextResponse.json(
@@ -42,7 +42,10 @@ export async function POST(req: NextRequest) {
       payment_method: payment_method_id,
       off_session: true,
       confirm: true,
-      metadata: { check_in_id },
+      metadata: {
+        check_in_id,
+        ...(via_reminder ? { via_reminder: "true" } : {}),
+      },
     });
 
     if (paymentIntent.status === "succeeded") {
@@ -53,6 +56,7 @@ export async function POST(req: NextRequest) {
           payment_method: "online_fallback",
           status: "paid",
           stripe_transaction_id: paymentIntent.id,
+          ...(via_reminder ? { paid_via_reminder: true } : {}),
         })
         .eq("id", check_in_id);
     }
