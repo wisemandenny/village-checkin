@@ -125,11 +125,17 @@ function isPaid(c: CheckIn): boolean {
   return c.status === "paid" && c.payment_method !== "subscription";
 }
 
-type RangeKey = "1mo" | "3mo" | "6mo" | "1y" | "all";
+type RangeKey = "mtd" | "1mo" | "3mo" | "6mo" | "1y" | "all";
 
-// Each range maps to a number of weekly buckets (or "all" history).
+// Each range maps to a number of weekly buckets (or "all" / month-to-date).
 // Week counts approximate the calendar period: 13w ~= 3mo, 26w ~= 6mo, 52w ~= 1y.
-const RANGE_OPTIONS: { key: RangeKey; label: string; weeks: number | "all" }[] = [
+// MTD starts at the Monday of the week that contains the 1st of the current month.
+const RANGE_OPTIONS: {
+  key: RangeKey;
+  label: string;
+  weeks: number | "all" | "mtd";
+}[] = [
+  { key: "mtd", label: "MTD", weeks: "mtd" },
   { key: "1mo", label: "1M", weeks: 4 },
   { key: "3mo", label: "3M", weeks: 13 },
   { key: "6mo", label: "6M", weeks: 26 },
@@ -181,7 +187,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
   const [newVillagersOnly, setNewVillagersOnly] = useState(false);
-  const [range, setRange] = useState<RangeKey>("3mo");
+  const [range, setRange] = useState<RangeKey>("mtd");
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [rolesOpen, setRolesOpen] = useState(false);
 
@@ -325,6 +331,12 @@ export default function StatisticsPanel({ token }: { token: string }) {
         if (k < earliest) earliest = k;
       }
       startMonday = earliest === Infinity ? endMonday : new Date(earliest);
+    } else if (weeksCount === "mtd") {
+      // Calendar month-to-date: include every weekly bucket from the week that
+      // contains the 1st of the current month through this week.
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      startMonday = mondayDate(toMondayOfWeek(monthStart.toISOString()));
     } else {
       startMonday = new Date(endMonday.getTime() - (weeksCount - 1) * WEEK_MS);
     }
