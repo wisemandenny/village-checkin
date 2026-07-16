@@ -2,7 +2,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { isUploadConfigured, presignDownloadUrl } from "@/lib/r2";
 import { NextRequest, NextResponse } from "next/server";
 
-const DEFAULT_PAGE_SIZE = 24;
+const DEFAULT_PAGE_SIZE = 12;
 const MAX_PAGE_SIZE = 48;
 // How many items the payment-screen mosaic fetches. Kept small: these load
 // inline on a high-traffic screen, and the mosaic only renders a handful.
@@ -39,6 +39,13 @@ function parsePageSize(raw: string | null): number {
   return Math.min(Math.max(n, 1), MAX_PAGE_SIZE);
 }
 
+function parseOffset(raw: string | null): number {
+  if (!raw) return 0;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
 // Presign each row's media; drop any whose presign fails. `promoted` is derived
 // from promoted_at so the mosaic can assign highlighted tiles client-side.
 async function presignRows(rows: UploadRow[]) {
@@ -63,7 +70,7 @@ async function presignRows(rows: UploadRow[]) {
 
 export async function GET(req: NextRequest) {
   if (!isUploadConfigured()) {
-    return NextResponse.json({ configured: false, uploads: [], hasMore: false, nextCursor: null });
+    return NextResponse.json({ configured: false, uploads: [], hasMore: false });
   }
 
   const supabase = createServerClient();
@@ -109,23 +116,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ configured: true, uploads });
   }
 
-  // Chronological feed with keyset pagination (`before` = created_at cursor).
+  // Chronological feed with offset pagination. Gallery catalogs stay small, so
+  // offset is simpler and avoids duplicate-timestamp cursor gaps on batch uploads.
   const limit = parsePageSize(req.nextUrl.searchParams.get("limit"));
-  const before = req.nextUrl.searchParams.get("before");
+  const offset = parseOffset(req.nextUrl.searchParams.get("offset"));
 
-  let query = supabase
+  // range() is inclusive; request one extra row to detect hasMore.
+  const { data, error } = await supabase
     .from("uploads")
     .select(FEED_SELECT)
     .is("deleted_at", null)
     .eq("reported", false)
     .order("created_at", { ascending: false })
-    .limit(limit + 1);
-
-  if (before) {
-    query = query.lt("created_at", before);
-  }
-
-  const { data, error } = await query;
+    .order("id", { ascending: false })
+    .range(offset, offset + limit);
 
   if (error) {
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
@@ -135,8 +139,6 @@ export async function GET(req: NextRequest) {
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
   const uploads = await presignRows(page);
-  const nextCursor =
-    hasMore && page.length > 0 ? page[page.length - 1].created_at : null;
 
-  return NextResponse.json({ configured: true, uploads, hasMore, nextCursor });
+  return NextResponse.json({ configured: true, uploads, hasMore });
 }

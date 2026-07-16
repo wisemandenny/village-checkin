@@ -15,7 +15,7 @@ interface GalleryItem {
   created_at: string;
 }
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 12;
 
 export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [items, setItems] = useState<GalleryItem[]>([]);
@@ -23,58 +23,64 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [preview, setPreview] = useState<GalleryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Guard against overlapping page fetches from rapid intersection callbacks.
   const loadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(false);
+  const itemsLenRef = useRef(0);
 
   const { me, uploading, uploadProgress, error, setError, uploadFiles } =
     useGalleryUpload(deviceId);
 
-  const fetchPage = useCallback(async (before: string | null) => {
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-    if (before) params.set("before", before);
+  const fetchPage = useCallback(async (offset: number) => {
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(offset),
+    });
     const res = await fetch(`/api/gallery?${params}`);
     if (!res.ok) {
-      return { uploads: [] as GalleryItem[], hasMore: false, nextCursor: null, configured: true };
+      return { uploads: [] as GalleryItem[], hasMore: false, configured: true };
     }
     const data = await res.json();
     return {
       uploads: (data.uploads ?? []) as GalleryItem[],
       hasMore: Boolean(data.hasMore),
-      nextCursor: (data.nextCursor as string | null) ?? null,
       configured: data.configured !== false,
     };
   }, []);
 
   const loadInitial = useCallback(async () => {
-    const page = await fetchPage(null);
+    const page = await fetchPage(0);
     setConfigured(page.configured);
     setItems(page.uploads);
     setHasMore(page.hasMore);
-    setNextCursor(page.nextCursor);
+    hasMoreRef.current = page.hasMore;
+    itemsLenRef.current = page.uploads.length;
   }, [fetchPage]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || !nextCursor || loadingMoreRef.current) return;
+    if (!hasMoreRef.current || loadingMoreRef.current) return;
     loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const page = await fetchPage(nextCursor);
+      const page = await fetchPage(itemsLenRef.current);
       setItems((cur) => {
         const seen = new Set(cur.map((i) => i.id));
         const appended = page.uploads.filter((u) => !seen.has(u.id));
-        return appended.length > 0 ? [...cur, ...appended] : cur;
+        const next = appended.length > 0 ? [...cur, ...appended] : cur;
+        itemsLenRef.current = next.length;
+        return next;
       });
+      hasMoreRef.current = page.hasMore;
       setHasMore(page.hasMore);
-      setNextCursor(page.nextCursor);
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [fetchPage, hasMore, nextCursor]);
+  }, [fetchPage]);
 
   useEffect(() => {
     (async () => {
@@ -83,12 +89,12 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
     })();
   }, [loadInitial]);
 
-  // Lazy-load the next page when the sentinel approaches the viewport.
-  // Scroll with the page (not a nested overflow box) so the feed is usable on
-  // mobile and inside centered layouts that don't give an inner scroller room.
+  // Lazy-load inside the gallery scroller. Keep requesting while the sentinel
+  // stays visible so short first pages still fill the panel and create overflow.
   useEffect(() => {
+    const root = scrollRef.current;
     const sentinel = sentinelRef.current;
-    if (!sentinel || !hasMore) return;
+    if (!root || !sentinel || !hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -96,11 +102,11 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
           void loadMore();
         }
       },
-      { root: null, rootMargin: "240px", threshold: 0 }
+      { root, rootMargin: "160px", threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, items.length]);
+  }, [hasMore, loadMore, items.length, loadingMore]);
 
   // Uploading is open to any signed-in villager; no check-in is required.
   // `eligible` is kept separate from the in-flight `uploading` flag so the
@@ -156,7 +162,10 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             </span>
           </button>
         ) : (
-          <div className="w-full">
+          <div
+            ref={scrollRef}
+            className="max-h-[min(70vh,28rem)] overflow-y-auto overscroll-y-contain pr-1"
+          >
             {/*
               Row height tracks the column width (via container-query units) so
               every tile stays square at any width. Uniform 4-across tiles keep
@@ -219,12 +228,16 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             </div>
 
             {hasMore && (
-              <div
-                ref={sentinelRef}
-                className="flex h-10 items-center justify-center text-xs text-[var(--color-muted)]"
-                aria-hidden={!loadingMore}
-              >
-                {loadingMore ? "Loading more…" : null}
+              <div className="flex flex-col items-center gap-2 py-3">
+                <div ref={sentinelRef} className="h-1 w-full" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="text-xs font-medium text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)] disabled:opacity-50"
+                >
+                  {loadingMore ? "Loading more…" : "Load more"}
+                </button>
               </div>
             )}
           </div>
