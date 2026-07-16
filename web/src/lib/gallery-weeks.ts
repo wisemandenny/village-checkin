@@ -34,19 +34,27 @@ function torontoParts(date: Date): { year: number; month: number; day: number; w
 }
 
 /**
- * Stable key for the Sunday-start week containing `iso`, in America/Toronto.
- * Format: YYYY-MM-DD of that Sunday.
+ * Stable key for the Monday-start week containing `iso`, in America/Toronto.
+ * Week runs Monday 00:00 through Sunday 23:59 (studio local time).
+ * Format: YYYY-MM-DD of that Monday.
  */
 export function weekKey(iso: string): string {
   const parts = torontoParts(new Date(iso));
   // Build a UTC noon date for the local calendar day so subtracting weekdays
   // doesn't cross a DST edge into the wrong day.
   const localNoon = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12));
-  localNoon.setUTCDate(localNoon.getUTCDate() - parts.weekday);
+  // weekday: 0=Sun..6=Sat → days since Monday
+  const daysFromMonday = (parts.weekday + 6) % 7;
+  localNoon.setUTCDate(localNoon.getUTCDate() - daysFromMonday);
   const y = localNoon.getUTCFullYear();
   const m = String(localNoon.getUTCMonth() + 1).padStart(2, "0");
   const d = String(localNoon.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+/** True when `iso` falls in the Monday–Sunday week that contains `now`. */
+export function isInCurrentMondayWeek(iso: string, now = new Date()): boolean {
+  return weekKey(iso) === weekKey(now.toISOString());
 }
 
 function parseWeekKey(key: string): Date {
@@ -89,7 +97,7 @@ export interface WeekGroup<T extends { created_at: string }> {
   items: T[];
 }
 
-/** Group already-sorted (newest-first) items into Sunday-start week buckets. */
+/** Group already-sorted (newest-first) items into Monday-start week buckets. */
 export function groupByWeek<T extends { created_at: string }>(
   items: T[],
   now = new Date()
