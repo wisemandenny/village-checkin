@@ -114,6 +114,15 @@ function mondayDate(key: string): Date {
   return new Date(key + "T00:00:00");
 }
 
+/** First Monday on or after the 1st of the given local month (0-indexed). */
+function firstMondayOfMonth(year: number, month: number): Date {
+  const d = new Date(year, month, 1);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const offset = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
+  d.setDate(1 + offset);
+  return d;
+}
+
 function formatMD(mondayKey: string): string {
   const d = mondayDate(mondayKey);
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -125,11 +134,17 @@ function isPaid(c: CheckIn): boolean {
   return c.status === "paid" && c.payment_method !== "subscription";
 }
 
-type RangeKey = "1mo" | "3mo" | "6mo" | "1y" | "all";
+type RangeKey = "mtd" | "1mo" | "3mo" | "6mo" | "1y" | "all";
 
-// Each range maps to a number of weekly buckets (or "all" history).
+// Each range maps to a number of weekly buckets (or "all" / month-to-date).
 // Week counts approximate the calendar period: 13w ~= 3mo, 26w ~= 6mo, 52w ~= 1y.
-const RANGE_OPTIONS: { key: RangeKey; label: string; weeks: number | "all" }[] = [
+// MTD starts at the first Monday of the current calendar month.
+const RANGE_OPTIONS: {
+  key: RangeKey;
+  label: string;
+  weeks: number | "all" | "mtd";
+}[] = [
+  { key: "mtd", label: "MTD", weeks: "mtd" },
   { key: "1mo", label: "1M", weeks: 4 },
   { key: "3mo", label: "3M", weeks: 13 },
   { key: "6mo", label: "6M", weeks: 26 },
@@ -181,7 +196,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
 
   const [filterVillagerId, setFilterVillagerId] = useState("");
   const [newVillagersOnly, setNewVillagersOnly] = useState(false);
-  const [range, setRange] = useState<RangeKey>("3mo");
+  const [range, setRange] = useState<RangeKey>("mtd");
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [rolesOpen, setRolesOpen] = useState(false);
 
@@ -314,7 +329,8 @@ export default function StatisticsPanel({ token }: { token: string }) {
     const thisMondayKey = toMondayOfWeek(new Date().toISOString());
     const endMonday = mondayDate(thisMondayKey);
 
-    // Determine the first week to display.
+    // Determine the first week to display. MTD starts at the first Monday of
+    // the current calendar month (e.g. 2026-07-06 for July 2026).
     const weeksCount =
       RANGE_OPTIONS.find((o) => o.key === range)?.weeks ?? "all";
     let startMonday: Date;
@@ -325,9 +341,15 @@ export default function StatisticsPanel({ token }: { token: string }) {
         if (k < earliest) earliest = k;
       }
       startMonday = earliest === Infinity ? endMonday : new Date(earliest);
+    } else if (weeksCount === "mtd") {
+      const now = new Date();
+      startMonday = firstMondayOfMonth(now.getFullYear(), now.getMonth());
+      // Before the first Monday of the month there is no MTD week yet.
+      if (startMonday.getTime() > endMonday.getTime()) return [];
     } else {
       startMonday = new Date(endMonday.getTime() - (weeksCount - 1) * WEEK_MS);
     }
+    const rangeStartMs = startMonday.getTime();
 
     // Build a continuous list of week keys so empty weeks still render as gaps.
     const weekKeys: string[] = [];
@@ -338,7 +360,6 @@ export default function StatisticsPanel({ token }: { token: string }) {
     ) {
       weekKeys.push(toMondayOfWeek(d.toISOString()));
     }
-    const startTime = startMonday.getTime();
 
     // "New villagers only" restricts to villagers whose first-ever visit falls
     // within the displayed range and who aren't excluded from new counts.
@@ -346,13 +367,14 @@ export default function StatisticsPanel({ token }: { token: string }) {
       const first = firstSeen.get(vid);
       return (
         first !== undefined &&
-        mondayDate(toMondayOfWeek(new Date(first).toISOString())).getTime() >=
-          startTime &&
+        first >= rangeStartMs &&
         !excludedIds.has(vid)
       );
     };
 
-    let source = allCheckins;
+    let source = allCheckins.filter(
+      (c) => new Date(c.created_at).getTime() >= rangeStartMs
+    );
     if (filterVillagerId) {
       source = source.filter((c) => c.villager_id === filterVillagerId);
     }
@@ -390,6 +412,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
         const first = firstSeen.get(vid);
         if (
           first !== undefined &&
+          first >= rangeStartMs &&
           toMondayOfWeek(new Date(first).toISOString()) === key &&
           !excludedIds.has(vid)
         ) {
@@ -488,7 +511,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
     // (not an average of weekly averages) for an accurate per-payment figure.
     const startTime = mondayDate(start).getTime();
     let source = allCheckins.filter(
-      (c) => mondayDate(toMondayOfWeek(c.created_at)).getTime() >= startTime
+      (c) => new Date(c.created_at).getTime() >= startTime
     );
     if (filterVillagerId)
       source = source.filter((c) => c.villager_id === filterVillagerId);

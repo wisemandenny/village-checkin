@@ -47,6 +47,8 @@ export interface CheckIn {
   status: CheckInStatus;
   created_at: string;
   stripe_transaction_id: string | null;
+  /** True when paid through the reminder email /pay/<token> link. */
+  paid_via_reminder?: boolean;
 }
 
 export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred" | "subscription" | "elder";
