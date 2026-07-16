@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
+import { CheckInStreak } from "@/components/checkin-streak";
 
 function SuccessHeading() {
   const searchParams = useSearchParams();
@@ -36,6 +37,9 @@ export default function SuccessPage() {
       <p className="mt-3 text-sm text-green-600 dark:text-green-400">
         Payment complete — thanks for supporting the Village!
       </p>
+      <div className="mt-4">
+        <CheckInStreak />
+      </div>
       <div className="mt-8 w-full max-w-sm">
         <GalleryMosaic />
       </div>
