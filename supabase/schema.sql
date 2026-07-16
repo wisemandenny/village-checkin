@@ -43,7 +43,10 @@ create table check_ins (
   -- Set when the unpaid-check-in reminder emails are sent (1h and 24h after a
   -- 'pending' check-in), so the scheduled job never sends the same nudge twice.
   reminder_1h_sent_at  timestamptz,
-  reminder_24h_sent_at timestamptz
+  reminder_24h_sent_at timestamptz,
+  -- True when payment completed through the reminder email /pay/<token> link.
+  -- payment_method remains online_fallback; this is a secondary admin signal.
+  paid_via_reminder    boolean not null default false
 );
 
 -- Subscriptions table: recurring support pledges processed by Stripe.

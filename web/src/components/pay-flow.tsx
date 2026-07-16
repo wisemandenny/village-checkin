@@ -133,6 +133,7 @@ export function PayFlow({ token }: { token: string }) {
         checkInId={state.data.check_in.id}
         deviceId=""
         allowCash={false}
+        viaReminder
         onComplete={handleComplete}
       />
     </div>

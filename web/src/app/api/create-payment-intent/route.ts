@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { amount, check_in_id, device_id } = body;
+  const { amount, check_in_id, device_id, via_reminder } = body;
 
   if (!amount || !check_in_id) {
     return NextResponse.json(
@@ -57,7 +57,10 @@ export async function POST(req: NextRequest) {
       amount: chargedAmount,
       currency: "cad",
       automatic_payment_methods: { enabled: true },
-      metadata: { check_in_id },
+      metadata: {
+        check_in_id,
+        ...(via_reminder ? { via_reminder: "true" } : {}),
+      },
       ...(customerId && {
         customer: customerId,
         setup_future_usage: "on_session",

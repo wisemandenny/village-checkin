@@ -54,7 +54,7 @@ export default function AdminPage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("villagers");
+  const [activeTab, setActiveTab] = useState<Tab>("checkins");
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -132,9 +132,16 @@ export default function AdminPage() {
         <h1 className="text-2xl font-bold">Admin Panel</h1>
         <div className="flex items-center gap-2">
           <ThemeToggleButton />
-          <button
-            onClick={handleLogout}
+          <Link
+            href="/"
             className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface)]"
+          >
+            Back to Check-in
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-lg px-3 py-2 text-sm text-[var(--color-muted)] transition hover:text-[var(--color-foreground)]"
           >
             Logout
           </button>
