@@ -26,7 +26,6 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [preview, setPreview] = useState<GalleryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Guard against overlapping page fetches from rapid intersection callbacks.
   const loadingMoreRef = useRef(false);
@@ -84,11 +83,12 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
     })();
   }, [loadInitial]);
 
-  // Lazy-load the next page when the sentinel enters the scroll container.
+  // Lazy-load the next page when the sentinel approaches the viewport.
+  // Scroll with the page (not a nested overflow box) so the feed is usable on
+  // mobile and inside centered layouts that don't give an inner scroller room.
   useEffect(() => {
-    const root = scrollRef.current;
     const sentinel = sentinelRef.current;
-    if (!root || !sentinel || !hasMore) return;
+    if (!sentinel || !hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -96,7 +96,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
           void loadMore();
         }
       },
-      { root, rootMargin: "120px", threshold: 0 }
+      { root: null, rootMargin: "240px", threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -156,7 +156,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             </span>
           </button>
         ) : (
-          <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto pr-1">
+          <div className="w-full">
             {/*
               Row height tracks the column width (via container-query units) so
               every tile stays square at any width. Uniform 4-across tiles keep
