@@ -54,7 +54,7 @@ export default function AdminPage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("villagers");
+  const [activeTab, setActiveTab] = useState<Tab>("checkins");
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
