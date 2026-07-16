@@ -49,6 +49,28 @@ export function weekKey(iso: string): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Stable key for the Monday-start week containing `iso`, in America/Toronto.
+ * Week runs Monday 00:00 through Sunday 23:59 (studio local time).
+ * Format: YYYY-MM-DD of that Monday.
+ */
+export function mondayWeekKey(iso: string): string {
+  const parts = torontoParts(new Date(iso));
+  const localNoon = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12));
+  // weekday: 0=Sun..6=Sat → days since Monday
+  const daysFromMonday = (parts.weekday + 6) % 7;
+  localNoon.setUTCDate(localNoon.getUTCDate() - daysFromMonday);
+  const y = localNoon.getUTCFullYear();
+  const m = String(localNoon.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(localNoon.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** True when `iso` falls in the Monday–Sunday week that contains `now`. */
+export function isInCurrentMondayWeek(iso: string, now = new Date()): boolean {
+  return mondayWeekKey(iso) === mondayWeekKey(now.toISOString());
+}
+
 function parseWeekKey(key: string): Date {
   const [y, m, d] = key.split("-").map((n) => parseInt(n, 10));
   return new Date(Date.UTC(y, m - 1, d, 12));

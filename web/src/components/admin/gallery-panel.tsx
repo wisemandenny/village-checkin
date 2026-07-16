@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { isInCurrentMondayWeek } from "@/lib/gallery-weeks";
 
 interface AdminUpload {
   id: string;
@@ -79,6 +80,12 @@ export default function GalleryPanel({ token }: { token: string }) {
       }
       return new Set(ordered.map((u) => u.id));
     });
+  }
+
+  function selectAllThisWeek() {
+    setSelectedIds(
+      new Set(ordered.filter((u) => isInCurrentMondayWeek(u.created_at)).map((u) => u.id))
+    );
   }
 
   const apiFetch = useCallback(
@@ -251,6 +258,7 @@ export default function GalleryPanel({ token }: { token: string }) {
   const rest = uploads.filter((u) => !u.reported || u.deleted_at);
   const ordered = [...reported, ...rest];
   const allSelected = ordered.length > 0 && selectedIds.size >= ordered.length;
+  const thisWeekCount = ordered.filter((u) => isInCurrentMondayWeek(u.created_at)).length;
 
   return (
     <div>
@@ -264,6 +272,14 @@ export default function GalleryPanel({ token }: { token: string }) {
             className={`${toolbarButtonClass} border border-[var(--color-border)] hover:bg-[var(--color-surface)]`}
           >
             {allSelected ? "Deselect all" : "Select all"}
+          </button>
+          <button
+            type="button"
+            onClick={selectAllThisWeek}
+            disabled={loading || thisWeekCount === 0}
+            className={`${toolbarButtonClass} border border-[var(--color-border)] hover:bg-[var(--color-surface)]`}
+          >
+            Select all from this week
           </button>
           <button
             type="button"
