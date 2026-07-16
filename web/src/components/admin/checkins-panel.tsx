@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useTransition, FormEvent } from "react";
 import type { CheckIn, PaymentMethod, CheckInStatus, Villager } from "@/lib/types";
+import { isPaymentSettled } from "@/lib/checkin-status";
 
 type CheckInWithVillager = CheckIn & {
   villagers: { display_name: string } | null;
@@ -25,7 +26,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
   "skipped",
   "subscription",
 ];
-const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped"];
+const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped", "waived"];
 
 interface CheckInForm {
   villager_id: string;
@@ -89,6 +90,8 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
   skipped:
     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+  waived:
+    "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
 /**
@@ -416,13 +419,15 @@ export default function CheckInsPanel({ token }: { token: string }) {
     }
     setQuickPaying(true);
     setQuickPayError("");
+    const cents = Math.round(dollars * 100);
     try {
       const res = await apiFetch(`/api/admin/checkins/${quickPayTarget.id}`, {
         method: "PUT",
         body: JSON.stringify({
-          status: "paid",
+          // $0 cash mark-paid is a waiver (server also coerces paid+0 → waived).
+          status: cents === 0 ? "waived" : "paid",
           payment_method: "cash",
-          intent_amount: Math.round(dollars * 100),
+          intent_amount: cents,
         }),
       });
       if (!res.ok) {
@@ -434,6 +439,33 @@ export default function CheckInsPanel({ token }: { token: string }) {
       loadAllCheckins();
     } catch (e: unknown) {
       setQuickPayError(e instanceof Error ? e.message : "Failed to mark paid");
+    } finally {
+      setQuickPaying(false);
+    }
+  }
+
+  async function handleWaive() {
+    if (!quickPayTarget) return;
+    setQuickPaying(true);
+    setQuickPayError("");
+    try {
+      const res = await apiFetch(`/api/admin/checkins/${quickPayTarget.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          status: "waived",
+          payment_method: "cash",
+          intent_amount: 0,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error || "Failed to waive fee");
+      }
+      setQuickPayTarget(null);
+      loadCheckins();
+      loadAllCheckins();
+    } catch (e: unknown) {
+      setQuickPayError(e instanceof Error ? e.message : "Failed to waive fee");
     } finally {
       setQuickPaying(false);
     }
@@ -850,7 +882,7 @@ export default function CheckInsPanel({ token }: { token: string }) {
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
-                    {c.status !== "paid" && (
+                    {!isPaymentSettled(c.status) && (
                       <button
                         onClick={() => openQuickPay(c)}
                         className="mr-2 rounded px-2 py-1 text-xs font-medium text-green-600 transition hover:bg-green-500/10 dark:text-green-400"
@@ -954,12 +986,14 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   <select
                     required
                     value={form.status}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const status = e.target.value as CheckInStatus;
                       setForm({
                         ...form,
-                        status: e.target.value as CheckInStatus,
-                      })
-                    }
+                        status,
+                        ...(status === "waived" ? { intent_amount: "0" } : {}),
+                      });
+                    }}
                     className="input"
                   >
                     {STATUSES.map((s) => (
@@ -1066,13 +1100,21 @@ export default function CheckInsPanel({ token }: { token: string }) {
             {quickPayError && (
               <p className="mt-3 text-sm text-red-500">{quickPayError}</p>
             )}
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setQuickPayTarget(null)}
                 className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm transition hover:bg-[var(--color-surface)]"
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                disabled={quickPaying}
+                onClick={handleWaive}
+                className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-surface)] disabled:opacity-50"
+              >
+                {quickPaying ? "Saving…" : "Waive Fee"}
               </button>
               <button
                 type="submit"
