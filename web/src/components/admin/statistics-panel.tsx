@@ -329,6 +329,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       RANGE_OPTIONS.find((o) => o.key === range)?.weeks ?? "all";
     let startMonday: Date;
     let rangeStartMs: number;
+    let mtdMonthStartLabel: string | null = null;
     if (weeksCount === "all") {
       let earliest = Infinity;
       for (const c of allCheckins) {
@@ -342,6 +343,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       rangeStartMs = monthStart.getTime();
       startMonday = mondayDate(toMondayOfWeek(monthStart.toISOString()));
+      mtdMonthStartLabel = `${monthStart.getMonth() + 1}/${monthStart.getDate()}`;
     } else {
       startMonday = new Date(endMonday.getTime() - (weeksCount - 1) * WEEK_MS);
       rangeStartMs = startMonday.getTime();
@@ -389,7 +391,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       byWeek.set(k, arr);
     }
 
-    const buckets = weekKeys.map((key) => {
+    const buckets = weekKeys.map((key, index) => {
       const rows = byWeek.get(key) ?? [];
       const paid = rows.filter(isPaid);
       const revenueCents = paid.reduce((s, c) => s + c.intent_amount, 0);
@@ -444,7 +446,12 @@ export default function StatisticsPanel({ token }: { token: string }) {
       }
 
       return {
-        week: formatMD(key),
+        // For MTD, label the partial first week as month start (e.g. 7/1)
+        // instead of its Monday (e.g. 6/29), which falls in the prior month.
+        week:
+          index === 0 && mtdMonthStartLabel
+            ? mtdMonthStartLabel
+            : formatMD(key),
         key,
         checkins: rows.length,
         revenue: revenueCents / 100,
