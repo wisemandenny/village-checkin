@@ -8,6 +8,7 @@ import { Spinner } from "@/components/motion/spinner";
 interface CheckInData {
   check_in: { id: string; status: string; intent_amount: number };
   villager: { display_name: string | null };
+  is_exclusive: boolean;
   already_paid: boolean;
 }
 
@@ -132,6 +133,7 @@ export function PayFlow({ token }: { token: string }) {
       <PaymentStep
         checkInId={state.data.check_in.id}
         deviceId=""
+        isExclusive={state.data.is_exclusive}
         allowCash={false}
         viaReminder
         onComplete={handleComplete}
