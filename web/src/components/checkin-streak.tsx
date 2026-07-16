@@ -37,11 +37,10 @@ export function CheckInStreak({
       {children}
       {current != null && (
         <span
-          className="absolute -right-1 -top-1 flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--color-accent)] px-1.5 text-xs font-bold tabular-nums text-white shadow-sm ring-2 ring-[var(--color-background)]"
-          title={`${current}-week check-in streak`}
-          aria-label={`${current}-week check-in streak`}
+          className="absolute -right-2 -top-2 flex items-center justify-center whitespace-nowrap rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-bold leading-none text-white shadow-sm ring-2 ring-[var(--color-background)]"
+          aria-label={`${current} week${current === 1 ? "" : "s"} streak`}
         >
-          {current}
+          {current} week{current === 1 ? "" : "s"} streak
         </span>
       )}
     </div>
