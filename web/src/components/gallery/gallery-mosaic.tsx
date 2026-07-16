@@ -26,8 +26,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [preview, setPreview] = useState<GalleryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  // Guard against overlapping page fetches from rapid intersection callbacks.
+  // Guard against overlapping page fetches from rapid scroll callbacks.
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(false);
   const itemsLenRef = useRef(0);
@@ -89,24 +88,21 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
     })();
   }, [loadInitial]);
 
-  // Lazy-load inside the gallery scroller. Keep requesting while the sentinel
-  // stays visible so short first pages still fill the panel and create overflow.
+  // Only fetch the next page after the user scrolls near the bottom. An
+  // IntersectionObserver on a still-visible sentinel would otherwise chain
+  // pages immediately whenever the first page doesn't fill the panel.
   useEffect(() => {
     const root = scrollRef.current;
-    const sentinel = sentinelRef.current;
-    if (!root || !sentinel || !hasMore) return;
+    if (!root || !hasMore) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          void loadMore();
-        }
-      },
-      { root, rootMargin: "160px", threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadMore, items.length, loadingMore]);
+    const onScroll = () => {
+      const remaining = root.scrollHeight - root.scrollTop - root.clientHeight;
+      if (remaining < 160) void loadMore();
+    };
+
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
+  }, [hasMore, loadMore]);
 
   // Uploading is open to any signed-in villager; no check-in is required.
   // `eligible` is kept separate from the in-flight `uploading` flag so the
@@ -228,8 +224,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             </div>
 
             {hasMore && (
-              <div className="flex flex-col items-center gap-2 py-3">
-                <div ref={sentinelRef} className="h-1 w-full" aria-hidden />
+              <div className="flex justify-center py-3">
                 <button
                   type="button"
                   onClick={() => void loadMore()}
