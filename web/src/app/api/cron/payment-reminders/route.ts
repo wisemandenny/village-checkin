@@ -6,8 +6,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Scheduled job (hit by a GitHub Actions cron) that nudges villagers who checked
 // in but never finished paying. Their check-in sits in status 'pending' with
-// payment_method 'deferred' (they abandoned the Stripe flow). We send a reminder
-// once at 1h and once at 24h, recording each on the check-in so it never repeats.
+// payment_method 'deferred' (they abandoned the Stripe flow) or 'online_fallback'.
+// We send a reminder once at 1h and once at 24h, recording each on the check-in
+// so it never repeats.
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -47,15 +48,17 @@ export async function POST(req: NextRequest) {
   const oneHourAgoIso = new Date(now - HOUR_MS).toISOString();
   const windowStartIso = new Date(now - MAX_AGE_MS).toISOString();
 
-  // Candidates: unpaid, deferred check-ins at least 1h old but within the safety
-  // window. The 24h cohort is a subset, handled by the per-row age check below.
+  // Candidates: unpaid check-ins at least 1h old but within the safety window.
+  // We nudge both 'deferred' (abandoned Stripe flow) and 'online_fallback'
+  // payment methods. The 24h cohort is a subset, handled by the per-row age
+  // check below.
   const { data, error } = await supabase
     .from("check_ins")
     .select(
       "id, created_at, reminder_1h_sent_at, reminder_24h_sent_at, villagers ( email, display_name )"
     )
     .eq("status", "pending")
-    .eq("payment_method", "deferred")
+    .in("payment_method", ["deferred", "online_fallback"])
     .gte("created_at", windowStartIso)
     .lte("created_at", oneHourAgoIso);
 
