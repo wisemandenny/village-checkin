@@ -50,5 +50,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  const { data: villager } = await supabase
+    .from("villagers")
+    .select("last_visited_at")
+    .eq("id", data.villager_id)
+    .single();
+
+  const checkInAt = data.created_at;
+  if (
+    !villager?.last_visited_at ||
+    new Date(checkInAt) > new Date(villager.last_visited_at)
+  ) {
+    await supabase
+      .from("villagers")
+      .update({ last_visited_at: checkInAt })
+      .eq("id", data.villager_id);
+  }
+
   return NextResponse.json({ checkin: data }, { status: 201 });
 }
