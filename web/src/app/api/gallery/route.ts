@@ -2,7 +2,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { isUploadConfigured, presignDownloadUrl } from "@/lib/r2";
 import { NextRequest, NextResponse } from "next/server";
 
-const GALLERY_LIMIT = 60;
+const DEFAULT_PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 48;
 // How many items the payment-screen mosaic fetches. Kept small: these load
 // inline on a high-traffic screen, and the mosaic only renders a handful.
 const MOSAIC_LIMIT = 12;
@@ -31,6 +32,13 @@ function villagerName(
   return villagers.display_name;
 }
 
+function parsePageSize(raw: string | null): number {
+  if (!raw) return DEFAULT_PAGE_SIZE;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(n, 1), MAX_PAGE_SIZE);
+}
+
 // Presign each row's media; drop any whose presign fails. `promoted` is derived
 // from promoted_at so the mosaic can assign highlighted tiles client-side.
 async function presignRows(rows: UploadRow[]) {
@@ -55,7 +63,7 @@ async function presignRows(rows: UploadRow[]) {
 
 export async function GET(req: NextRequest) {
   if (!isUploadConfigured()) {
-    return NextResponse.json({ configured: false, uploads: [] });
+    return NextResponse.json({ configured: false, uploads: [], hasMore: false, nextCursor: null });
   }
 
   const supabase = createServerClient();
@@ -101,17 +109,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ configured: true, uploads });
   }
 
-  const { data, error } = await supabase
+  // Chronological feed with keyset pagination (`before` = created_at cursor).
+  const limit = parsePageSize(req.nextUrl.searchParams.get("limit"));
+  const before = req.nextUrl.searchParams.get("before");
+
+  let query = supabase
     .from("uploads")
     .select(FEED_SELECT)
     .is("deleted_at", null)
+    .eq("reported", false)
     .order("created_at", { ascending: false })
-    .limit(GALLERY_LIMIT);
+    .limit(limit + 1);
+
+  if (before) {
+    query = query.lt("created_at", before);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 
-  const uploads = await presignRows((data ?? []) as unknown as UploadRow[]);
-  return NextResponse.json({ configured: true, uploads });
+  const rows = (data ?? []) as unknown as UploadRow[];
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const uploads = await presignRows(page);
+  const nextCursor =
+    hasMore && page.length > 0 ? page[page.length - 1].created_at : null;
+
+  return NextResponse.json({ configured: true, uploads, hasMore, nextCursor });
 }

@@ -4,47 +4,103 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Reveal } from "@/components/motion";
 import { ACCEPT, useGalleryUpload } from "@/lib/use-gallery-upload";
 import { MediaPreviewer, PlayBadge } from "@/components/gallery/media-previewer";
+import { groupByWeek } from "@/lib/gallery-weeks";
 
-interface MosaicItem {
+interface GalleryItem {
   id: string;
   kind: "photo" | "video";
   url: string;
   display_name: string;
   villager_id: string;
   created_at: string;
-  promoted: boolean;
 }
 
-// How many tiles get the larger 2x2 "highlighted" treatment. The mosaic feed
-// returns promoted-first then recency, so the first slice is already the right
-// set: promoted items fill highlights first, recency fills the remainder.
-const HIGHLIGHT_SLOTS = 2;
+const PAGE_SIZE = 24;
 
 export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
-  const [items, setItems] = useState<MosaicItem[]>([]);
+  const [items, setItems] = useState<GalleryItem[]>([]);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [preview, setPreview] = useState<MosaicItem | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [preview, setPreview] = useState<GalleryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Guard against overlapping page fetches from rapid intersection callbacks.
+  const loadingMoreRef = useRef(false);
 
   const { me, uploading, uploadProgress, error, setError, uploadFiles } =
     useGalleryUpload(deviceId);
 
-  const loadMosaic = useCallback(async () => {
-    const res = await fetch("/api/gallery?scope=mosaic");
-    if (res.ok) {
-      const data = await res.json();
-      setConfigured(data.configured !== false);
-      setItems(data.uploads ?? []);
+  const fetchPage = useCallback(async (before: string | null) => {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+    if (before) params.set("before", before);
+    const res = await fetch(`/api/gallery?${params}`);
+    if (!res.ok) {
+      return { uploads: [] as GalleryItem[], hasMore: false, nextCursor: null, configured: true };
     }
+    const data = await res.json();
+    return {
+      uploads: (data.uploads ?? []) as GalleryItem[],
+      hasMore: Boolean(data.hasMore),
+      nextCursor: (data.nextCursor as string | null) ?? null,
+      configured: data.configured !== false,
+    };
   }, []);
+
+  const loadInitial = useCallback(async () => {
+    const page = await fetchPage(null);
+    setConfigured(page.configured);
+    setItems(page.uploads);
+    setHasMore(page.hasMore);
+    setNextCursor(page.nextCursor);
+  }, [fetchPage]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || !nextCursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const page = await fetchPage(nextCursor);
+      setItems((cur) => {
+        const seen = new Set(cur.map((i) => i.id));
+        const appended = page.uploads.filter((u) => !seen.has(u.id));
+        return appended.length > 0 ? [...cur, ...appended] : cur;
+      });
+      setHasMore(page.hasMore);
+      setNextCursor(page.nextCursor);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [fetchPage, hasMore, nextCursor]);
 
   useEffect(() => {
     (async () => {
-      await loadMosaic();
+      await loadInitial();
       setLoading(false);
     })();
-  }, [loadMosaic]);
+  }, [loadInitial]);
+
+  // Lazy-load the next page when the sentinel enters the scroll container.
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void loadMore();
+        }
+      },
+      { root, rootMargin: "120px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, items.length]);
 
   // Uploading is open to any signed-in villager; no check-in is required.
   // `eligible` is kept separate from the in-flight `uploading` flag so the
@@ -57,7 +113,9 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
     const { succeeded } = await uploadFiles(files);
     if (fileRef.current) fileRef.current.value = "";
     if (succeeded > 0) {
-      await loadMosaic();
+      setLoading(true);
+      await loadInitial();
+      setLoading(false);
     }
   }
 
@@ -67,8 +125,7 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   if (!loading && !configured) return null;
   if (!loading && items.length === 0 && !eligible) return null;
 
-  const highlights = items.slice(0, HIGHLIGHT_SLOTS);
-  const highlightIds = new Set(highlights.map((i) => i.id));
+  const weeks = groupByWeek(items);
 
   return (
     <Reveal delay={320} className="w-full">
@@ -99,61 +156,77 @@ export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
             </span>
           </button>
         ) : (
-          <div className="max-h-[70vh] overflow-y-auto pr-1">
+          <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto pr-1">
             {/*
               Row height tracks the column width (via container-query units) so
-              every tile stays square at any width. A fixed row height instead
-              stretched tiles into tall rectangles on narrow screens — and the
-              4x4 highlight made that distortion obvious across the whole grid.
+              every tile stays square at any width. Uniform 4-across tiles keep
+              the endless feed readable across week sections.
             */}
-            <div className="@container">
-            <div className="grid grid-flow-row-dense grid-cols-8 gap-1.5 [grid-auto-rows:calc((100cqw_-_7_*_0.375rem)_/_8)]">
-            {items.map((item) => {
-              const isHighlight = highlightIds.has(item.id);
-              const isMine = me?.id === item.villager_id;
-              return (
-                <div
-                  key={item.id}
-                  className={`relative overflow-hidden rounded-lg bg-[var(--color-surface)] ${
-                    isHighlight ? "col-span-4 row-span-4" : "col-span-2 row-span-2"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setPreview(item)}
-                    className="group h-full w-full cursor-zoom-in"
-                    aria-label={`Open ${item.kind} by ${item.display_name}`}
+            <div className="@container space-y-5">
+              {weeks.map((week) => (
+                <section key={week.key} aria-labelledby={`gallery-week-${week.key}`}>
+                  <h3
+                    id={`gallery-week-${week.key}`}
+                    className="sticky top-0 z-[1] -mx-1 mb-2 bg-[var(--color-background)]/95 px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] backdrop-blur-sm"
                   >
-                    {item.kind === "photo" ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={item.url}
-                        alt={`Photo by ${item.display_name}`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <>
-                        <video
-                          src={item.url}
-                          preload="metadata"
-                          muted
-                          playsInline
-                          className="h-full w-full object-cover"
-                        />
-                        <PlayBadge size={isHighlight ? "md" : "sm"} />
-                      </>
-                    )}
-                  </button>
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-[10px] font-medium text-white">
-                    {item.display_name}
-                    {isMine && " (you)"}
-                  </span>
-                </div>
-              );
-            })}
+                    {week.label}
+                  </h3>
+                  <div className="grid grid-cols-8 gap-1.5 [grid-auto-rows:calc((100cqw_-_7_*_0.375rem)_/_8)]">
+                    {week.items.map((item) => {
+                      const isMine = me?.id === item.villager_id;
+                      return (
+                        <div
+                          key={item.id}
+                          className="relative col-span-2 row-span-2 overflow-hidden rounded-lg bg-[var(--color-surface)]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setPreview(item)}
+                            className="group h-full w-full cursor-zoom-in"
+                            aria-label={`Open ${item.kind} by ${item.display_name}`}
+                          >
+                            {item.kind === "photo" ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={item.url}
+                                alt={`Photo by ${item.display_name}`}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <>
+                                <video
+                                  src={item.url}
+                                  preload="metadata"
+                                  muted
+                                  playsInline
+                                  className="h-full w-full object-cover"
+                                />
+                                <PlayBadge size="sm" />
+                              </>
+                            )}
+                          </button>
+                          <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-[10px] font-medium text-white">
+                            {item.display_name}
+                            {isMine && " (you)"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
-            </div>
+
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="flex h-10 items-center justify-center text-xs text-[var(--color-muted)]"
+                aria-hidden={!loadingMore}
+              >
+                {loadingMore ? "Loading more…" : null}
+              </div>
+            )}
           </div>
         )}
 
