@@ -192,7 +192,7 @@ export function SelfieCapture({ value, onChange }: SelfieCaptureProps) {
       </button>
       <label className="cursor-pointer text-center text-xs text-[var(--color-muted)] underline underline-offset-4 transition hover:text-[var(--color-foreground)]">
         or upload a photo
-        <input type="file" accept="image/*" capture="user" onChange={onFile} className="hidden" />
+        <input type="file" accept="image/*" onChange={onFile} className="hidden" />
       </label>
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
