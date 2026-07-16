@@ -4,9 +4,9 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "@/lib/theme-context";
 
 // Positioning is intentionally omitted: `relative` (inline) and `fixed` (chrome)
- // both establish a containing block for the absolute sun/moon icons. Putting
- // `relative` in the shared base made `fixed` lose to CSS source order, so the
- // admin login toggle sat in the centered flex layout instead of top-left.
+// both establish a containing block for the absolute sun/moon icons. Putting
+// `relative` in the shared base made `fixed` lose to CSS source order, so the
+// admin login toggle sat in the centered flex layout instead of top-left.
 const BASE_CLASS =
   "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] shadow-sm transition-colors duration-200 hover:bg-[var(--color-border)]";
 
