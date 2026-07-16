@@ -50,6 +50,34 @@ function withSubscriptionSummary(
   return { ...rest, subscription: summarizeSubscription(subscriptions) };
 }
 
+/** Sum paid check-in intent amounts (cents) per villager. */
+async function totalContributedByVillager(
+  supabase: ReturnType<typeof createServerClient>,
+  villagerIds: string[]
+): Promise<Map<string, number>> {
+  const totals = new Map<string, number>();
+  if (villagerIds.length === 0) return totals;
+
+  const { data, error } = await supabase
+    .from("check_ins")
+    .select("villager_id, intent_amount")
+    .eq("status", "paid")
+    .in("villager_id", villagerIds);
+
+  if (error) {
+    console.error("[admin/villagers] total contributed query failed", error);
+    return totals;
+  }
+
+  for (const row of data ?? []) {
+    totals.set(
+      row.villager_id,
+      (totals.get(row.villager_id) ?? 0) + (row.intent_amount ?? 0)
+    );
+  }
+  return totals;
+}
+
 export async function GET(req: NextRequest) {
   const denied = await verifyAdmin(req);
   if (denied) return denied;
@@ -99,9 +127,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const villagers = (data ?? []).map((v) =>
-    withSubscriptionSummary(v as Record<string, unknown> & { subscriptions?: JoinedSubscription[] })
+  const rows = data ?? [];
+  const contributed = await totalContributedByVillager(
+    supabase,
+    rows.map((v) => v.id)
   );
+
+  const villagers = rows.map((v) => ({
+    ...withSubscriptionSummary(
+      v as Record<string, unknown> & { subscriptions?: JoinedSubscription[] }
+    ),
+    total_contributed: contributed.get(v.id) ?? 0,
+  }));
 
   return NextResponse.json({ villagers });
 }

@@ -26,6 +26,13 @@ function formatSubscriptionAmount(sub: VillagerSubscriptionSummary): string {
   return `${dollars}/${sub.interval === "week" ? "wk" : "mo"}`;
 }
 
+function formatContributed(cents: number): string {
+  if (cents === 0) return "$0";
+  return cents % 100 === 0
+    ? `$${cents / 100}`
+    : `$${(cents / 100).toFixed(2)}`;
+}
+
 // Sort rank: active pledges rank highest, then any other recorded subscription,
 // then villagers with none. Amount breaks ties within a tier.
 function subscriptionSortValue(v: Villager): number {
@@ -164,6 +171,9 @@ export default function VillagersPanel({ token }: { token: string }) {
     return [...villagers].sort((a, b) => {
       if (sortBy === "subscription") {
         return (subscriptionSortValue(a) - subscriptionSortValue(b)) * dir;
+      }
+      if (sortBy === "total_contributed") {
+        return ((a.total_contributed ?? 0) - (b.total_contributed ?? 0)) * dir;
       }
       const av = a[sortBy];
       const bv = b[sortBy];
@@ -311,6 +321,7 @@ export default function VillagersPanel({ token }: { token: string }) {
     { key: "instruments", label: "Instruments" },
     { key: "email", label: "Email", sortable: true },
     { key: "subscription", label: "Subscription", sortable: true },
+    { key: "total_contributed", label: "Total $", sortable: true },
     { key: "first_visited_at", label: "First Visit", sortable: true },
     { key: "last_visited_at", label: "Last Visit", sortable: true },
   ];
@@ -467,6 +478,9 @@ export default function VillagersPanel({ token }: { token: string }) {
                     ) : (
                       <span className="text-[var(--color-muted)]">—</span>
                     )}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 tabular-nums text-[var(--color-muted)]">
+                    {formatContributed(v.total_contributed ?? 0)}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(v.first_visited_at)}

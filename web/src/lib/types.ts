@@ -25,6 +25,8 @@ export interface Villager {
   first_visited_at: string;
   last_visited_at: string | null;
   subscription?: VillagerSubscriptionSummary | null;
+  /** Sum of paid check-in intent_amount values, in cents. */
+  total_contributed?: number;
 }
 
 export interface Subscription {
