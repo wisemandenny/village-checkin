@@ -8,3 +8,4 @@ dist/
 web/src/generated/
 .vercel
 .env*
+.worktrees/
