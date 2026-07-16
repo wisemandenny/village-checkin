@@ -129,7 +129,8 @@ type RangeKey = "mtd" | "1mo" | "3mo" | "6mo" | "1y" | "all";
 
 // Each range maps to a number of weekly buckets (or "all" / month-to-date).
 // Week counts approximate the calendar period: 13w ~= 3mo, 26w ~= 6mo, 52w ~= 1y.
-// MTD starts at the Monday of the week that contains the 1st of the current month.
+// MTD covers the current calendar month; the first week bucket may be partial
+// when the 1st is not a Monday (prior-month days in that week are excluded).
 const RANGE_OPTIONS: {
   key: RangeKey;
   label: string;
@@ -320,10 +321,14 @@ export default function StatisticsPanel({ token }: { token: string }) {
     const thisMondayKey = toMondayOfWeek(new Date().toISOString());
     const endMonday = mondayDate(thisMondayKey);
 
-    // Determine the first week to display.
+    // Determine the first week to display, and the inclusive lower bound for
+    // which check-ins count. For MTD that bound is calendar month start (not
+    // the Monday of the week containing the 1st), so late prior-month visits
+    // in a partial first week are excluded.
     const weeksCount =
       RANGE_OPTIONS.find((o) => o.key === range)?.weeks ?? "all";
     let startMonday: Date;
+    let rangeStartMs: number;
     if (weeksCount === "all") {
       let earliest = Infinity;
       for (const c of allCheckins) {
@@ -331,14 +336,15 @@ export default function StatisticsPanel({ token }: { token: string }) {
         if (k < earliest) earliest = k;
       }
       startMonday = earliest === Infinity ? endMonday : new Date(earliest);
+      rangeStartMs = startMonday.getTime();
     } else if (weeksCount === "mtd") {
-      // Calendar month-to-date: include every weekly bucket from the week that
-      // contains the 1st of the current month through this week.
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      rangeStartMs = monthStart.getTime();
       startMonday = mondayDate(toMondayOfWeek(monthStart.toISOString()));
     } else {
       startMonday = new Date(endMonday.getTime() - (weeksCount - 1) * WEEK_MS);
+      rangeStartMs = startMonday.getTime();
     }
 
     // Build a continuous list of week keys so empty weeks still render as gaps.
@@ -350,7 +356,6 @@ export default function StatisticsPanel({ token }: { token: string }) {
     ) {
       weekKeys.push(toMondayOfWeek(d.toISOString()));
     }
-    const startTime = startMonday.getTime();
 
     // "New villagers only" restricts to villagers whose first-ever visit falls
     // within the displayed range and who aren't excluded from new counts.
@@ -358,13 +363,14 @@ export default function StatisticsPanel({ token }: { token: string }) {
       const first = firstSeen.get(vid);
       return (
         first !== undefined &&
-        mondayDate(toMondayOfWeek(new Date(first).toISOString())).getTime() >=
-          startTime &&
+        first >= rangeStartMs &&
         !excludedIds.has(vid)
       );
     };
 
-    let source = allCheckins;
+    let source = allCheckins.filter(
+      (c) => new Date(c.created_at).getTime() >= rangeStartMs
+    );
     if (filterVillagerId) {
       source = source.filter((c) => c.villager_id === filterVillagerId);
     }
@@ -392,7 +398,8 @@ export default function StatisticsPanel({ token }: { token: string }) {
       const unique = uniqueIds.size;
 
       // Villagers whose first-ever visit lands in this week (and not excluded),
-      // plus the role breakdown of everyone active that week.
+      // plus the role breakdown of everyone active that week. First visits
+      // before rangeStartMs (e.g. late June in an MTD partial week) don't count.
       let newVillagers = 0;
       let producers = 0;
       let vocalists = 0;
@@ -402,6 +409,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
         const first = firstSeen.get(vid);
         if (
           first !== undefined &&
+          first >= rangeStartMs &&
           toMondayOfWeek(new Date(first).toISOString()) === key &&
           !excludedIds.has(vid)
         ) {
@@ -498,9 +506,16 @@ export default function StatisticsPanel({ token }: { token: string }) {
     if (!start) return 0;
     // Recompute the average across the displayed weeks at the check-in level
     // (not an average of weekly averages) for an accurate per-payment figure.
-    const startTime = mondayDate(start).getTime();
+    // MTD uses calendar month start so prior-month days in the first week are out.
+    const startTime =
+      range === "mtd"
+        ? (() => {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          })()
+        : mondayDate(start).getTime();
     let source = allCheckins.filter(
-      (c) => mondayDate(toMondayOfWeek(c.created_at)).getTime() >= startTime
+      (c) => new Date(c.created_at).getTime() >= startTime
     );
     if (filterVillagerId)
       source = source.filter((c) => c.villager_id === filterVillagerId);
@@ -513,7 +528,7 @@ export default function StatisticsPanel({ token }: { token: string }) {
       }
     }
     return paid > 0 ? total / paid : 0;
-  }, [weeks, allCheckins, filterVillagerId, selectedRoles, matchesRoleFilter]);
+  }, [weeks, range, allCheckins, filterVillagerId, selectedRoles, matchesRoleFilter]);
 
   const tooltipStyle = {
     background: "var(--color-surface)",
