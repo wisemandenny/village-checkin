@@ -80,6 +80,9 @@ interface PaymentStepProps {
   // Pay-with-cash only makes sense in the studio. Remote contexts (e.g. settling
   // an unpaid check-in from an emailed link) hide it.
   allowCash?: boolean;
+  // When true, mark the resulting paid check-in as settled via the reminder
+  // email pay link (secondary admin signal; method stays online_fallback).
+  viaReminder?: boolean;
   onComplete: (paid?: boolean) => void;
 }
 
@@ -109,7 +112,7 @@ const BRAND_DISPLAY: Record<string, string> = {
   discover: "Discover",
 };
 
-export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, isNewRegistration = false, allowCash = true, onComplete }: PaymentStepProps) {
+export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, isNewRegistration = false, allowCash = true, viaReminder = false, onComplete }: PaymentStepProps) {
   // Exclusive villagers commit to a recurring pledge only; everyone else gets
   // the one-time flow. The mode is fixed by tier, so there is no toggle.
   const mode: "once" | "recurring" = isExclusive ? "recurring" : "once";
@@ -159,7 +162,12 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
       const res = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: cents, check_in_id: checkInId, device_id: deviceId }),
+        body: JSON.stringify({
+          amount: cents,
+          check_in_id: checkInId,
+          device_id: deviceId,
+          ...(viaReminder ? { via_reminder: true } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -172,7 +180,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
     } finally {
       setLoading(false);
     }
-  }, [checkInId, deviceId]);
+  }, [checkInId, deviceId, viaReminder]);
 
   const handleCustomConfirm = useCallback(async () => {
     const cents = Math.round(parseFloat(customAmount || "0") * 100);
@@ -186,7 +194,12 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
       const res = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: cents, check_in_id: checkInId, device_id: deviceId }),
+        body: JSON.stringify({
+          amount: cents,
+          check_in_id: checkInId,
+          device_id: deviceId,
+          ...(viaReminder ? { via_reminder: true } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -199,7 +212,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
     } finally {
       setLoading(false);
     }
-  }, [customAmount, checkInId, deviceId]);
+  }, [customAmount, checkInId, deviceId, viaReminder]);
 
   const handleSavedCardPayment = useCallback(async (card: SavedCard, cents: number) => {
     setChargingSaved(true);
@@ -213,6 +226,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
           check_in_id: checkInId,
           device_id: deviceId,
           payment_method_id: card.id,
+          ...(viaReminder ? { via_reminder: true } : {}),
         }),
       });
       const data = await res.json();
@@ -227,7 +241,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
     } finally {
       setChargingSaved(false);
     }
-  }, [checkInId, deviceId, onComplete]);
+  }, [checkInId, deviceId, viaReminder, onComplete]);
 
   const handleBackToAmounts = useCallback(() => {
     setClientSecret(null);

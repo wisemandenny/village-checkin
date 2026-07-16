@@ -37,13 +37,16 @@ create table check_ins (
   villager_id          uuid not null references villagers(id) on delete cascade,
   intent_amount        integer not null default 0,
   payment_method       text not null check (payment_method in ('terminal', 'online_fallback', 'cash', 'skipped', 'deferred', 'subscription', 'elder')),
-  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped')),
+  status               text not null default 'pending' check (status in ('pending', 'paid', 'skipped', 'waived')),
   created_at           timestamptz not null default now(),
   stripe_transaction_id text,
   -- Set when the unpaid-check-in reminder emails are sent (1h and 24h after a
   -- 'pending' check-in), so the scheduled job never sends the same nudge twice.
   reminder_1h_sent_at  timestamptz,
-  reminder_24h_sent_at timestamptz
+  reminder_24h_sent_at timestamptz,
+  -- True when payment completed through the reminder email /pay/<token> link.
+  -- payment_method remains online_fallback; this is a secondary admin signal.
+  paid_via_reminder    boolean not null default false
 );
 
 -- Subscriptions table: recurring support pledges processed by Stripe.

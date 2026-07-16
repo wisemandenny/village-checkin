@@ -6,7 +6,9 @@ import Link from "next/link";
 import { PaymentStep } from "@/components/payment-step";
 import { AnimatedCheck, Reveal } from "@/components/motion";
 import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
+import { CheckInStreak } from "@/components/checkin-streak";
 import type { PaymentMethod } from "@/lib/types";
+import { isPaymentSettled } from "@/lib/checkin-status";
 
 type Step = "checking-in" | "payment" | "done";
 
@@ -77,8 +79,8 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       setAlreadyCheckedIn(true);
       if (check_in?.id) setCheckInId(check_in.id);
 
-      if (check_in?.status === "paid") {
-        markPaid(check_in.payment_method ?? null);
+      if (isPaymentSettled(check_in?.status)) {
+        markPaid(check_in?.payment_method ?? null);
       } else if (
         paymentsEnabledFlag &&
         statusData.has_active_subscription !== true &&
@@ -156,8 +158,8 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
         const { check_in, is_elder } = await res.json();
         if (is_elder === true) {
           markPaid("elder");
-        } else if (check_in?.status === "paid") {
-          markPaid(check_in.payment_method ?? null);
+        } else if (isPaymentSettled(check_in?.status)) {
+          markPaid(check_in?.payment_method ?? null);
         }
       } catch {
         // Transient network errors are ignored; the next tick retries.
@@ -243,9 +245,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <Reveal className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
-        <AnimatedCheck className="h-10 w-10 text-green-500" />
-      </Reveal>
+      <CheckInStreak deviceId={deviceId}>
+        <Reveal className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+          <AnimatedCheck className="h-10 w-10 text-green-500" />
+        </Reveal>
+      </CheckInStreak>
       <Reveal delay={120}>
         <h2 className="text-2xl font-bold">
           {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {firstName}!
@@ -274,23 +278,22 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </Reveal>
         )
       )}
-      <GalleryMosaic deviceId={deviceId} />
       <CommunityLinks />
+      <GalleryMosaic deviceId={deviceId} />
     </div>
   );
 }
 
-// Entry points to community pages. "See who's here" is the primary CTA; the
-// gallery is reached inline via the mosaic's "Open full gallery" link, so no
-// separate gallery button is needed here.
+// Entry point to the "who's here" board. The gallery is reached inline via the
+// mosaic's "Open full gallery" link, so no separate gallery button is needed.
 function CommunityLinks() {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex w-full flex-col items-center gap-2">
       <Link
         href="/here"
-        className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[var(--color-accent)] px-8 text-lg font-semibold text-white transition hover:bg-[var(--color-accent-light)] font-[family-name:var(--font-domaine)]"
+        className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-[var(--color-border)] px-8 text-lg font-semibold text-[var(--color-muted)] transition hover:border-[var(--color-foreground)] hover:text-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
       >
-        See who&apos;s here
+        See Who&apos;s Here Tonight
       </Link>
     </div>
   );

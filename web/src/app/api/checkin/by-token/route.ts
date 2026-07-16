@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyPayToken } from "@/lib/pay-token";
+import { isPaymentSettled } from "@/lib/checkin-status";
 import { NextRequest, NextResponse } from "next/server";
 
 // Resolves a signed pay-link token (from an unpaid-check-in reminder email) into
@@ -43,6 +44,6 @@ export async function GET(req: NextRequest) {
       intent_amount: checkIn.intent_amount,
     },
     villager: { display_name: villager?.display_name ?? null },
-    already_paid: checkIn.status === "paid",
+    already_paid: isPaymentSettled(checkIn.status),
   });
 }

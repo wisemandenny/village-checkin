@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
+import { normalizeAdminCheckInFields } from "@/lib/checkin-status";
 
 export async function GET(req: NextRequest) {
   const denied = await verifyAdmin(req);
@@ -33,13 +34,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = createServerClient();
 
+  const intentAmount = body.intent_amount ?? 0;
+  const { status, intent_amount } = normalizeAdminCheckInFields({
+    status: body.status || "paid",
+    intent_amount: intentAmount,
+  });
+
   const { data, error } = await supabase
     .from("check_ins")
     .insert({
       villager_id: body.villager_id,
-      intent_amount: body.intent_amount ?? 0,
+      intent_amount: intent_amount ?? intentAmount,
       payment_method: body.payment_method || "cash",
-      status: body.status || "paid",
+      status: status || "paid",
       created_at: body.created_at || new Date().toISOString(),
       stripe_transaction_id: body.stripe_transaction_id || null,
     })

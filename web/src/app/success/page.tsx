@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
+import { CheckInStreak } from "@/components/checkin-streak";
 
 function SuccessHeading() {
   const searchParams = useSearchParams();
@@ -19,16 +20,20 @@ function SuccessHeading() {
 export default function SuccessPage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 mb-6">
-        <svg
-          className="h-10 w-10 text-green-500"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
+      <div className="mb-6">
+        <CheckInStreak>
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+            <svg
+              className="h-10 w-10 text-green-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </CheckInStreak>
       </div>
       <Suspense fallback={<h1 className="text-3xl font-bold">Welcome to the Village!</h1>}>
         <SuccessHeading />
