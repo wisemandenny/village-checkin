@@ -19,24 +19,45 @@ import { NextRequest, NextResponse } from "next/server";
 // which would break the inline payment.
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { device_id, check_in_id } = body as {
+  const { device_id, check_in_id, via_reminder } = body as {
     device_id?: string;
     check_in_id?: string;
+    via_reminder?: boolean;
   };
 
-  if (!device_id) {
-    return NextResponse.json({ error: "device_id is required" }, { status: 400 });
+  // Callers identify the villager one of two ways: by device (in-app check-in
+  // flow) or, when there is no device (the emailed reminder pay link), by the
+  // check-in the pledge settles.
+  if (!device_id && !check_in_id) {
+    return NextResponse.json(
+      { error: "device_id or check_in_id is required" },
+      { status: 400 }
+    );
   }
 
   try {
     const stripe = getStripe();
     const supabase = createServerClient();
 
-    const { data: villager } = await supabase
+    let villagerQuery = supabase
       .from("villagers")
-      .select("id, stripe_customer_id, display_name, email, roles, ig_handle")
-      .contains("device_ids", [device_id])
-      .single();
+      .select("id, stripe_customer_id, display_name, email, roles, ig_handle");
+
+    if (device_id) {
+      villagerQuery = villagerQuery.contains("device_ids", [device_id]);
+    } else {
+      const { data: checkIn } = await supabase
+        .from("check_ins")
+        .select("villager_id")
+        .eq("id", check_in_id!)
+        .maybeSingle();
+      if (!checkIn) {
+        return NextResponse.json({ error: "Check-in not found" }, { status: 404 });
+      }
+      villagerQuery = villagerQuery.eq("id", checkIn.villager_id);
+    }
+
+    const { data: villager } = await villagerQuery.single();
 
     if (!villager) {
       return NextResponse.json({ error: "Villager not found" }, { status: 404 });
@@ -61,7 +82,7 @@ export async function POST(req: NextRequest) {
     // the processing fee.
     const chargeAmount = exclusiveMonthlyTotalCents();
 
-    const customerId = await resolveCustomerId(stripe, supabase, villager, device_id);
+    const customerId = await resolveCustomerId(stripe, supabase, villager, device_id ?? "");
 
     // The first recurring charge lands on the first of next month. The webhook
     // reads this back rather than recomputing, so the anchor can't drift if the
@@ -77,12 +98,15 @@ export async function POST(req: NextRequest) {
       automatic_payment_methods: { enabled: true },
       metadata: {
         villager_id: villager.id,
-        device_id,
+        device_id: device_id ?? "",
         // Drives subscription creation in the `payment_intent.succeeded` webhook.
         subscription_signup: "true",
         recurring_amount: String(chargeAmount),
         first_of_month_anchor: String(anchorUnix),
         ...(check_in_id ? { check_in_id } : {}),
+        // Settling a reminder-linked check-in via the subscription flow: carry
+        // the flag so the webhook records it like the one-time reminder path.
+        ...(via_reminder ? { via_reminder: "true" } : {}),
       },
     });
 
