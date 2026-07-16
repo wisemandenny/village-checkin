@@ -8,6 +8,7 @@ import { AnimatedCheck, Reveal } from "@/components/motion";
 import { GalleryMosaic } from "@/components/gallery/gallery-mosaic";
 import { CheckInStreak } from "@/components/checkin-streak";
 import type { PaymentMethod } from "@/lib/types";
+import { isPaymentSettled } from "@/lib/checkin-status";
 
 type Step = "checking-in" | "payment" | "done";
 
@@ -78,8 +79,8 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
       setAlreadyCheckedIn(true);
       if (check_in?.id) setCheckInId(check_in.id);
 
-      if (check_in?.status === "paid") {
-        markPaid(check_in.payment_method ?? null);
+      if (isPaymentSettled(check_in?.status)) {
+        markPaid(check_in?.payment_method ?? null);
       } else if (
         paymentsEnabledFlag &&
         statusData.has_active_subscription !== true &&
@@ -157,8 +158,8 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
         const { check_in, is_elder } = await res.json();
         if (is_elder === true) {
           markPaid("elder");
-        } else if (check_in?.status === "paid") {
-          markPaid(check_in.payment_method ?? null);
+        } else if (isPaymentSettled(check_in?.status)) {
+          markPaid(check_in?.payment_method ?? null);
         }
       } catch {
         // Transient network errors are ignored; the next tick retries.

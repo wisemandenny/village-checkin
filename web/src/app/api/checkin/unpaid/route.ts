@@ -4,7 +4,7 @@ import { resolveExclusive, ELDER_ROLE } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 // Lists a villager's past check-ins that were never paid for (status not
-// "paid"), so they can settle a session they attended but didn't pay for —
+// settled), so they can settle a session they attended but didn't pay for —
 // notably while check-ins are closed. Also returns the tier/subscription flags
 // the payment screen needs.
 export async function GET(req: NextRequest) {
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     .from("check_ins")
     .select("id, status, payment_method, intent_amount, created_at")
     .eq("villager_id", villager.id)
-    .neq("status", "paid")
+    .not("status", "in", '("paid","waived")')
     .order("created_at", { ascending: false });
 
   const { data: subscriptions } = await supabase

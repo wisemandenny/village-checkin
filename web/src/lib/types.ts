@@ -52,7 +52,7 @@ export interface CheckIn {
 }
 
 export type PaymentMethod = "terminal" | "online_fallback" | "cash" | "skipped" | "deferred" | "subscription" | "elder";
-export type CheckInStatus = "pending" | "paid" | "skipped";
+export type CheckInStatus = "pending" | "paid" | "skipped" | "waived";
 
 export interface StudioSettings {
   payments_enabled: boolean;
