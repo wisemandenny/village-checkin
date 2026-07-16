@@ -2,7 +2,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { isUploadConfigured, presignDownloadUrl } from "@/lib/r2";
 import { NextRequest, NextResponse } from "next/server";
 
-const DEFAULT_PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 48;
 // How many items the payment-screen mosaic fetches. Kept small: these load
 // inline on a high-traffic screen, and the mosaic only renders a handful.

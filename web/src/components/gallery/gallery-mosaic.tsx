@@ -15,7 +15,7 @@ interface GalleryItem {
   created_at: string;
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 20;
 
 export function GalleryMosaic({ deviceId }: { deviceId?: string }) {
   const [items, setItems] = useState<GalleryItem[]>([]);
