@@ -37,7 +37,7 @@ export function CheckInStreak({
       {children}
       {current != null && (
         <span
-          className="absolute -right-2 -top-2 flex items-center justify-center whitespace-nowrap rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-bold leading-none text-white shadow-sm ring-2 ring-[var(--color-background)]"
+          className="absolute top-0 right-0 z-10 -translate-y-1/2 translate-x-1/2 whitespace-nowrap rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-bold leading-none text-white shadow-sm ring-2 ring-[var(--color-background)]"
           aria-label={`${current} week${current === 1 ? "" : "s"} streak`}
         >
           {current} week{current === 1 ? "" : "s"} streak
