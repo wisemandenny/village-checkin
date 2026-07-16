@@ -244,9 +244,11 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <Reveal className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
-        <AnimatedCheck className="h-10 w-10 text-green-500" />
-      </Reveal>
+      <CheckInStreak deviceId={deviceId}>
+        <Reveal className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+          <AnimatedCheck className="h-10 w-10 text-green-500" />
+        </Reveal>
+      </CheckInStreak>
       <Reveal delay={120}>
         <h2 className="text-2xl font-bold">
           {isNewRegistration ? "Welcome to the Village" : "Welcome back to the Village"}, {firstName}!
@@ -275,7 +277,6 @@ export function CheckInFlow({ deviceId, displayName, isNewRegistration = false, 
           </Reveal>
         )
       )}
-      <CheckInStreak deviceId={deviceId} />
       <GalleryMosaic deviceId={deviceId} />
       <CommunityLinks />
     </div>

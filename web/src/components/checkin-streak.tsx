@@ -1,24 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Reveal } from "@/components/motion";
+import { useEffect, useState, type ReactNode } from "react";
 import { getDeviceId } from "@/lib/device-id";
-import { formatWeekLabel } from "@/lib/checkin-streaks";
 
-interface StreakData {
-  current: number;
-  best: number;
-  best_is_current: boolean;
-}
-
+/** Wraps the success checkmark and overlays the current streak as a top-right badge. */
 export function CheckInStreak({
   deviceId,
-  delay = 260,
+  children,
 }: {
   deviceId?: string | null;
-  delay?: number;
+  children: ReactNode;
 }) {
-  const [streak, setStreak] = useState<StreakData | null>(null);
+  const [current, setCurrent] = useState<number | null>(null);
 
   useEffect(() => {
     const id = deviceId ?? getDeviceId();
@@ -30,11 +23,7 @@ export function CheckInStreak({
       .then((data) => {
         if (cancelled || !data) return;
         if (typeof data.current !== "number" || data.current < 1) return;
-        setStreak({
-          current: data.current,
-          best: data.best ?? data.current,
-          best_is_current: data.best_is_current === true,
-        });
+        setCurrent(data.current);
       })
       .catch(() => {});
 
@@ -43,22 +32,18 @@ export function CheckInStreak({
     };
   }, [deviceId]);
 
-  if (!streak) return null;
-
-  const showBest = streak.best > streak.current;
-
   return (
-    <Reveal delay={delay}>
-      <div className="flex flex-col items-center gap-1">
-        <p className="text-base font-semibold text-[var(--color-foreground)]">
-          {formatWeekLabel(streak.current)} check-in streak
-        </p>
-        {showBest && (
-          <p className="text-xs text-[var(--color-muted)]">
-            Best: {formatWeekLabel(streak.best)}
-          </p>
-        )}
-      </div>
-    </Reveal>
+    <div className="relative inline-flex">
+      {children}
+      {current != null && (
+        <span
+          className="absolute -right-1 -top-1 flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--color-accent)] px-1.5 text-xs font-bold tabular-nums text-white shadow-sm ring-2 ring-[var(--color-background)]"
+          title={`${current}-week check-in streak`}
+          aria-label={`${current}-week check-in streak`}
+        >
+          {current}
+        </span>
+      )}
+    </div>
   );
 }
