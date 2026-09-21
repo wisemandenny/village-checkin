@@ -29,29 +29,31 @@ export async function PUT(
     }
   }
 
-  // $0 "mark paid" (or edit) is a fee waiver, not revenue. When only one of
-  // status/amount is in the payload, load the other from the existing row so
-  // "set amount to 0 while status is paid" still becomes waived.
-  if ("status" in updates || "intent_amount" in updates) {
+  // $0 "mark paid" (or edit) is a fee waiver, not revenue, unless the method
+  // is prepaid. Fields missing from the payload are loaded from the existing
+  // row so a partial edit is judged against the check-in's real state.
+  if ("status" in updates || "intent_amount" in updates || "payment_method" in updates) {
     let status = updates.status as string | undefined;
     let intentAmount = updates.intent_amount as number | undefined;
+    let paymentMethod = updates.payment_method as string | undefined;
 
-    if (status === undefined || intentAmount === undefined) {
+    if (status === undefined || intentAmount === undefined || paymentMethod === undefined) {
       const { data: current } = await supabase
         .from("check_ins")
-        .select("status, intent_amount")
+        .select("status, intent_amount, payment_method")
         .eq("id", id)
         .single();
       if (current) {
         status = status ?? (current.status as string);
-        intentAmount =
-          intentAmount ?? (current.intent_amount as number);
+        intentAmount = intentAmount ?? (current.intent_amount as number);
+        paymentMethod = paymentMethod ?? (current.payment_method as string);
       }
     }
 
     const normalized = normalizeAdminCheckInFields({
       status,
       intent_amount: intentAmount,
+      payment_method: paymentMethod,
     });
     if (normalized.status !== undefined) updates.status = normalized.status;
     if (normalized.intent_amount !== undefined) {

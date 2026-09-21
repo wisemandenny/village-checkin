@@ -35,9 +35,11 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient();
 
   const intentAmount = body.intent_amount ?? 0;
+  const paymentMethod = body.payment_method || "cash";
   const { status, intent_amount } = normalizeAdminCheckInFields({
     status: body.status || "paid",
     intent_amount: intentAmount,
+    payment_method: paymentMethod,
   });
 
   const { data, error } = await supabase
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
     .insert({
       villager_id: body.villager_id,
       intent_amount: intent_amount ?? intentAmount,
-      payment_method: body.payment_method || "cash",
+      payment_method: paymentMethod,
       status: status || "paid",
       created_at: body.created_at || new Date().toISOString(),
       stripe_transaction_id: body.stripe_transaction_id || null,
