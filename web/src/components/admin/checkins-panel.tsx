@@ -99,7 +99,12 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
     "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
-export default function CheckInsPanel({ token }: { token: string }) {
+interface CheckInsPanelProps {
+  token: string;
+  onVillagerSelect?: (villager: { id: string; display_name: string }) => void;
+}
+
+export default function CheckInsPanel({ token, onVillagerSelect }: CheckInsPanelProps) {
   const [checkins, setCheckins] = useState<CheckInWithVillager[]>([]);
   const [villagers, setVillagers] = useState<Villager[]>([]);
   // The fetch runs inside a transition so we never call setState synchronously
@@ -749,7 +754,22 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
                 >
                   <td className="px-4 py-3 font-medium">
-                    {c.villagers?.display_name || "Unknown"}
+                    {onVillagerSelect && c.villagers ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onVillagerSelect({
+                            id: c.villager_id,
+                            display_name: c.villagers!.display_name,
+                          })
+                        }
+                        className="underline-offset-4 transition hover:text-[var(--color-accent)] hover:underline"
+                      >
+                        {c.villagers.display_name}
+                      </button>
+                    ) : (
+                      c.villagers?.display_name || "Unknown"
+                    )}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {formatCents(c.intent_amount)}
