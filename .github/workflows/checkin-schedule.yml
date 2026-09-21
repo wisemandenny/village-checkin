@@ -5,6 +5,11 @@ name: Check-in schedule
 # when the schedule is disabled, so running often is cheap. Every 15 minutes
 # means check-ins flip within ~15 min of a scheduled boundary. Also exposed as
 # a manual trigger for ad-hoc reconciliation.
+#
+# Transient 5xx responses (e.g. a Supabase blip) are retried and then treated as
+# a skip rather than a failure: the next tick 15 minutes later self-heals, and a
+# failed run would only generate a noisy notification email. 401/404 still fail,
+# since they mean the secret or route is misconfigured.
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -22,13 +27,21 @@ jobs:
             echo "CRON_SECRET not set; skipping."
             exit 0
           fi
-          response=$(curl -sS -w "\n%{http_code}" \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            https://app.takesavillagemusic.com/api/cron/checkins)
-          body=$(echo "$response" | sed '$d')
-          status=$(echo "$response" | tail -n1)
-          echo "HTTP $status: $body"
-          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-            echo "Cron request failed."
-            exit 1
-          fi
+          for attempt in 1 2 3; do
+            response=$(curl -sS -w "\n%{http_code}" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              https://app.takesavillagemusic.com/api/cron/checkins) || response=$'\n000'
+            body=$(echo "$response" | sed '$d')
+            status=$(echo "$response" | tail -n1)
+            echo "Attempt $attempt: HTTP $status: $body"
+            if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+              exit 0
+            fi
+            if [ "$status" -ge 400 ] && [ "$status" -lt 500 ]; then
+              echo "::error::Cron request rejected with HTTP $status; check CRON_SECRET and the route."
+              exit 1
+            fi
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 10))
+          done
+          echo "::warning::Cron request still failing (HTTP $status) after 3 attempts; skipping until next tick."
+          exit 0
