@@ -14,13 +14,15 @@ export async function POST(req: NextRequest) {
   const denied = await verifyAdmin(req);
   if (denied) return denied;
 
-  const stripe = getStripe();
-  const supabase = createServerClient();
-
   let synced = 0;
   let failed = 0;
 
+  // getStripe() throws when STRIPE_SECRET_KEY is unset for this environment;
+  // keep that inside the try so the client gets a JSON error, not an empty 500.
+  let stripe;
+  const supabase = createServerClient();
   try {
+    stripe = getStripe();
     for await (const sub of stripe.subscriptions.list({ status: "all", limit: 100 })) {
       try {
         if (await syncSubscriptionFromStripe(supabase, sub)) synced++;

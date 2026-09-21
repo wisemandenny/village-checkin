@@ -45,9 +45,9 @@ export async function recordInvoiceContribution(
   invoice: Stripe.Invoice,
   villager: VillagerLite,
   checkInId: string | null = null
-): Promise<void> {
-  if (!invoice.id || (invoice.amount_paid ?? 0) <= 0) return;
-  await recordContribution(supabase, {
+): Promise<boolean> {
+  if (!invoice.id || (invoice.amount_paid ?? 0) <= 0) return false;
+  return recordContribution(supabase, {
     villagerId: villager.id,
     amountCents: invoice.amount_paid,
     source:
@@ -71,10 +71,15 @@ export async function backfillInvoiceContributions(
   supabase: SupabaseClient,
   stripe: Stripe
 ): Promise<{ recorded: number; unmatched: number }> {
-  const { data: existing } = await supabase
+  const { data: existing, error } = await supabase
     .from("contributions")
     .select("stripe_transaction_id")
     .not("stripe_transaction_id", "is", null);
+  // Typically the ledger migration has not been applied yet; nothing to do.
+  if (error) {
+    console.error("[contributions] ledger unavailable, skipping backfill", error);
+    return { recorded: 0, unmatched: 0 };
+  }
   const known = new Set((existing ?? []).map((r) => r.stripe_transaction_id as string));
 
   let recorded = 0;
@@ -86,8 +91,7 @@ export async function backfillInvoiceContributions(
       unmatched++;
       continue;
     }
-    await recordInvoiceContribution(supabase, invoice, villager);
-    recorded++;
+    if (await recordInvoiceContribution(supabase, invoice, villager)) recorded++;
   }
   return { recorded, unmatched };
 }

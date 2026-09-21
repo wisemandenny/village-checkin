@@ -27,8 +27,8 @@ export type RecordContributionInput = {
 export async function recordContribution(
   supabase: SupabaseClient,
   input: RecordContributionInput
-): Promise<void> {
-  if (!input.villagerId || input.amountCents <= 0) return;
+): Promise<boolean> {
+  if (!input.villagerId || input.amountCents <= 0) return false;
 
   const row: Record<string, unknown> = {
     villager_id: input.villagerId,
@@ -45,8 +45,9 @@ export async function recordContribution(
       .upsert(row, { onConflict: "check_in_id" });
     if (error && error.code !== "23505") {
       console.error("[contributions] upsert failed", error);
+      return false;
     }
-    return;
+    return true;
   }
 
   const { error } = await supabase.from("contributions").insert(row);
@@ -54,5 +55,7 @@ export async function recordContribution(
   // 23505 = unique_violation (already recorded for this check-in / Stripe txn)
   if (error && error.code !== "23505") {
     console.error("[contributions] insert failed", error);
+    return false;
   }
+  return true;
 }
