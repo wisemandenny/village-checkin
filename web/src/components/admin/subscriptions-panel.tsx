@@ -191,7 +191,7 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Refresh failed");
       setRefreshMessage(
-        `Reconciled ${data.synced} subscriptions from Stripe${data.failed ? ` (${data.failed} failed)` : ""}.`
+        `Reconciled ${data.synced} subscriptions from Stripe${data.failed ? ` (${data.failed} failed)` : ""}${data.contributions ? `, added ${data.contributions} past payments to contribution totals` : ""}.`
       );
       await loadSubscriptions();
     } catch (e: unknown) {

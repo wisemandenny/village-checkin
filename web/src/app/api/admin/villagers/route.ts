@@ -14,7 +14,7 @@ import {
 } from "@/lib/villager-dedupe";
 
 // `total_contributed` is a Postgres computed column that sums the contributions
-// ledger (see migration 20260716130000_villager_total_contributed.sql).
+// ledger (see migration 20260716140000_contributions_ledger.sql).
 const VILLAGER_SELECT =
   "*, total_contributed, subscriptions(status, amount, interval, created_at)";
 

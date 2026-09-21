@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { getStripe } from "@/lib/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { backfillInvoiceContributions } from "@/lib/invoice-contributions";
 
 // Pages through all Stripe subscriptions with several Kit calls each.
 export const maxDuration = 300;
@@ -33,5 +34,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  return NextResponse.json({ synced, failed });
+  // Missed invoice webhooks (and history predating the ledger) surface here.
+  let contributions = 0;
+  try {
+    contributions = (await backfillInvoiceContributions(supabase, stripe)).recorded;
+  } catch (err) {
+    console.error("[subscriptions] contribution backfill failed", err);
+  }
+
+  return NextResponse.json({ synced, failed, contributions });
 }

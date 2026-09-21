@@ -1,6 +1,10 @@
 import { getStripe, getSupporterProductId } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
 import { recordContribution } from "@/lib/contributions";
+import {
+  recordInvoiceContribution,
+  resolveInvoiceVillager,
+} from "@/lib/invoice-contributions";
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import {
@@ -213,37 +217,10 @@ async function handleInvoicePaid(
   if ((invoice.amount_paid ?? 0) <= 0) return;
   if (!invoice.id) return;
 
-  // Subscription renewals/create have parent.subscription_details. Manual
-  // one-off invoices (e.g. bill-now-and-anchor) do not — still count those
-  // toward contributions when we can resolve the villager.
   const subDetails = invoice.parent?.subscription_details ?? null;
   const meta = subDetails?.metadata ?? {};
-  const customerId = customerIdOf(invoice.customer);
   const email = invoice.customer_email ?? meta.email ?? null;
-  const stripeSubId = customerIdOf(subDetails?.subscription);
-
-  let villager = await ensureVillager(supabase, {
-    villagerId: meta.villager_id,
-    customerId,
-    email,
-  });
-
-  // Older pledges may lack villager_id on subscription metadata — fall back to
-  // our mirrored subscriptions row.
-  if (!villager && stripeSubId) {
-    const { data: subRow } = await supabase
-      .from("subscriptions")
-      .select("villager_id")
-      .eq("stripe_subscription_id", stripeSubId)
-      .maybeSingle();
-    if (subRow?.villager_id) {
-      villager = await ensureVillager(supabase, {
-        villagerId: subRow.villager_id,
-        customerId,
-        email,
-      });
-    }
-  }
+  const villager = await resolveInvoiceVillager(supabase, invoice);
 
   // Kit purchase tracking stays subscription-invoice-only (unchanged behavior).
   if (subDetails) {
@@ -276,19 +253,7 @@ async function handleInvoicePaid(
     }
 
     if (villager) {
-      await recordContribution(supabase, {
-        villagerId: villager.id,
-        amountCents: invoice.amount_paid,
-        source:
-          invoice.billing_reason === "subscription_create"
-            ? "subscription_signup"
-            : "subscription_invoice",
-        checkInId,
-        stripeTransactionId: invoice.id,
-        createdAt: invoice.status_transitions?.paid_at
-          ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
-          : undefined,
-      });
+      await recordInvoiceContribution(supabase, invoice, villager, checkInId);
     }
     return;
   }
@@ -296,15 +261,7 @@ async function handleInvoicePaid(
   // Manual / one-off paid invoice linked to a known villager (supporter fees
   // charged outside the normal subscription invoice parent shape).
   if (villager) {
-    await recordContribution(supabase, {
-      villagerId: villager.id,
-      amountCents: invoice.amount_paid,
-      source: "subscription_invoice",
-      stripeTransactionId: invoice.id,
-      createdAt: invoice.status_transitions?.paid_at
-        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
-        : undefined,
-    });
+    await recordInvoiceContribution(supabase, invoice, villager);
   }
 }
 
