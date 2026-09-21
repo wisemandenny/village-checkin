@@ -1,5 +1,6 @@
 import { getStripe, getSupporterProductId } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
+import { recordContribution } from "@/lib/contributions";
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import {
@@ -11,6 +12,18 @@ import {
 } from "@/lib/subscription-sync";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
+
+async function villagerIdForCheckIn(
+  supabase: SupabaseClient,
+  checkInId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("check_ins")
+    .select("villager_id")
+    .eq("id", checkInId)
+    .maybeSingle();
+  return data?.villager_id ?? null;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -44,7 +57,28 @@ export async function POST(req: NextRequest) {
             .update({ status: "paid", stripe_transaction_id: session.payment_intent as string })
             .eq("id", checkInId);
           if (error) console.error("[check_ins] update failed", checkInId, error);
-          await recordCheckInPurchase(supabase, checkInId, session.payment_intent as string, session.amount_total ?? 0, session.currency ?? "cad");
+          const amount = session.amount_total ?? 0;
+          const txnId =
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : session.payment_intent?.id ?? null;
+          const villagerId = await villagerIdForCheckIn(supabase, checkInId);
+          if (villagerId) {
+            await recordContribution(supabase, {
+              villagerId,
+              amountCents: amount,
+              source: "check_in",
+              checkInId,
+              stripeTransactionId: txnId,
+            });
+          }
+          await recordCheckInPurchase(
+            supabase,
+            checkInId,
+            txnId ?? session.id,
+            amount,
+            session.currency ?? "cad"
+          );
         }
         break;
       }
@@ -71,7 +105,23 @@ export async function POST(req: NextRequest) {
             })
             .eq("id", checkInId);
           if (error) console.error("[check_ins] update failed", checkInId, error);
-          await recordCheckInPurchase(supabase, checkInId, paymentIntent.id, paymentIntent.amount, paymentIntent.currency);
+          const villagerId = await villagerIdForCheckIn(supabase, checkInId);
+          if (villagerId) {
+            await recordContribution(supabase, {
+              villagerId,
+              amountCents: paymentIntent.amount,
+              source: "check_in",
+              checkInId,
+              stripeTransactionId: paymentIntent.id,
+            });
+          }
+          await recordCheckInPurchase(
+            supabase,
+            checkInId,
+            paymentIntent.id,
+            paymentIntent.amount,
+            paymentIntent.currency
+          );
         }
         break;
       }
@@ -160,42 +210,101 @@ async function handleInvoicePaid(
   supabase: SupabaseClient,
   invoice: Stripe.Invoice
 ): Promise<void> {
-  const subDetails = invoice.parent?.subscription_details;
-  if (!subDetails) return; // not a subscription invoice (e.g. one-off)
   if ((invoice.amount_paid ?? 0) <= 0) return;
   if (!invoice.id) return;
 
-  const meta = subDetails.metadata ?? {};
+  // Subscription renewals/create have parent.subscription_details. Manual
+  // one-off invoices (e.g. bill-now-and-anchor) do not — still count those
+  // toward contributions when we can resolve the villager.
+  const subDetails = invoice.parent?.subscription_details ?? null;
+  const meta = subDetails?.metadata ?? {};
   const customerId = customerIdOf(invoice.customer);
   const email = invoice.customer_email ?? meta.email ?? null;
+  const stripeSubId = customerIdOf(subDetails?.subscription);
 
-  const villager = await ensureVillager(supabase, {
+  let villager = await ensureVillager(supabase, {
     villagerId: meta.villager_id,
     customerId,
     email,
   });
 
-  await recordKitPurchase(villager?.email ?? email, {
-    transactionId: invoice.id,
-    amountCents: invoice.amount_paid,
-    currency: invoice.currency,
-    productName: "Village Supporter",
-    productId: "village-supporter",
-  });
+  // Older pledges may lack villager_id on subscription metadata — fall back to
+  // our mirrored subscriptions row.
+  if (!villager && stripeSubId) {
+    const { data: subRow } = await supabase
+      .from("subscriptions")
+      .select("villager_id")
+      .eq("stripe_subscription_id", stripeSubId)
+      .maybeSingle();
+    if (subRow?.villager_id) {
+      villager = await ensureVillager(supabase, {
+        villagerId: subRow.villager_id,
+        customerId,
+        email,
+      });
+    }
+  }
 
-  // When a recurring subscription is first set up during check-in, mark that
-  // check-in as paid (only the first invoice carries a fresh check_in_id).
-  if (invoice.billing_reason === "subscription_create" && meta.check_in_id) {
-    const { error } = await supabase
-      .from("check_ins")
-      .update({
-        status: "paid",
-        payment_method: "online_fallback",
-        intent_amount: invoice.amount_paid,
-        stripe_transaction_id: invoice.id,
-      })
-      .eq("id", meta.check_in_id);
-    if (error) console.error("[check_ins] recurring mark-paid failed", meta.check_in_id, error);
+  // Kit purchase tracking stays subscription-invoice-only (unchanged behavior).
+  if (subDetails) {
+    await recordKitPurchase(villager?.email ?? email, {
+      transactionId: invoice.id,
+      amountCents: invoice.amount_paid,
+      currency: invoice.currency,
+      productName: "Village Supporter",
+      productId: "village-supporter",
+    });
+
+    // When a recurring subscription is first set up during check-in, mark that
+    // check-in as paid (only the first invoice carries a fresh check_in_id).
+    const checkInId =
+      invoice.billing_reason === "subscription_create" && meta.check_in_id
+        ? meta.check_in_id
+        : null;
+    if (checkInId) {
+      const { error } = await supabase
+        .from("check_ins")
+        .update({
+          status: "paid",
+          payment_method: "online_fallback",
+          intent_amount: invoice.amount_paid,
+          stripe_transaction_id: invoice.id,
+        })
+        .eq("id", checkInId);
+      if (error)
+        console.error("[check_ins] recurring mark-paid failed", checkInId, error);
+    }
+
+    if (villager) {
+      await recordContribution(supabase, {
+        villagerId: villager.id,
+        amountCents: invoice.amount_paid,
+        source:
+          invoice.billing_reason === "subscription_create"
+            ? "subscription_signup"
+            : "subscription_invoice",
+        checkInId,
+        stripeTransactionId: invoice.id,
+        createdAt: invoice.status_transitions?.paid_at
+          ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+          : undefined,
+      });
+    }
+    return;
+  }
+
+  // Manual / one-off paid invoice linked to a known villager (supporter fees
+  // charged outside the normal subscription invoice parent shape).
+  if (villager) {
+    await recordContribution(supabase, {
+      villagerId: villager.id,
+      amountCents: invoice.amount_paid,
+      source: "subscription_invoice",
+      stripeTransactionId: invoice.id,
+      createdAt: invoice.status_transitions?.paid_at
+        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+        : undefined,
+    });
   }
 }
 
@@ -210,6 +319,48 @@ async function handleSubscriptionSignup(
 ): Promise<void> {
   const meta = pi.metadata ?? {};
   const customerId = customerIdOf(pi.customer);
+  const amount = pi.amount_received ?? pi.amount ?? 0;
+
+  // The PaymentIntent already succeeded — record the contribution even if we
+  // can't create the recurring subscription (bad/missing anchor metadata).
+  const villager = await ensureVillager(supabase, {
+    villagerId: meta.villager_id,
+    customerId,
+    email: pi.receipt_email,
+  });
+
+  await recordKitPurchase(villager?.email ?? pi.receipt_email ?? null, {
+    transactionId: pi.id,
+    amountCents: amount,
+    currency: pi.currency,
+    productName: "Village Supporter",
+    productId: "village-supporter",
+  });
+
+  if (meta.check_in_id) {
+    const { error } = await supabase
+      .from("check_ins")
+      .update({
+        status: "paid",
+        payment_method: "online_fallback",
+        intent_amount: amount,
+        stripe_transaction_id: pi.id,
+      })
+      .eq("id", meta.check_in_id);
+    if (error)
+      console.error("[check_ins] subscription signup mark-paid failed", meta.check_in_id, error);
+  }
+
+  if (villager) {
+    await recordContribution(supabase, {
+      villagerId: villager.id,
+      amountCents: amount,
+      source: "subscription_signup",
+      checkInId: meta.check_in_id || null,
+      stripeTransactionId: pi.id,
+    });
+  }
+
   const anchorUnix = Number(meta.first_of_month_anchor);
   const recurringAmount = Number(meta.recurring_amount);
 
@@ -262,35 +413,5 @@ async function handleSubscriptionSignup(
     // The signup fee is still paid; the subscription just wasn't created. Surface
     // it — re-running the migration (or a manual retry) recovers the pledge.
     console.error("[webhook] subscription signup create failed", pi.id, err);
-  }
-
-  // Record the immediate signup charge and mark the originating check-in paid.
-  const amount = pi.amount_received ?? pi.amount ?? 0;
-  const villager = await ensureVillager(supabase, {
-    villagerId: meta.villager_id,
-    customerId,
-    email: pi.receipt_email,
-  });
-
-  await recordKitPurchase(villager?.email ?? pi.receipt_email ?? null, {
-    transactionId: pi.id,
-    amountCents: amount,
-    currency: pi.currency,
-    productName: "Village Supporter",
-    productId: "village-supporter",
-  });
-
-  if (meta.check_in_id) {
-    const { error } = await supabase
-      .from("check_ins")
-      .update({
-        status: "paid",
-        payment_method: "online_fallback",
-        intent_amount: amount,
-        stripe_transaction_id: pi.id,
-      })
-      .eq("id", meta.check_in_id);
-    if (error)
-      console.error("[check_ins] subscription signup mark-paid failed", meta.check_in_id, error);
   }
 }
