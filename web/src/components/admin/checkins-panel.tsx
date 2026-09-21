@@ -33,6 +33,10 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 ];
 const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped", "waived"];
 
+// Mirror of subscription-sync's ACTIVE_STATUSES, kept local so this client
+// component doesn't pull in server-only modules.
+const ACTIVE_SUB_STATUSES = new Set(["active", "trialing", "past_due"]);
+
 interface CheckInForm {
   villager_id: string;
   intent_amount: string;
@@ -835,9 +839,31 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   <select
                     required
                     value={form.villager_id}
-                    onChange={(e) =>
-                      setForm({ ...form, villager_id: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const villagerId = e.target.value;
+                      const picked = villagers.find((v) => v.id === villagerId);
+                      const isSubscriber = ACTIVE_SUB_STATUSES.has(
+                        picked?.subscription?.status ?? ""
+                      );
+                      if (isSubscriber) {
+                        setForm({
+                          ...form,
+                          villager_id: villagerId,
+                          payment_method: "subscription",
+                          status: "paid",
+                          intent_amount: "0",
+                        });
+                      } else if (form.payment_method === "subscription") {
+                        // Leaving a subscriber: drop the auto-picked method.
+                        setForm({
+                          ...form,
+                          villager_id: villagerId,
+                          payment_method: EMPTY_FORM.payment_method,
+                        });
+                      } else {
+                        setForm({ ...form, villager_id: villagerId });
+                      }
+                    }}
                     className="input"
                   >
                     <option value="">Select a villager…</option>
