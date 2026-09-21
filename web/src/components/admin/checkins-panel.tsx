@@ -148,6 +148,11 @@ export default function CheckInsPanel({ token, onVillagerSelect }: CheckInsPanel
   const [quickPaying, setQuickPaying] = useState(false);
   const [quickPayError, setQuickPayError] = useState("");
 
+  // Manual "send payment reminder" per row — tracks the in-flight row id and a
+  // transient success banner.
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [remindNotice, setRemindNotice] = useState("");
+
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
       return fetch(url, {
@@ -375,6 +380,27 @@ export default function CheckInsPanel({ token, onVillagerSelect }: CheckInsPanel
       setQuickPayError(e instanceof Error ? e.message : "Failed to waive fee");
     } finally {
       setQuickPaying(false);
+    }
+  }
+
+  async function handleSendReminder(c: CheckInWithVillager) {
+    setRemindingId(c.id);
+    setError("");
+    setRemindNotice("");
+    try {
+      const res = await apiFetch(`/api/admin/checkins/${c.id}/send-reminder`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || "Failed to send reminder");
+      }
+      const name = c.villagers?.display_name || "villager";
+      setRemindNotice(`Payment reminder sent to ${name} (${body.email}).`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to send reminder");
+    } finally {
+      setRemindingId(null);
     }
   }
 
@@ -708,6 +734,19 @@ export default function CheckInsPanel({ token, onVillagerSelect }: CheckInsPanel
         </div>
       )}
 
+      {/* Reminder-sent notice */}
+      {remindNotice && (
+        <div className="mb-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+          {remindNotice}
+          <button
+            onClick={() => setRemindNotice("")}
+            className="ml-3 font-semibold underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--color-border)]">
         <table className="w-full text-left text-sm">
@@ -817,6 +856,15 @@ export default function CheckInsPanel({ token, onVillagerSelect }: CheckInsPanel
                         className="mr-2 rounded px-2 py-1 text-xs font-medium text-green-600 transition hover:bg-green-500/10 dark:text-green-400"
                       >
                         Mark Paid
+                      </button>
+                    )}
+                    {c.status === "pending" && (
+                      <button
+                        onClick={() => handleSendReminder(c)}
+                        disabled={remindingId === c.id}
+                        className="mr-2 rounded px-2 py-1 text-xs font-medium text-amber-600 transition hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
+                      >
+                        {remindingId === c.id ? "Sending…" : "Remind"}
                       </button>
                     )}
                     <button

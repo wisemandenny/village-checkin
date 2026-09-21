@@ -295,6 +295,7 @@ async function handleSubscriptionSignup(
   });
 
   if (meta.check_in_id) {
+    const viaReminder = meta.via_reminder === "true";
     const { error } = await supabase
       .from("check_ins")
       .update({
@@ -302,6 +303,7 @@ async function handleSubscriptionSignup(
         payment_method: "online_fallback",
         intent_amount: amount,
         stripe_transaction_id: pi.id,
+        ...(viaReminder ? { paid_via_reminder: true } : {}),
       })
       .eq("id", meta.check_in_id);
     if (error)

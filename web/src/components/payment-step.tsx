@@ -258,7 +258,13 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
       const res = await fetch("/api/create-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: recurringChargeCents, interval: recurringInterval, device_id: deviceId, check_in_id: checkInId }),
+        body: JSON.stringify({
+          amount: recurringChargeCents,
+          interval: recurringInterval,
+          device_id: deviceId,
+          check_in_id: checkInId,
+          ...(viaReminder ? { via_reminder: true } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to set up subscription");
@@ -268,7 +274,7 @@ export function PaymentStep({ checkInId = null, deviceId, isExclusive = false, i
     } finally {
       setLoading(false);
     }
-  }, [recurringChargeCents, recurringInterval, deviceId, checkInId]);
+  }, [recurringChargeCents, recurringInterval, deviceId, checkInId, viaReminder]);
 
   const handleBackFromRecurring = useCallback(() => {
     setSubClientSecret(null);

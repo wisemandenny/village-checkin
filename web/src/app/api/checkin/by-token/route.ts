@@ -1,6 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyPayToken } from "@/lib/pay-token";
 import { isPaymentSettled } from "@/lib/checkin-status";
+import { resolveExclusive } from "@/lib/exclusive-tier";
 import { NextRequest, NextResponse } from "next/server";
 
 // Resolves a signed pay-link token (from an unpaid-check-in reminder email) into
@@ -33,9 +34,20 @@ export async function GET(req: NextRequest) {
 
   const { data: villager } = await supabase
     .from("villagers")
-    .select("display_name")
+    .select("id, display_name, ig_handle, roles")
     .eq("id", checkIn.villager_id)
     .maybeSingle();
+
+  // Exclusive-tier villagers pledge monthly, so the pay link must show the
+  // subscription flow (not the one-time amount) — matching what they saw at
+  // check-in. Everyone else gets the one-time flow.
+  const isExclusive = villager
+    ? await resolveExclusive(supabase, {
+        id: villager.id,
+        ig_handle: villager.ig_handle,
+        roles: villager.roles,
+      })
+    : false;
 
   return NextResponse.json({
     check_in: {
@@ -44,6 +56,7 @@ export async function GET(req: NextRequest) {
       intent_amount: checkIn.intent_amount,
     },
     villager: { display_name: villager?.display_name ?? null },
+    is_exclusive: isExclusive,
     already_paid: isPaymentSettled(checkIn.status),
   });
 }
