@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { getStripe } from "@/lib/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { backfillInvoiceContributions } from "@/lib/invoice-contributions";
 
 // Pages through all Stripe subscriptions with several Kit calls each.
 export const maxDuration = 300;
@@ -13,13 +14,15 @@ export async function POST(req: NextRequest) {
   const denied = await verifyAdmin(req);
   if (denied) return denied;
 
-  const stripe = getStripe();
-  const supabase = createServerClient();
-
   let synced = 0;
   let failed = 0;
 
+  // getStripe() throws when STRIPE_SECRET_KEY is unset for this environment;
+  // keep that inside the try so the client gets a JSON error, not an empty 500.
+  let stripe;
+  const supabase = createServerClient();
   try {
+    stripe = getStripe();
     for await (const sub of stripe.subscriptions.list({ status: "all", limit: 100 })) {
       try {
         if (await syncSubscriptionFromStripe(supabase, sub)) synced++;
@@ -33,5 +36,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  return NextResponse.json({ synced, failed });
+  // Missed invoice webhooks (and history predating the ledger) surface here.
+  let contributions = 0;
+  try {
+    contributions = (await backfillInvoiceContributions(supabase, stripe)).recorded;
+  } catch (err) {
+    console.error("[subscriptions] contribution backfill failed", err);
+  }
+
+  return NextResponse.json({ synced, failed, contributions });
 }

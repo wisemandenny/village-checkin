@@ -13,7 +13,10 @@ import {
   uniqueViolationMessage,
 } from "@/lib/villager-dedupe";
 
-const VILLAGER_SELECT = "*, subscriptions(status, amount, interval, created_at)";
+// `total_contributed` is a Postgres computed column that sums the contributions
+// ledger (see migration 20260716140000_contributions_ledger.sql).
+const VILLAGER_SELECT =
+  "*, total_contributed, subscriptions(status, amount, interval, created_at)";
 
 type JoinedSubscription = {
   status: string;
@@ -48,6 +51,41 @@ function withSubscriptionSummary(
 ) {
   const { subscriptions, ...rest } = villager;
   return { ...rest, subscription: summarizeSubscription(subscriptions) };
+}
+
+function maxLastVisitedAt(
+  stored: string | null | undefined,
+  fromCheckIns: string | undefined
+): string | null {
+  if (!fromCheckIns) return stored ?? null;
+  if (!stored) return fromCheckIns;
+  return new Date(fromCheckIns) > new Date(stored) ? fromCheckIns : stored;
+}
+
+async function lastVisitedAtByVillagerId(
+  supabase: ReturnType<typeof createServerClient>,
+  villagerIds: string[]
+): Promise<Map<string, string>> {
+  if (villagerIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("check_ins")
+    .select("villager_id, created_at")
+    .in("villager_id", villagerIds);
+
+  if (error || !data) return new Map();
+
+  const maxByVillager = new Map<string, string>();
+  for (const row of data) {
+    const existing = maxByVillager.get(row.villager_id);
+    if (
+      !existing ||
+      new Date(row.created_at).getTime() > new Date(existing).getTime()
+    ) {
+      maxByVillager.set(row.villager_id, row.created_at);
+    }
+  }
+  return maxByVillager;
 }
 
 export async function GET(req: NextRequest) {
@@ -99,9 +137,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const villagers = (data ?? []).map((v) =>
-    withSubscriptionSummary(v as Record<string, unknown> & { subscriptions?: JoinedSubscription[] })
+  const rows = data ?? [];
+  const lastVisitedMap = await lastVisitedAtByVillagerId(
+    supabase,
+    rows.map((v) => v.id)
   );
+
+  const villagers = rows.map((v) => {
+    const summary = withSubscriptionSummary(
+      v as Record<string, unknown> & { subscriptions?: JoinedSubscription[] }
+    );
+    return {
+      ...summary,
+      last_visited_at: maxLastVisitedAt(
+        v.last_visited_at,
+        lastVisitedMap.get(v.id)
+      ),
+    };
+  });
 
   return NextResponse.json({ villagers });
 }

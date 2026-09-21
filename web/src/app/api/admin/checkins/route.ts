@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { normalizeAdminCheckInFields } from "@/lib/checkin-status";
+import { recordContribution } from "@/lib/contributions";
 
 export async function GET(req: NextRequest) {
   const denied = await verifyAdmin(req);
@@ -35,9 +36,11 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient();
 
   const intentAmount = body.intent_amount ?? 0;
+  const paymentMethod = body.payment_method || "cash";
   const { status, intent_amount } = normalizeAdminCheckInFields({
     status: body.status || "paid",
     intent_amount: intentAmount,
+    payment_method: paymentMethod,
   });
 
   const { data, error } = await supabase
@@ -45,7 +48,7 @@ export async function POST(req: NextRequest) {
     .insert({
       villager_id: body.villager_id,
       intent_amount: intent_amount ?? intentAmount,
-      payment_method: body.payment_method || "cash",
+      payment_method: paymentMethod,
       status: status || "paid",
       created_at: body.created_at || new Date().toISOString(),
       stripe_transaction_id: body.stripe_transaction_id || null,
@@ -55,6 +58,41 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  const { data: villager } = await supabase
+    .from("villagers")
+    .select("last_visited_at")
+    .eq("id", data.villager_id)
+    .single();
+
+  const checkInAt = data.created_at;
+  if (
+    !villager?.last_visited_at ||
+    new Date(checkInAt) > new Date(villager.last_visited_at)
+  ) {
+    await supabase
+      .from("villagers")
+      .update({ last_visited_at: checkInAt })
+      .eq("id", data.villager_id);
+  }
+
+  if (
+    data &&
+    data.status === "paid" &&
+    data.intent_amount > 0 &&
+    data.payment_method !== "subscription" &&
+    data.payment_method !== "elder"
+  ) {
+    await recordContribution(supabase, {
+      villagerId: data.villager_id,
+      amountCents: data.intent_amount,
+      source: "admin",
+      checkInId: data.id,
+      stripeTransactionId: data.stripe_transaction_id,
+      createdAt: data.created_at,
+      replaceExisting: true,
+    });
   }
 
   return NextResponse.json({ checkin: data }, { status: 201 });

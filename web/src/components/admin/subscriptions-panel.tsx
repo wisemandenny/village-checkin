@@ -188,10 +188,16 @@ export default function SubscriptionsPanel({ token }: { token: string }) {
       const res = await apiFetch("/api/admin/subscriptions/refresh", {
         method: "POST",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Refresh failed");
+      const text = await res.text();
+      let data: { synced?: number; failed?: number; contributions?: number; error?: string } = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Refresh failed (HTTP ${res.status}, non-JSON response)`);
+      }
+      if (!res.ok) throw new Error(data.error || `Refresh failed (HTTP ${res.status})`);
       setRefreshMessage(
-        `Reconciled ${data.synced} subscriptions from Stripe${data.failed ? ` (${data.failed} failed)` : ""}.`
+        `Reconciled ${data.synced} subscriptions from Stripe${data.failed ? ` (${data.failed} failed)` : ""}${data.contributions ? `, added ${data.contributions} past payments to contribution totals` : ""}.`
       );
       await loadSubscriptions();
     } catch (e: unknown) {

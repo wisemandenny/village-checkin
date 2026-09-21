@@ -290,7 +290,7 @@ function CommunityLinks() {
   return (
     <div className="flex w-full flex-col items-center gap-2">
       <Link
-        href="/here"
+        href="/here?forge=1"
         className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-[var(--color-border)] px-8 text-lg font-semibold text-[var(--color-muted)] transition hover:border-[var(--color-foreground)] hover:text-[var(--color-foreground)] font-[family-name:var(--font-domaine)]"
       >
         See Who&apos;s Here Tonight

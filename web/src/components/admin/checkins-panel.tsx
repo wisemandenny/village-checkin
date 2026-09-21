@@ -33,6 +33,10 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 ];
 const STATUSES: CheckInStatus[] = ["pending", "paid", "skipped", "waived"];
 
+// Mirror of subscription-sync's ACTIVE_STATUSES, kept local so this client
+// component doesn't pull in server-only modules.
+const ACTIVE_SUB_STATUSES = new Set(["active", "trialing", "past_due"]);
+
 interface CheckInForm {
   villager_id: string;
   intent_amount: string;
@@ -99,7 +103,12 @@ const STATUS_STYLES: Record<CheckInStatus, string> = {
     "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
-export default function CheckInsPanel({ token }: { token: string }) {
+interface CheckInsPanelProps {
+  token: string;
+  onVillagerSelect?: (villager: { id: string; display_name: string }) => void;
+}
+
+export default function CheckInsPanel({ token, onVillagerSelect }: CheckInsPanelProps) {
   const [checkins, setCheckins] = useState<CheckInWithVillager[]>([]);
   const [villagers, setVillagers] = useState<Villager[]>([]);
   // The fetch runs inside a transition so we never call setState synchronously
@@ -138,6 +147,11 @@ export default function CheckInsPanel({ token }: { token: string }) {
   const [quickPayAmount, setQuickPayAmount] = useState("5");
   const [quickPaying, setQuickPaying] = useState(false);
   const [quickPayError, setQuickPayError] = useState("");
+
+  // Manual "send payment reminder" per row — tracks the in-flight row id and a
+  // transient success banner.
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [remindNotice, setRemindNotice] = useState("");
 
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
@@ -366,6 +380,27 @@ export default function CheckInsPanel({ token }: { token: string }) {
       setQuickPayError(e instanceof Error ? e.message : "Failed to waive fee");
     } finally {
       setQuickPaying(false);
+    }
+  }
+
+  async function handleSendReminder(c: CheckInWithVillager) {
+    setRemindingId(c.id);
+    setError("");
+    setRemindNotice("");
+    try {
+      const res = await apiFetch(`/api/admin/checkins/${c.id}/send-reminder`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || "Failed to send reminder");
+      }
+      const name = c.villagers?.display_name || "villager";
+      setRemindNotice(`Payment reminder sent to ${name} (${body.email}).`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to send reminder");
+    } finally {
+      setRemindingId(null);
     }
   }
 
@@ -699,6 +734,19 @@ export default function CheckInsPanel({ token }: { token: string }) {
         </div>
       )}
 
+      {/* Reminder-sent notice */}
+      {remindNotice && (
+        <div className="mb-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+          {remindNotice}
+          <button
+            onClick={() => setRemindNotice("")}
+            className="ml-3 font-semibold underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--color-border)]">
         <table className="w-full text-left text-sm">
@@ -749,7 +797,22 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   className="border-b border-[var(--color-border)] transition hover:bg-[var(--color-surface)]"
                 >
                   <td className="px-4 py-3 font-medium">
-                    {c.villagers?.display_name || "Unknown"}
+                    {onVillagerSelect && c.villagers ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onVillagerSelect({
+                            id: c.villager_id,
+                            display_name: c.villagers!.display_name,
+                          })
+                        }
+                        className="underline-offset-4 transition hover:text-[var(--color-accent)] hover:underline"
+                      >
+                        {c.villagers.display_name}
+                      </button>
+                    ) : (
+                      c.villagers?.display_name || "Unknown"
+                    )}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {formatCents(c.intent_amount)}
@@ -795,6 +858,15 @@ export default function CheckInsPanel({ token }: { token: string }) {
                         Mark Paid
                       </button>
                     )}
+                    {c.status === "pending" && (
+                      <button
+                        onClick={() => handleSendReminder(c)}
+                        disabled={remindingId === c.id}
+                        className="mr-2 rounded px-2 py-1 text-xs font-medium text-amber-600 transition hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
+                      >
+                        {remindingId === c.id ? "Sending…" : "Remind"}
+                      </button>
+                    )}
                     <button
                       onClick={() => openEdit(c)}
                       className="mr-2 rounded px-2 py-1 text-xs font-medium text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/10"
@@ -835,9 +907,31 @@ export default function CheckInsPanel({ token }: { token: string }) {
                   <select
                     required
                     value={form.villager_id}
-                    onChange={(e) =>
-                      setForm({ ...form, villager_id: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const villagerId = e.target.value;
+                      const picked = villagers.find((v) => v.id === villagerId);
+                      const isSubscriber = ACTIVE_SUB_STATUSES.has(
+                        picked?.subscription?.status ?? ""
+                      );
+                      if (isSubscriber) {
+                        setForm({
+                          ...form,
+                          villager_id: villagerId,
+                          payment_method: "subscription",
+                          status: "paid",
+                          intent_amount: "0",
+                        });
+                      } else if (form.payment_method === "subscription") {
+                        // Leaving a subscriber: drop the auto-picked method.
+                        setForm({
+                          ...form,
+                          villager_id: villagerId,
+                          payment_method: EMPTY_FORM.payment_method,
+                        });
+                      } else {
+                        setForm({ ...form, villager_id: villagerId });
+                      }
+                    }}
                     className="input"
                   >
                     <option value="">Select a villager…</option>

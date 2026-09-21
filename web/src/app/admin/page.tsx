@@ -55,6 +55,8 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("checkins");
+  // Name seeded into the villagers search when a check-in row links there.
+  const [villagerSearch, setVillagerSearch] = useState("");
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -153,7 +155,10 @@ export default function AdminPage() {
         {leftTabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setVillagerSearch("");
+              setActiveTab(tab.key);
+            }}
             className={tabClass(tab.key)}
           >
             {tab.label}
@@ -173,8 +178,18 @@ export default function AdminPage() {
       </div>
 
       {/* Active panel */}
-      {activeTab === "villagers" && <VillagersPanel token={token} />}
-      {activeTab === "checkins" && <CheckInsPanel token={token} />}
+      {activeTab === "villagers" && (
+        <VillagersPanel token={token} initialSearch={villagerSearch} />
+      )}
+      {activeTab === "checkins" && (
+        <CheckInsPanel
+          token={token}
+          onVillagerSelect={(v) => {
+            setVillagerSearch(v.display_name);
+            setActiveTab("villagers");
+          }}
+        />
+      )}
       {activeTab === "subscriptions" && <SubscriptionsPanel token={token} />}
       {activeTab === "statistics" && <StatisticsPanel token={token} />}
       {activeTab === "gallery" && <GalleryPanel token={token} />}
