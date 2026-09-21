@@ -223,9 +223,10 @@ webhook endpoint at `<NEXT_PUBLIC_BASE_URL>/api/webhook/stripe`.
 Scheduled jobs run as GitHub Actions crons (`.github/workflows/`) and call the
 `/api/cron/*` routes with the `CRON_SECRET` bearer token. Set `CRON_SECRET` both
 as an app env var **and** as a repository **Actions secret** of the same name.
-Relevant repo secrets: `PROD_BASE_URL`, `CRON_SECRET` (and, for staging,
-`STAGING_BASE_URL`, `STAGING_CRON_SECRET`). Because the cron routes are
-idempotent, running them more or less often only changes timing.
+Relevant repo secrets: `PROD_BASE_URL`, `CRON_SECRET`. The crons target
+production only; staging is not pinged on a schedule. Because the cron routes
+are idempotent, running them more or less often only changes timing, and a
+transient 5xx is retried and then skipped rather than failing the run.
 
 ### Staging
 
