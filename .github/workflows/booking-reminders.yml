@@ -1,7 +1,12 @@
 name: Booking reminders
 
 # Sends reminder emails (with .ics attachments) for studio bookings happening
-# tomorrow. Hits the secret-protected cron route on production and staging.
+# tomorrow by hitting the secret-protected cron route on production once a day.
+# Also exposed as a manual trigger for ad-hoc runs.
+#
+# Transient 5xx responses (e.g. a Supabase blip) are retried and then treated as
+# a skip rather than a failure, matching the other cron workflows. 401/404 still
+# fail, since they mean the secret or route is misconfigured.
 on:
   schedule:
     - cron: "0 14 * * *"
@@ -10,24 +15,31 @@ on:
 jobs:
   remind:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - env_name: production
-            base_url: ${{ vars.PROD_BASE_URL }}
-            cron_secret: ${{ secrets.PROD_CRON_SECRET }}
-          - env_name: staging
-            base_url: ${{ vars.STAGING_BASE_URL }}
-            cron_secret: ${{ secrets.STAGING_CRON_SECRET }}
     steps:
-      - name: Send reminders (${{ matrix.env_name }})
+      - name: Send production booking reminders
         env:
-          BASE_URL: ${{ matrix.base_url }}
-          CRON_SECRET: ${{ matrix.cron_secret }}
+          BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "${{ matrix.env_name }}: BASE_URL or CRON_SECRET not set; skipping."
+            echo "PROD_BASE_URL or CRON_SECRET not set; skipping."
             exit 0
           fi
-          curl -sf -H "Authorization: Bearer $CRON_SECRET" \
-            "$BASE_URL/api/cron/booking-reminders"
+          for attempt in 1 2 3; do
+            response=$(curl -sS -w "\n%{http_code}" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "$BASE_URL/api/cron/booking-reminders") || response=$'\n000'
+            body=$(echo "$response" | sed '$d')
+            status=$(echo "$response" | tail -n1)
+            echo "Attempt $attempt: HTTP $status: $body"
+            if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+              exit 0
+            fi
+            if [ "$status" -ge 400 ] && [ "$status" -lt 500 ]; then
+              echo "::error::Cron request rejected with HTTP $status; check CRON_SECRET and the route."
+              exit 1
+            fi
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 10))
+          done
+          echo "::warning::Cron request still failing (HTTP $status) after 3 attempts; skipping until next tick."
+          exit 0
