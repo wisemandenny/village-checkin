@@ -90,7 +90,12 @@ function fromDatetimeLocal(val: string): string {
   return new Date(val).toISOString();
 }
 
-export default function VillagersPanel({ token }: { token: string }) {
+interface VillagersPanelProps {
+  token: string;
+  initialSearch?: string;
+}
+
+export default function VillagersPanel({ token, initialSearch = "" }: VillagersPanelProps) {
   const [villagers, setVillagers] = useState<Villager[]>([]);
   // The fetch runs inside a transition so we never call setState synchronously
   // in the load effect. `loading` stays true until the first load resolves to
@@ -100,8 +105,9 @@ export default function VillagersPanel({ token }: { token: string }) {
   const loading = isPending || !hasLoaded;
   const [error, setError] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Both seeded so a linked-in search filters the very first load.
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [sortBy, setSortBy] = useState<SortField>("display_name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
