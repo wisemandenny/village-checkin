@@ -13,7 +13,10 @@ import {
   uniqueViolationMessage,
 } from "@/lib/villager-dedupe";
 
-const VILLAGER_SELECT = "*, subscriptions(status, amount, interval, created_at)";
+// `total_contributed` is a Postgres computed column that sums the contributions
+// ledger (see migration 20260716140000_contributions_ledger.sql).
+const VILLAGER_SELECT =
+  "*, total_contributed, subscriptions(status, amount, interval, created_at)";
 
 type JoinedSubscription = {
   status: string;

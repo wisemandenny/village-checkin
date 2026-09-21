@@ -25,6 +25,8 @@ export interface Villager {
   first_visited_at: string;
   last_visited_at: string | null;
   subscription?: VillagerSubscriptionSummary | null;
+  /** Lifetime cents contributed (SQL computed column over contributions). */
+  total_contributed?: number;
 }
 
 export interface Subscription {
