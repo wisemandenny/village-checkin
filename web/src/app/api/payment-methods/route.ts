@@ -1,5 +1,6 @@
 import { getStripe } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase/server";
+import { isCardExpired } from "@/lib/card-on-file";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -27,13 +28,16 @@ export async function GET(req: NextRequest) {
       type: "card",
     });
 
-    const cards = methods.data.map((m) => ({
-      id: m.id,
-      brand: m.card?.brand ?? "unknown",
-      last4: m.card?.last4 ?? "****",
-      exp_month: m.card?.exp_month,
-      exp_year: m.card?.exp_year,
-    }));
+    // Charging an expired card always fails, so don't offer it as a one-tap option.
+    const cards = methods.data
+      .filter((m) => m.card && !isCardExpired(m.card.exp_month, m.card.exp_year))
+      .map((m) => ({
+        id: m.id,
+        brand: m.card?.brand ?? "unknown",
+        last4: m.card?.last4 ?? "****",
+        exp_month: m.card?.exp_month,
+        exp_year: m.card?.exp_year,
+      }));
 
     return NextResponse.json({ methods: cards });
   } catch (err) {

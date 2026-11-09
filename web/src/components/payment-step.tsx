@@ -6,7 +6,7 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import type { Appearance } from "@stripe/stripe-js";
 import { calcProcessingFee, EXCLUSIVE_SUPPORT_CENTS, exclusiveMonthlyTotalCents } from "@/lib/fees";
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+export const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const darkModeQuery = "(prefers-color-scheme: dark)";
 
@@ -20,11 +20,11 @@ function getSnapshotDarkMode() {
   return window.matchMedia(darkModeQuery).matches;
 }
 
-function useDarkMode() {
+export function useDarkMode() {
   return useSyncExternalStore(subscribeDarkMode, getSnapshotDarkMode, () => false);
 }
 
-function buildStripeAppearance(isDark: boolean): Appearance {
+export function buildStripeAppearance(isDark: boolean): Appearance {
   return {
     theme: isDark ? "night" : "flat",
     variables: {
