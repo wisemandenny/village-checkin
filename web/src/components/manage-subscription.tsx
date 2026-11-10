@@ -5,6 +5,12 @@ import Link from "next/link";
 import { getDeviceId } from "@/lib/device-id";
 import { EXCLUSIVE_SUPPORT_CENTS } from "@/lib/fees";
 import type { SubscriptionInterval } from "@/lib/types";
+import type { CardSummary } from "@/lib/card-on-file";
+import {
+  finalizeCardUpdate,
+  UpdatePaymentMethod,
+  type CardUpdateResult,
+} from "@/components/update-payment-method";
 
 interface ManageSubscriptionData {
   stripe_subscription_id: string;
@@ -17,6 +23,9 @@ interface ManageSubscriptionData {
 
 interface SubscriptionResponse {
   is_exclusive: boolean;
+  can_update_payment_method: boolean;
+  can_resubscribe: boolean;
+  card: CardSummary | null;
   subscription: ManageSubscriptionData | null;
 }
 
@@ -38,6 +47,9 @@ export function ManageSubscription() {
   const [error, setError] = useState<string | null>(null);
   const [isExclusive, setIsExclusive] = useState(false);
   const [sub, setSub] = useState<ManageSubscriptionData | null>(null);
+  const [card, setCard] = useState<CardSummary | null>(null);
+  const [canUpdateCard, setCanUpdateCard] = useState(false);
+  const [canResubscribe, setCanResubscribe] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -46,9 +58,9 @@ export function ManageSubscription() {
   // Fetches the current subscription state. All setState calls happen after an
   // await so this is safe to invoke from the mount effect (no synchronous
   // cascading renders). Throws on failure so callers can surface the error.
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (): Promise<SubscriptionResponse | null> => {
     const deviceId = getDeviceId();
-    if (!deviceId) return;
+    if (!deviceId) return null;
     const res = await fetch(
       `/api/subscription?device_id=${encodeURIComponent(deviceId)}`
     );
@@ -56,7 +68,20 @@ export function ManageSubscription() {
     const data: SubscriptionResponse = await res.json();
     setIsExclusive(data.is_exclusive);
     setSub(data.subscription);
+    setCard(data.card);
+    setCanUpdateCard(data.can_update_payment_method);
+    setCanResubscribe(data.can_resubscribe);
+    return data;
   }, []);
+
+  // The restarted subscription is created by the payment webhook, so it can lag the charge by a few seconds.
+  const waitForSubscription = useCallback(async () => {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const data = await reload();
+      if (data?.subscription) return;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }, [reload]);
 
   useEffect(() => {
     if (!getDeviceId()) {
@@ -65,6 +90,27 @@ export function ManageSubscription() {
     }
     (async () => {
       try {
+        // Stripe sends the villager back here with these params after a 3DS redirect.
+        const params = new URLSearchParams(window.location.search);
+        const returnedSetupIntent = params.get("setup_intent");
+        const returnedPaymentIntent = params.get("payment_intent");
+        if (returnedSetupIntent || returnedPaymentIntent) {
+          window.history.replaceState(null, "", window.location.pathname);
+          const result =
+            params.get("redirect_status") === "succeeded"
+              ? await finalizeCardUpdate(
+                  returnedPaymentIntent
+                    ? { paymentIntentId: returnedPaymentIntent }
+                    : { setupIntentId: returnedSetupIntent! }
+                )
+              : { notice: null, error: "Your card couldn't be verified. Please try again.", resubscribed: false };
+          setNotice(result.notice);
+          setError(result.error);
+          if (result.resubscribed) {
+            await waitForSubscription();
+            return;
+          }
+        }
         await reload();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -72,7 +118,7 @@ export function ManageSubscription() {
         setLoading(false);
       }
     })();
-  }, [reload]);
+  }, [reload, waitForSubscription]);
 
   const post = useCallback(
     async (path: string, body: Record<string, unknown>) => {
@@ -119,6 +165,24 @@ export function ManageSubscription() {
     }
   }, [post, reload]);
 
+  const handleCardUpdated = useCallback(
+    async (result: CardUpdateResult) => {
+      setNotice(result.notice);
+      setError(result.error);
+      try {
+        if (result.resubscribed) await waitForSubscription();
+        else await reload();
+      } catch {
+        // The card update already succeeded; a stale display is not worth an error.
+      }
+    },
+    [reload, waitForSubscription]
+  );
+
+  const paymentMethodSection = canUpdateCard && (
+    <UpdatePaymentMethod card={card} resubscribe={canResubscribe} onUpdated={handleCardUpdated} />
+  );
+
   if (loading) {
     return (
       <p className="text-sm text-[var(--color-muted)]">Loading your support…</p>
@@ -134,6 +198,9 @@ export function ManageSubscription() {
         <p className="text-sm text-[var(--color-muted)]">
           You don&apos;t have an active recurring pledge right now.
         </p>
+        {paymentMethodSection}
+        {notice && <p className="text-sm text-green-600 dark:text-green-400">{notice}</p>}
+        {error && <p className="text-sm text-red-500">{error}</p>}
         <Link
           href="/"
           className="text-sm text-[var(--color-accent)] underline underline-offset-4 hover:text-[var(--color-accent-light)]"
@@ -180,6 +247,8 @@ export function ManageSubscription() {
           )
         )}
       </div>
+
+      {paymentMethodSection}
 
       {pendingCancel ? (
         <button
